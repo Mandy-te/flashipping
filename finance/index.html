@@ -1,0 +1,2038 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E4429">
+<title>Flashipping — Finance</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+
+/* ═══════════════════════════════════════════════════════════════
+   Même grammaire visuelle que l'app Logistique, mais l'en-tête est
+   ambre : quand un agent a les deux applications installées, il voit
+   d'un coup d'œil laquelle est ouverte.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --marine:#0E4429; --or:#1B7F4B; --or-fonce:#14623A;
+  --vert:#1B7F4B; --rouge:#C62828; --orange:#E67E22; --bleu:#1565C0;
+  --fond:#F3F7F4; --carte:#FFFFFF; --bord:#D7E3DA;
+  --texte:#10261B; --doux:#5C7366;
+  --ombre:0 1px 3px rgba(14,68,41,.12);
+  --haut:env(safe-area-inset-top,0px);
+  --bas:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--fond); color:var(--texte); overscroll-behavior-y:none;
+}
+input,select,textarea,button{font:inherit;color:inherit}
+a{color:var(--bleu)}
+
+#app{min-height:100vh;display:flex;flex-direction:column}
+.entete{
+  background:var(--marine); color:#fff;
+  padding:calc(var(--haut) + 10px) 14px 10px;
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;
+}
+.entete h1{font-size:16px;margin:0;font-weight:700;flex:1;letter-spacing:.2px}
+.entete .sous{font-size:11.5px;opacity:.78;font-weight:400;display:block}
+.pastille{width:9px;height:9px;border-radius:50%;background:#7ED6A5;flex:none}
+.pastille.hors{background:#FF8A80}
+.btn-entete{
+  background:rgba(255,255,255,.16);border:0;color:#fff;
+  width:38px;height:38px;border-radius:10px;font-size:17px;flex:none;
+}
+main{flex:1;padding:12px 12px 96px;max-width:760px;margin:0 auto;width:100%}
+
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;
+  border-top:1px solid var(--bord);display:flex;padding-bottom:var(--bas);
+  box-shadow:0 -1px 8px rgba(14,68,41,.08);
+}
+nav button{
+  flex:1;background:none;border:0;padding:8px 2px 7px;display:flex;
+  flex-direction:column;align-items:center;gap:3px;font-size:10.5px;
+  color:var(--doux);font-weight:600;
+}
+nav button .ic{font-size:21px;line-height:1}
+nav button.actif{color:var(--marine)}
+
+.carte{
+  background:var(--carte);border:1px solid var(--bord);border-radius:12px;
+  padding:14px;margin-bottom:12px;box-shadow:var(--ombre);
+}
+.carte.serree{padding:11px 12px}
+.titre-section{
+  font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--doux);margin:18px 2px 8px;
+}
+.titre-section:first-child{margin-top:2px}
+
+label.champ{display:block;margin-bottom:12px}
+label.champ > span{
+  display:block;font-size:12px;font-weight:700;color:var(--doux);
+  margin-bottom:5px;letter-spacing:.2px;
+}
+input[type=text],input[type=tel],input[type=number],input[type=password],
+input[type=email],input[type=url],select,textarea{
+  width:100%;padding:13px 12px;border:1.5px solid var(--bord);
+  border-radius:10px;background:#fff;font-size:16px;
+}
+input:focus,select:focus,textarea:focus{
+  outline:0;border-color:var(--or-fonce);box-shadow:0 0 0 3px rgba(27,127,75,.18);
+}
+input[readonly]{background:#EFF4F0;color:var(--doux)}
+textarea{min-height:60px;resize:vertical}
+.duo{display:flex;gap:10px}
+.duo > *{flex:1;min-width:0}
+.trio{display:flex;gap:8px}
+.trio > *{min-width:0}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:14px;border:0;border-radius:11px;background:var(--or);
+  color:#fff;font-weight:800;font-size:15.5px;
+}
+.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.45}
+.btn.vert{background:#0E4429;color:#fff}
+.btn.rouge{background:var(--rouge);color:#fff}
+.btn.sombre{background:var(--marine);color:#fff}
+.btn.vide{background:#fff;color:var(--marine);border:1.5px solid var(--bord);font-weight:700}
+.btn.petit{padding:10px;font-size:14px;border-radius:9px}
+.btn + .btn{margin-top:9px}
+.rangee-btn{display:flex;gap:9px}
+.rangee-btn .btn + .btn{margin-top:0}
+
+.puces{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 8px;
+  scrollbar-width:none;-ms-overflow-style:none}
+.puces::-webkit-scrollbar{display:none}
+.puce{
+  flex:none;padding:8px 13px;border-radius:999px;border:1.5px solid var(--bord);
+  background:#fff;font-size:13px;font-weight:650;white-space:nowrap;color:var(--doux);
+}
+.puce.actif{background:var(--marine);color:#fff;border-color:var(--marine)}
+
+.ligne{
+  display:flex;align-items:center;gap:11px;padding:12px 13px;background:#fff;
+  border:1px solid var(--bord);border-radius:11px;margin-bottom:8px;
+  text-align:left;width:100%;
+}
+.ligne:active{background:#F7FBF8}
+.ligne .corps{flex:1;min-width:0}
+.ligne .t1{font-weight:700;font-size:14.5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ligne .t2{font-size:12.5px;color:var(--doux);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ligne .droite{text-align:right;flex:none}
+.mono{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;
+  letter-spacing:-.2px;word-break:break-all}
+
+.etat{display:inline-block;padding:3px 9px;border-radius:7px;
+  font-size:11px;font-weight:800;letter-spacing:.3px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;
+  border-radius:7px;font-size:11px;font-weight:700;background:#E7EFE9;color:var(--doux)}
+.badge.ok{background:#E8F5E9;color:var(--vert)}
+.badge.ko{background:#FFEBEE;color:var(--rouge)}
+
+.msg{padding:12px 13px;border-radius:11px;margin-bottom:12px;font-size:14px;
+  font-weight:500;line-height:1.4;display:flex;gap:9px;align-items:flex-start}
+.msg.ok{background:#E8F5E9;color:#145A32;border:1px solid #BEE3C8}
+.msg.ko{background:#FFEBEE;color:#8E1F1F;border:1px solid #F5C6C6}
+.msg.info{background:#EAF3FB;color:#0D3C6E;border:1px solid #C3DEF3}
+.msg.attention{background:#FFF8E1;color:#7A4F00;border:1px solid #FFE0A3}
+.msg .ic{font-size:17px;flex:none;line-height:1.3}
+
+.vide{text-align:center;padding:42px 20px;color:var(--doux)}
+.vide .gros{font-size:40px;margin-bottom:10px;opacity:.5}
+.chargement{text-align:center;padding:30px;color:var(--doux);font-size:14px}
+.tourne{display:inline-block;width:19px;height:19px;border:2.5px solid var(--bord);
+  border-top-color:var(--or-fonce);border-radius:50%;animation:t .7s linear infinite;
+  vertical-align:-4px;margin-right:8px}
+@keyframes t{to{transform:rotate(360deg)}}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:9px}
+.stat{background:#fff;border:1px solid var(--bord);border-radius:11px;
+  padding:12px 9px;text-align:center}
+.stat .v{font-size:20px;font-weight:800;line-height:1.1}
+.stat .l{font-size:10.5px;color:var(--doux);margin-top:3px;font-weight:650;
+  text-transform:uppercase;letter-spacing:.4px}
+
+.total{display:flex;justify-content:space-between;align-items:baseline;
+  padding:8px 0;font-size:14.5px}
+.total + .total{border-top:1px solid var(--bord)}
+.total.gros{font-size:19px;font-weight:800;padding-top:12px;
+  border-top:2px solid var(--marine);margin-top:4px}
+.total .l{color:var(--doux);font-weight:650}
+.total.gros .l{color:var(--texte)}
+
+/* ── Article du panier ── */
+.article{
+  border:1.5px solid var(--bord);border-radius:11px;padding:12px;
+  margin-bottom:9px;background:#fff;
+}
+.article .tete{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.article .num{
+  width:24px;height:24px;border-radius:7px;background:var(--or);
+  color:#fff;font-weight:800;font-size:12.5px;display:flex;
+  align-items:center;justify-content:center;flex:none;
+}
+.article .tete .sup{
+  margin-left:auto;background:none;border:0;color:var(--rouge);
+  font-size:17px;padding:2px 6px;
+}
+.article label.champ{margin-bottom:8px}
+
+/* ── Jalons du cycle de vie ── */
+.jalons{display:flex;gap:4px;margin:4px 0 14px}
+.jalon{flex:1;text-align:center}
+.jalon .pt{
+  height:5px;border-radius:9px;background:var(--bord);margin-bottom:6px;
+}
+.jalon.faite .pt{background:var(--vert)}
+.jalon.ici .pt{background:var(--or)}
+.jalon .l{font-size:9.5px;color:var(--doux);font-weight:700;
+  text-transform:uppercase;letter-spacing:.2px;line-height:1.2}
+.jalon.ici .l{color:var(--texte)}
+
+/* ── Marge ── */
+.marge{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 13px;border-radius:11px;margin-bottom:12px;font-weight:700;
+}
+.marge.positive{background:#E8F5E9;color:#145A32}
+.marge.negative{background:#FFEBEE;color:#8E1F1F}
+.marge .v{font-size:20px;font-weight:800}
+
+.voile{position:fixed;inset:0;background:rgba(16,38,27,.5);z-index:60;
+  display:flex;align-items:flex-end;justify-content:center}
+.modale{
+  background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;
+  padding:18px 16px calc(18px + var(--bas));max-height:92vh;overflow-y:auto;
+  animation:monte .22s ease-out;
+}
+@keyframes monte{from{transform:translateY(18px);opacity:.4}}
+.modale h3{margin:0 0 14px;font-size:17px}
+.poignee{width:40px;height:4px;background:var(--bord);border-radius:9px;
+  margin:0 auto 14px}
+
+.suggestions{border:1.5px solid var(--bord);border-radius:11px;overflow:hidden;
+  margin-top:-4px;margin-bottom:12px;background:#fff}
+.suggestions button{display:block;width:100%;text-align:left;padding:12px 13px;
+  background:none;border:0;border-bottom:1px solid var(--bord)}
+.suggestions button:last-child{border-bottom:0}
+.suggestions button:active{background:#EFF6F1}
+
+.coche{
+  display:flex;gap:12px;align-items:center;padding:13px;border:1.5px solid var(--bord);
+  border-radius:11px;background:#fff;margin-bottom:8px;
+}
+.coche.on{border-color:var(--or-fonce);background:#F2FAF5}
+.coche input{width:23px;height:23px;flex:none;accent-color:var(--or-fonce)}
+.coche .corps{flex:1;min-width:0}
+
+#bandeau{
+  background:var(--rouge);color:#fff;padding:9px 13px;font-size:13px;
+  font-weight:700;display:none;align-items:center;gap:8px;
+  position:sticky;top:0;z-index:29;
+}
+#bandeau.vu{display:flex}
+
+#toast{position:fixed;left:12px;right:12px;bottom:calc(84px + var(--bas));
+  z-index:80;pointer-events:none}
+#toast div{
+  background:var(--marine);color:#fff;padding:13px 15px;border-radius:11px;
+  font-size:14px;font-weight:650;box-shadow:0 5px 22px rgba(14,68,41,.3);
+  animation:monte .2s ease-out;margin-top:8px;
+}
+#toast div.ko{background:var(--rouge)}
+#toast div.ok{background:var(--vert)}
+
+/* ── Impression 50 mm : reçu de commande ── */
+#zone-impression{display:none}
+@media print{
+  @page{size:50mm auto;margin:2mm}
+  body{background:#fff}
+  #app,#toast,#bandeau,nav{display:none!important}
+  #zone-impression{display:block!important}
+  .etiquette{width:46mm;font-family:Arial,Helvetica,sans-serif;color:#000}
+  .et-haut{text-align:center;font-size:8pt;font-weight:bold;
+    border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1.5mm;
+    letter-spacing:.5px}
+  .rec-t{font-size:12pt;font-weight:bold;text-align:center}
+  .rec-l{font-size:8pt;display:flex;justify-content:space-between;padding:.5mm 0}
+  .rec-art{font-size:7.5pt;padding:.4mm 0;border-bottom:1px dotted #999}
+  .rec-sep{border-top:1px dashed #000;margin:1.5mm 0}
+  .rec-tot{font-size:12pt;font-weight:bold;display:flex;justify-content:space-between;
+    border-top:1.5px solid #000;padding-top:1mm;margin-top:1mm}
+  .et-pied{font-size:6.5pt;text-align:center;margin-top:1.5mm;
+    border-top:1px solid #000;padding-top:.8mm}
+}
+
+/* ── Règles d'entrée d'un associé : vert / rouge, toutes visibles ── */
+.regle{
+  display:flex;gap:10px;align-items:flex-start;padding:10px 12px;
+  border-radius:10px;margin-bottom:7px;font-size:13.5px;line-height:1.35;
+}
+.regle.oui{background:#E8F5E9;color:#145A32}
+.regle.non{background:#FFEBEE;color:#8E1F1F}
+.regle .ic{flex:none;font-weight:800}
+.regle .detail{display:block;font-size:12px;opacity:.78;margin-top:2px}
+
+/* ── Barre de progression d'un versement ── */
+.jauge{height:7px;border-radius:9px;background:var(--bord);overflow:hidden;margin-top:6px}
+.jauge > div{height:100%;background:var(--or);border-radius:9px}
+.jauge.plein > div{background:#0E4429}
+
+/* ── Montant principal ── */
+.chiffre{
+  text-align:center;padding:16px 12px;border-radius:13px;margin-bottom:12px;
+  background:#fff;border:1px solid var(--bord);
+}
+.chiffre .v{font-size:31px;font-weight:800;line-height:1.1;letter-spacing:-.5px}
+.chiffre .l{font-size:11.5px;color:var(--doux);font-weight:700;
+  text-transform:uppercase;letter-spacing:.6px;margin-top:5px}
+.chiffre .s{font-size:13.5px;color:var(--doux);margin-top:4px}
+.chiffre.positif .v{color:#0E4429}
+.chiffre.negatif .v{color:var(--rouge)}
+
+/* ── Segments de saisie ── */
+.segments{display:flex;gap:6px;background:#E7EFE9;padding:4px;border-radius:11px;
+  margin-bottom:14px}
+.segments button{
+  flex:1;border:0;background:none;padding:10px 4px;border-radius:8px;
+  font-size:13.5px;font-weight:700;color:var(--doux);
+}
+.segments button.actif{background:#fff;color:var(--marine);
+  box-shadow:0 1px 3px rgba(14,68,41,.14)}
+</style>
+</head>
+<body>
+
+<div id="bandeau"><span>📴</span><span id="bandeau-txt">Hors ligne</span></div>
+<div id="app"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLASHIPPING — FINANCE
+   Comptabilité, parts des associés, clôtures.
+
+   Deux principes gouvernent tout ce fichier.
+
+   1. FLUX NEUTRE. Certaines opérations déplacent de l'argent sans
+      créer ni détruire de richesse : l'avance d'un client sur une
+      commande, l'achat correspondant, un emprunt et son
+      remboursement. Elles bougent la caisse, jamais le bénéfice.
+      L'application le dit à chaque fois plutôt que de laisser croire
+      à un gain.
+
+   2. LE PARAMÈTRE NE SERT QU'À LA SAISIE. Chaque écriture emporte son
+      taux, son prix, son pourcentage. Changer un paramètre demain ne
+      retouche aucune ligne d'hier.
+
+   Comme l'app Commandes, celle-ci exige le réseau : tout ce qu'on y
+   fait touche la caisse.
+   ═══════════════════════════════════════════════════════════════════ */
+
+var CLE_URL   = 'fls_api_url';
+var CLE_TOKEN = 'fls_fin_token';
+var CLE_USER  = 'fls_fin_user';
+var CLE_CACHE = 'fls_fin_cache';
+
+var S = {
+  lire: function (c, d) {
+    try { var v = localStorage.getItem(c); return v === null ? d : v; }
+    catch (e) { return d; }
+  },
+  ecrire: function (c, v) { try { localStorage.setItem(c, v); } catch (e) {} },
+  effacer: function (c) { try { localStorage.removeItem(c); } catch (e) {} },
+  lireJson: function (c, d) {
+    try { return JSON.parse(localStorage.getItem(c)) || d; } catch (e) { return d; }
+  },
+  ecrireJson: function (c, v) { S.ecrire(c, JSON.stringify(v)); }
+};
+
+var Etat = {
+  url: S.lire(CLE_URL, ''),
+  token: S.lire(CLE_TOKEN, ''),
+  user: S.lireJson(CLE_USER, null),
+  ref: null,
+  onglet: 'caisse',
+  vue: null
+};
+
+var CATEGORIES = ['Logistique', 'Commandes', 'Salaire', 'Loyer',
+                  'Materiel', 'Communication', 'Dette', 'Autre'];
+var SOURCES = ['Autre Revenu', 'Colis Livre', 'Commission Commande',
+               'Avance Commande', 'Encaissement emprunt'];
+/** Ces lignes bougent la caisse sans toucher au bénéfice. */
+var NEUTRES = { 'Avance Commande': true, 'Encaissement emprunt': true,
+                'Achat Commande': true, 'Remboursement dette': true };
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  API
+// ═══════════════════════════════════════════════════════════════════
+
+function api(action, params) {
+  params = params || {};
+  if (!Etat.url) return Promise.reject(new Error('Aucune URL d\'API configurée.'));
+  if (!navigator.onLine) {
+    return Promise.reject(new Error(
+      'Pas de réseau. Cette application écrit directement en caisse : ' +
+      'elle ne peut pas travailler hors ligne.'));
+  }
+
+  var corps = Object.assign({ action: action }, params);
+  if (Etat.token && !corps.token) corps.token = Etat.token;
+
+  // text/plain : Apps Script ne répond pas au préalable CORS
+  return fetch(Etat.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(corps),
+    redirect: 'follow'
+  })
+  .then(function (r) { return r.text(); })
+  .then(function (txt) {
+    var d;
+    try { d = JSON.parse(txt); }
+    catch (e) {
+      if (txt.indexOf('<!DOCTYPE') === 0 || txt.indexOf('<html') === 0) {
+        throw new Error(Etat.token
+          ? 'Google a renvoyé une page d\'erreur : le script a échoué ou a ' +
+            'dépassé son temps d\'exécution. Regarde « Exécutions » dans ' +
+            'Apps Script pour la cause exacte.'
+          : 'L\'API a renvoyé une page web. Vérifie que le déploiement est ' +
+            'réglé sur « Accès : Tout le monde ».');
+      }
+      throw new Error('Réponse illisible du serveur.');
+    }
+    if (d.ok === false) { var x = new Error(d.erreur || 'Erreur inconnue.');
+                          x.metier = true; x.detail = d; throw x; }
+    return d.data !== undefined ? d.data : d;
+  })
+  .catch(function (e) {
+    if (e.metier) throw e;
+    if (/Session expirée|Jeton/i.test(e.message)) { deconnecter(); throw e; }
+    throw e;
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  OUTILS
+// ═══════════════════════════════════════════════════════════════════
+
+function e(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function n2(v) { return (Math.round((Number(v) || 0) * 100) / 100).toFixed(2); }
+function n0(v) { return Math.round(Number(v) || 0).toLocaleString('fr-FR'); }
+function usd(v) { return n2(v) + ' $'; }
+function htg(v) { return n0(v) + ' HTG'; }
+function pct(v) { return (Math.round((Number(v) || 0) * 100) / 100) + ' %'; }
+
+/** Les gros montants se lisent mieux abrégés sur un téléphone. */
+function court(v) {
+  var n = Number(v) || 0, s = n < 0 ? '-' : '';
+  n = Math.abs(n);
+  if (n >= 1000000) return s + (n / 1000000).toFixed(1).replace('.0', '') + ' M';
+  if (n >= 10000)   return s + Math.round(n / 1000) + ' k';
+  return s + n0(n);
+}
+
+function dateCourte(d) {
+  if (!d) return '';
+  var x = new Date(d);
+  if (isNaN(x)) return String(d).substring(0, 10);
+  return ('0' + x.getDate()).slice(-2) + '/' + ('0' + (x.getMonth() + 1)).slice(-2) +
+         '/' + x.getFullYear();
+}
+function aujourdhui() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) +
+         '-' + ('0' + d.getDate()).slice(-2);
+}
+function premierDuMois() { return aujourdhui().substring(0, 8) + '01'; }
+
+function toast(txt, genre) {
+  var z = document.getElementById('toast');
+  var d = document.createElement('div');
+  if (genre) d.className = genre;
+  d.textContent = txt;
+  z.appendChild(d);
+  setTimeout(function () { d.remove(); }, genre === 'ko' ? 5600 : 3200);
+}
+
+function bloc(msg, genre, icone) {
+  return '<div class="msg ' + genre + '"><span class="ic">' + (icone || 'ℹ️') +
+         '</span><span>' + e(msg) + '</span></div>';
+}
+function chargement(t) {
+  return '<div class="chargement"><span class="tourne"></span>' +
+         e(t || 'Chargement…') + '</div>';
+}
+function vide(ic, t) {
+  return '<div class="vide"><div class="gros">' + ic + '</div>' + e(t) + '</div>';
+}
+function tauxUsd() {
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  return Number(p.TAUX_ACHAT_USD) || 135;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  SQUELETTE
+// ═══════════════════════════════════════════════════════════════════
+
+var ONGLETS = [
+  { id: 'caisse',   ic: '💰', nom: 'Caisse' },
+  { id: 'saisie',   ic: '✍️', nom: 'Saisie' },
+  { id: 'associes', ic: '👥', nom: 'Associés' },
+  { id: 'cloture',  ic: '🔒', nom: 'Clôture' }
+];
+
+var Nav = { modaleOuverte: false };
+
+function dessiner() {
+  var app = document.getElementById('app');
+  if (!Etat.url)   { app.innerHTML = ecranReglage(); return; }
+  if (!Etat.token) { app.innerHTML = ecranConnexion(); chargerUtilisateurs(); return; }
+
+  if (!Etat.user || !Etat.user.droits || !Etat.user.droits.voir_finance) {
+    app.innerHTML =
+      '<header class="entete"><h1>Finance<span class="sous">' +
+      e(Etat.user ? Etat.user.nom : '') + '</span></h1>' +
+      '<button class="btn-entete" onclick="deconnecter()">⏻</button></header>' +
+      '<main>' + bloc('La comptabilité est réservée aux administrateurs. ' +
+        'Ton compte n\'y a pas accès.', 'attention', '🔒') +
+      '<button class="btn vide" onclick="deconnecter()">Se déconnecter</button></main>';
+    return;
+  }
+
+  var u = Etat.user;
+  app.innerHTML =
+    '<header class="entete">' +
+      '<span class="pastille' + (navigator.onLine ? '' : ' hors') + '"></span>' +
+      '<h1>' + e(titreOnglet()) + '<span class="sous">' + e(u.nom) +
+        ' · ' + e(u.role) + '</span></h1>' +
+      '<button class="btn-entete" onclick="ouvrirReglages()">⚙️</button>' +
+    '</header>' +
+    '<main id="contenu">' + chargement() + '</main>' +
+    '<nav>' + ONGLETS.map(function (o) {
+      return '<button class="' + (Etat.onglet === o.id ? 'actif' : '') +
+        '" onclick="allerA(\'' + o.id + '\')"><span class="ic">' + o.ic +
+        '</span>' + e(o.nom) + '</button>';
+    }).join('') + '</nav>';
+
+  majBandeau();
+  rendreOnglet();
+}
+
+function titreOnglet() {
+  var o = ONGLETS.filter(function (x) { return x.id === Etat.onglet; })[0];
+  return o ? o.nom : 'Finance';
+}
+
+function allerA(id) {
+  if (Etat.onglet === id) return;
+  Etat.onglet = id; Etat.vue = null;
+  try { history.pushState({ onglet: id }, '', '#' + id); } catch (e2) {}
+  dessiner();
+}
+
+window.addEventListener('popstate', function (ev) {
+  if (Nav.modaleOuverte) { fermerModaleDom(); return; }
+  var st = ev.state || {};
+  if (st.onglet && st.onglet !== Etat.onglet) {
+    Etat.onglet = st.onglet; Etat.vue = null; dessiner();
+  }
+});
+
+function poser(h) { var c = document.getElementById('contenu'); if (c) c.innerHTML = h; }
+
+function rendreOnglet() {
+  switch (Etat.onglet) {
+    case 'caisse':   return ongletCaisse();
+    case 'saisie':   return ongletSaisie();
+    case 'associes': return ongletAssocies();
+    case 'cloture':  return ongletCloture();
+  }
+}
+
+function majBandeau() {
+  var b = document.getElementById('bandeau');
+  if (!b) return;
+  b.className = navigator.onLine ? '' : 'vu';
+  if (!navigator.onLine) {
+    document.getElementById('bandeau-txt').textContent =
+      'Hors ligne — la comptabilité ne peut rien enregistrer';
+  }
+  var p = document.querySelector('.pastille');
+  if (p) p.className = 'pastille' + (navigator.onLine ? '' : ' hors');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  RÉGLAGE INITIAL ET CONNEXION
+// ═══════════════════════════════════════════════════════════════════
+
+function ecranReglage() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">' +
+    'Première configuration</span></h1></header><main><div class="carte">' +
+    bloc('Colle l\'URL de ton déploiement Apps Script — la même que pour les ' +
+         'autres applications. Elle se termine par /exec.', 'info', '🔗') +
+    '<label class="champ"><span>URL de l\'API</span>' +
+    '<input type="url" id="in-url" placeholder="https://script.google.com/macros/s/…/exec" ' +
+    'autocomplete="off" autocapitalize="off" spellcheck="false"></label>' +
+    '<button class="btn" onclick="validerUrl()">Vérifier et continuer</button>' +
+    '<div id="res-url"></div></div></main>';
+}
+
+function validerUrl() {
+  var v = (document.getElementById('in-url').value || '').trim();
+  var res = document.getElementById('res-url');
+
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec$/.test(v)) {
+    res.innerHTML = bloc('L\'URL doit finir par /exec, pas /dev.', 'ko', '⚠️');
+    return;
+  }
+  res.innerHTML = chargement('Vérification…');
+  Etat.url = v;
+
+  api('diag').then(function (d) {
+    var manquants = [];
+    if (d.modules) {
+      if (!d.modules.finance) manquants.push('Finance.gs');
+      if (!d.modules.parts)   manquants.push('Parts_Associes.gs');
+    }
+    if (manquants.length) {
+      Etat.url = '';
+      res.innerHTML = bloc('L\'API répond, mais ' + manquants.join(' et ') +
+        ' n\'y est pas enregistré. Ouvre le projet Apps Script, enregistre ' +
+        'le fichier, puis redéploie une nouvelle version.', 'ko', '❌');
+      return;
+    }
+    S.ecrire(CLE_URL, v);
+    toast('API joignable.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    Etat.url = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ecranConnexion() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">Finance' +
+    '</span></h1></header><main><div class="carte">' +
+    '<div id="liste-users">' + chargement('Chargement des comptes…') + '</div></div>' +
+    '<button class="btn vide petit" onclick="changerUrl()">Changer l\'URL de l\'API</button>' +
+    '</main>';
+}
+
+function chargerUtilisateurs() {
+  api('utilisateurs_publics').then(function (liste) {
+    var z = document.getElementById('liste-users');
+    if (!z) return;
+    // Seuls les admins peuvent entrer ici : autant ne pas proposer les autres.
+    var admins = liste.filter(function (u) { return u.role === 'admin'; });
+    if (!admins.length) {
+      z.innerHTML = bloc('Aucun compte administrateur actif.', 'attention', '⚠️');
+      return;
+    }
+    z.innerHTML =
+      '<label class="champ"><span>Qui es-tu ?</span><select id="in-user">' +
+      admins.map(function (u) {
+        return '<option value="' + e(u.user_id) + '">' + e(u.nom) + '</option>';
+      }).join('') + '</select></label>' +
+      '<label class="champ"><span>Code à 6 chiffres</span>' +
+      '<input type="password" id="in-code" inputmode="numeric" maxlength="6" ' +
+      'autocomplete="current-password" style="text-align:center;font-size:25px;' +
+      'letter-spacing:9px;font-weight:700"></label>' +
+      '<button class="btn" id="btn-login" onclick="connecter()">Entrer</button>' +
+      '<div id="res-login"></div>';
+
+    var ic = document.getElementById('in-code');
+    ic.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') connecter(); });
+    ic.addEventListener('input', function () { if (ic.value.length === 6) connecter(); });
+  }).catch(function (err) {
+    var z = document.getElementById('liste-users');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function connecter() {
+  var uid = document.getElementById('in-user').value;
+  var code = document.getElementById('in-code').value;
+  var b = document.getElementById('btn-login');
+  var res = document.getElementById('res-login');
+
+  if (!/^\d{6}$/.test(code)) { res.innerHTML = bloc('Six chiffres.', 'ko', '⚠️'); return; }
+  b.disabled = true; b.textContent = 'Connexion…'; res.innerHTML = '';
+
+  api('login', { user_id: uid, code: code }).then(function (d) {
+    Etat.token = d.token; Etat.user = d.utilisateur;
+    S.ecrire(CLE_TOKEN, d.token); S.ecrireJson(CLE_USER, d.utilisateur);
+    return chargerReferentiels();
+  }).then(function () {
+    toast('Bienvenue ' + (Etat.user.nom || '') + '.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Entrer';
+    document.getElementById('in-code').value = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function chargerReferentiels() {
+  return api('referentiels').then(function (r) {
+    Etat.ref = r;
+    S.ecrireJson(CLE_CACHE, { ref: r, date: Date.now() });
+    return r;
+  }).catch(function (err) {
+    var c = S.lireJson(CLE_CACHE, null);
+    if (c && c.ref) { Etat.ref = c.ref; return c.ref; }
+    throw err;
+  });
+}
+
+function deconnecter() {
+  S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  Etat.token = ''; Etat.user = null; Etat.onglet = 'caisse';
+  dessiner();
+}
+
+function changerUrl() {
+  if (!confirm('Changer l\'URL de l\'API ? Tu devras te reconnecter.')) return;
+  S.effacer(CLE_URL); S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  Etat.url = ''; Etat.token = ''; Etat.user = null;
+  dessiner();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET CAISSE
+// ═══════════════════════════════════════════════════════════════════
+
+function ongletCaisse() {
+  poser(chargement('Calcul des soldes…'));
+
+  api('soldes').then(function (d) {
+    Etat.vue = d;
+    var taux = d.taux_achat || tauxUsd();
+    var profit = Number(d.profit_gdes) || 0;
+
+    var h =
+      '<div class="chiffre ' + (profit < 0 ? 'negatif' : 'positif') + '">' +
+        '<div class="v">' + court(profit) + '</div>' +
+        '<div class="l">bénéfice en gourdes</div>' +
+        '<div class="s">' + usd(d.profit_usd) + ' · taux ' + n0(taux) + '</div>' +
+      '</div>' +
+
+      '<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v" style="color:var(--vert)">' +
+          court(d.total_revenus_gdes) + '</div><div class="l">revenus</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+          court(d.total_depenses_gdes) + '</div><div class="l">dépenses</div></div>' +
+        (d.tresorerie_gdes !== undefined
+          ? '<div class="stat"><div class="v">' + court(d.tresorerie_gdes) +
+            '</div><div class="l">trésorerie</div></div>' : '') +
+      '</div>';
+
+    if (d.depuis_cloture) {
+      h += bloc('Ces chiffres repartent de la clôture du ' +
+                dateCourte(d.depuis_cloture) + '.', 'info', '🔒');
+    }
+
+    // ── La clé de répartition, expliquée à l'écran ──
+    var r = d.repartition || {};
+    h += '<div class="titre-section">Clé de répartition du bénéfice</div>' +
+      '<div class="carte">' +
+        '<div style="font-weight:800;font-size:16px;text-transform:uppercase;' +
+          'letter-spacing:.5px">' + e(r.mode || d.mode_repartition) + '</div>' +
+        '<div style="font-size:13px;color:var(--doux);margin:6px 0 10px;' +
+          'line-height:1.4">' + e(r.note || '') + '</div>' +
+        (r.mode === 'mixte'
+          ? '<div class="total"><span class="l">Rôles actifs</span><b>' +
+            r.nb_roles_actifs + '</b></div>' +
+            (Number(r.points_role_perdus) > 0.01
+              ? '<div class="total"><span class="l">Points de rôle non ' +
+                'attribués</span><b style="color:var(--orange)">' +
+                n2(r.points_role_perdus) + '</b></div>' : '')
+          : '') +
+        (Number(r.capital_cible_gdes) > 0
+          ? '<div class="total"><span class="l">Capital appelé</span><span>' +
+            htg(r.capital_cible_gdes) + '</span></div>' +
+            '<div class="total"><span class="l">Versé</span><b>' +
+            htg(r.capital_verse_gdes) + '</b></div>' +
+            (Number(r.capital_manquant_gdes) > 0
+              ? '<div class="total"><span class="l">Manquant</span>' +
+                '<b style="color:var(--rouge)">' + htg(r.capital_manquant_gdes) +
+                '</b></div>' : '')
+          : '') +
+      '</div>';
+
+    // ── Le solde de chaque associé ──
+    var liste = d.associes || d.soldes_associes || [];
+    if (liste.length) {
+      h += '<div class="titre-section">Solde de chaque associé</div>';
+      h += liste.map(function (a) {
+        var neg = Number(a.solde_gdes) < 0;
+        return '<button class="ligne" onclick="ouvrirAssocie(\'' +
+          e(a.associe_id) + '\')"><div class="corps">' +
+          '<div class="t1">' + e(a.nom) + '</div>' +
+          '<div class="t2">' + pct(a.part_pourcentage) + ' du bénéfice' +
+            (a.role_nom ? ' · ' + e(a.role_nom) : '') +
+            (a.role_actif ? '' : ' · sans rôle') + '</div></div>' +
+          '<div class="droite"><div style="font-weight:800;color:' +
+            (neg ? 'var(--rouge)' : 'var(--texte)') + '">' +
+            court(a.solde_gdes) + '</div>' +
+          '<div style="font-size:11.5px;color:var(--doux)">HTG</div></div></button>';
+      }).join('');
+    }
+
+    h += '<div class="rangee-btn" style="margin-top:14px">' +
+      '<button class="btn vide petit" onclick="allerA(\'saisie\')">✍️ Saisir</button>' +
+      '<button class="btn vide petit" onclick="ouvrirEtats()">📊 États financiers</button>' +
+      '</div>';
+
+    poser(h);
+  }).catch(function (err) { poser(bloc(err.message, 'ko', '❌')); });
+}
+
+function ouvrirEtats() {
+  modale('États financiers', chargement());
+  api('etats_financiers', { debut: premierDuMois(), fin: aujourdhui() })
+    .then(function (d) {
+      var r = d.resultat, b = d.bilan;
+      var h = '<div style="font-size:13px;color:var(--doux);margin-bottom:12px">' +
+        dateCourte(d.periode.debut) + ' → ' + dateCourte(d.periode.fin) + '</div>' +
+
+        '<div class="titre-section" style="margin-top:0">Compte de résultat</div>' +
+        '<div class="total"><span class="l">Produits</span><span>' +
+          htg(r.produits_gdes) + '</span></div>' +
+        '<div class="total"><span class="l">Charges</span><span>−' +
+          htg(r.charges_gdes) + '</span></div>' +
+        (Number(r.dotation_amortissement_gdes) > 0
+          ? '<div class="total"><span class="l">Amortissements</span><span>−' +
+            htg(r.dotation_amortissement_gdes) + '</span></div>' : '') +
+        '<div class="total gros"><span class="l">Résultat net</span>' +
+          '<span style="color:' + (r.resultat_net_gdes < 0 ? 'var(--rouge)' : '#0E4429') +
+          '">' + htg(r.resultat_net_gdes) + '</span></div>' +
+        '<div class="total"><span class="l">Marge</span><b>' +
+          n2(r.marge_pct) + ' %</b></div>' +
+
+        '<div class="titre-section">Bilan</div>' +
+        '<div class="total"><span class="l">Trésorerie</span><span>' +
+          htg(b.actif.tresorerie_gdes) + '</span></div>' +
+        '<div class="total"><span class="l">Stock</span><span>' +
+          htg(b.actif.stock_gdes) + '</span></div>' +
+        '<div class="total"><span class="l">Immobilisations</span><span>' +
+          htg(b.actif.immobilisations_nettes_gdes) + '</span></div>' +
+        '<div class="total gros"><span class="l">Total actif</span><span>' +
+          htg(b.actif.total_gdes) + '</span></div>' +
+        '<div class="total"><span class="l">Dettes</span><span>' +
+          htg(b.passif.dettes_gdes) + '</span></div>' +
+        '<div class="total"><span class="l">Capitaux propres</span><span>' +
+          htg(b.passif.capitaux_propres_gdes) + '</span></div>' +
+        '<div class="total gros"><span class="l">Total passif</span><span>' +
+          htg(b.passif.total_gdes) + '</span></div>' +
+        (b.equilibre
+          ? bloc('Bilan équilibré.', 'ok', '✅')
+          : bloc('Bilan déséquilibré de ' + htg(b.ecart_gdes) + '.', 'ko', '⚠️'));
+
+      (d.avertissements || []).forEach(function (a) {
+        h += bloc(a, 'attention', '⚠️');
+      });
+
+      majModale('États financiers', h);
+    }).catch(function (err) {
+      majModale('États financiers', bloc(err.message, 'ko', '❌'));
+    });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET SAISIE
+// ═══════════════════════════════════════════════════════════════════
+
+var Saisie = { type: 'depense' };
+
+function ongletSaisie() {
+  poser(
+    '<div class="segments">' +
+      ['depense', 'revenu', 'contribution'].map(function (t) {
+        var nom = t === 'depense' ? 'Dépense' : (t === 'revenu' ? 'Revenu' : 'Apport');
+        return '<button class="' + (Saisie.type === t ? 'actif' : '') +
+          '" onclick="choisirSaisie(\'' + t + '\')">' + nom + '</button>';
+      }).join('') +
+    '</div>' +
+    '<div id="form-saisie"></div>'
+  );
+  rendreFormulaire();
+}
+
+function choisirSaisie(t) { Saisie.type = t; ongletSaisie(); }
+
+function champMontant(id) {
+  return '<div class="duo">' +
+    '<label class="champ"><span>Montant</span>' +
+      '<input type="number" id="' + id + '-montant" step="0.01" min="0" ' +
+      'inputmode="decimal" oninput="majConversion(\'' + id + '\')"></label>' +
+    '<label class="champ"><span>Devise</span>' +
+      '<select id="' + id + '-devise" onchange="majConversion(\'' + id + '\')">' +
+      '<option value="Gourdes">Gourdes</option>' +
+      '<option value="USD">Dollars</option></select></label>' +
+  '</div>' +
+  '<div id="' + id + '-conv" class="total" style="margin-top:-6px"></div>';
+}
+
+/**
+ * La conversion s'affiche AVANT l'enregistrement.
+ *
+ * Le taux d'achat et le taux de vente diffèrent : une dépense saisie
+ * en dollars ne vaut pas le même nombre de gourdes qu'un revenu du
+ * même montant. Montrer le résultat ici évite d'avoir à le découvrir
+ * dans le classeur.
+ */
+function majConversion(id) {
+  var z = document.getElementById(id + '-conv');
+  if (!z) return;
+  var m = Number(document.getElementById(id + '-montant').value) || 0;
+  var dev = document.getElementById(id + '-devise').value;
+  if (!m) { z.innerHTML = ''; return; }
+
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  var achat = Number(p.TAUX_ACHAT_USD) || 135;
+  var vente = Number(p.TAUX_VENTE_USD) || 130;
+  // Un revenu encaissé en dollars se convertit au taux de VENTE.
+  var taux = dev === 'USD'
+    ? (Saisie.type === 'revenu' ? vente : achat)
+    : achat;
+
+  var perso = document.getElementById(id + '-taux');
+  if (perso && perso.value) taux = Number(perso.value);
+
+  z.innerHTML = dev === 'USD'
+    ? '<span class="l">Au taux ' + n0(taux) + '</span><b>' + htg(m * taux) + '</b>'
+    : '<span class="l">Au taux ' + n0(taux) + '</span><b>' + usd(m / taux) + '</b>';
+}
+
+function rendreFormulaire() {
+  var z = document.getElementById('form-saisie');
+  if (Saisie.type === 'depense')      z.innerHTML = formDepense();
+  else if (Saisie.type === 'revenu')  z.innerHTML = formRevenu();
+  else                                 z.innerHTML = formContribution();
+
+  if (Saisie.type === 'contribution') chargerAssociesPourApport();
+}
+
+function formDepense() {
+  return '<div class="carte">' +
+    '<label class="champ"><span>Objet</span>' +
+      '<input type="text" id="dp-objet" placeholder="Carburant, loyer, achat…"></label>' +
+    '<label class="champ"><span>Catégorie</span><select id="dp-cat">' +
+      CATEGORIES.map(function (c) {
+        return '<option value="' + e(c) + '">' + e(c) + '</option>';
+      }).join('') + '</select></label>' +
+    champMontant('dp') +
+    '<label class="champ"><span>Taux appliqué <span style="font-weight:400">' +
+      '— laisse vide pour le taux du jour</span></span>' +
+      '<input type="number" id="dp-taux" step="1" inputmode="decimal" ' +
+      'oninput="majConversion(\'dp\')"></label>' +
+    '<label class="champ"><span>Date</span>' +
+      '<input type="date" id="dp-date" value="' + aujourdhui() + '"></label>' +
+    '<label class="champ"><span>Description</span>' +
+      '<textarea id="dp-desc"></textarea></label>' +
+
+    '<label class="champ"><span>Est-ce du stock à revendre ?</span>' +
+      '<select id="dp-stock">' +
+      '<option value="Non">Non — c\'est une charge</option>' +
+      '<option value="Oui">Oui — ça entre en stock</option></select>' +
+      '<span style="font-size:12px;color:var(--doux);font-weight:400;display:block;' +
+      'margin-top:5px">Du stock n\'est pas une perte : l\'argent s\'est transformé ' +
+      'en marchandise. Il ne réduit donc pas le bénéfice tant qu\'il n\'est pas ' +
+      'vendu.</span></label>' +
+
+    '<div id="dp-res"></div>' +
+    '<button class="btn" id="dp-btn" onclick="validerDepense()">Enregistrer la dépense</button>' +
+  '</div>';
+}
+
+function validerDepense() {
+  var res = document.getElementById('dp-res');
+  var b = document.getElementById('dp-btn');
+  var objet = document.getElementById('dp-objet').value.trim();
+  var montant = Number(document.getElementById('dp-montant').value);
+
+  if (!objet)    { res.innerHTML = bloc('L\'objet est requis.', 'ko', '⚠️'); return; }
+  if (!montant)  { res.innerHTML = bloc('Le montant est requis.', 'ko', '⚠️'); return; }
+
+  var p = {
+    objet: objet,
+    categorie: document.getElementById('dp-cat').value,
+    description: document.getElementById('dp-desc').value,
+    montant_saisi: montant,
+    devise_saisie: document.getElementById('dp-devise').value,
+    date: document.getElementById('dp-date').value,
+    entree_stock: document.getElementById('dp-stock').value
+  };
+  var taux = document.getElementById('dp-taux').value;
+  if (taux) p.taux_applique = taux;
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('depense', p).then(function (d) {
+    toast('Dépense ' + (d.depense_id || '') + ' enregistrée.', 'ok');
+    ongletSaisie();
+    if (NEUTRES[objet]) {
+      toast('Flux neutre : la caisse baisse, le bénéfice ne bouge pas.', 'ok');
+    }
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer la dépense';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function formRevenu() {
+  return '<div class="carte">' +
+    '<label class="champ"><span>Source</span><select id="rv-source" ' +
+      'onchange="avertirNeutre()">' +
+      SOURCES.map(function (c) {
+        return '<option value="' + e(c) + '">' + e(c) + '</option>';
+      }).join('') + '</select></label>' +
+    '<div id="rv-neutre"></div>' +
+    '<label class="champ"><span>Description</span>' +
+      '<input type="text" id="rv-desc" placeholder="D\'où vient cet argent ?"></label>' +
+    champMontant('rv') +
+    '<label class="champ"><span>Date</span>' +
+      '<input type="date" id="rv-date" value="' + aujourdhui() + '"></label>' +
+    '<div id="rv-res"></div>' +
+    '<button class="btn" id="rv-btn" onclick="validerRevenu()">Enregistrer le revenu</button>' +
+    bloc('Les revenus de colis et de commandes s\'écrivent tout seuls depuis ' +
+         'les autres applications. Ne les saisis ici que pour une correction.',
+         'info', 'ℹ️') +
+  '</div>';
+}
+
+function avertirNeutre() {
+  var src = document.getElementById('rv-source').value;
+  var z = document.getElementById('rv-neutre');
+  z.innerHTML = NEUTRES[src]
+    ? bloc('« ' + src + ' » est un flux neutre : cet argent entre en caisse ' +
+           'mais ne fait pas de bénéfice. Il appartient au client, ou il sera ' +
+           'rendu.', 'attention', '↔️')
+    : '';
+}
+
+function validerRevenu() {
+  var res = document.getElementById('rv-res');
+  var b = document.getElementById('rv-btn');
+  var montant = Number(document.getElementById('rv-montant').value);
+  if (!montant) { res.innerHTML = bloc('Le montant est requis.', 'ko', '⚠️'); return; }
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('revenu', {
+    source: document.getElementById('rv-source').value,
+    description: document.getElementById('rv-desc').value,
+    montant_saisi: montant,
+    devise_saisie: document.getElementById('rv-devise').value,
+    date: document.getElementById('rv-date').value
+  }).then(function (d) {
+    toast('Revenu ' + (d.revenu_id || '') + ' enregistré.', 'ok');
+    ongletSaisie();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer le revenu';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function formContribution() {
+  return '<div class="carte">' +
+    bloc('Un apport n\'est pas un revenu : c\'est de l\'argent que l\'associé ' +
+         'met dans l\'entreprise. Il augmente son solde, pas le bénéfice. ' +
+         'Les versements peuvent être partiels, autant de fois que nécessaire.',
+         'info', '💼') +
+    '<label class="champ"><span>Associé</span><select id="ct-associe">' +
+      '<option value="">…</option></select></label>' +
+    '<label class="champ"><span>Nature</span><select id="ct-type">' +
+      '<option value="Apport Cash">Apport en espèces</option>' +
+      '<option value="Apport Nature">Apport en nature</option>' +
+      '<option value="Retrait">Retrait</option></select></label>' +
+    champMontant('ct') +
+    '<label class="champ"><span>Taux appliqué <span style="font-weight:400">' +
+      '— laisse vide pour le taux du jour</span></span>' +
+      '<input type="number" id="ct-taux" step="1" inputmode="decimal" ' +
+      'oninput="majConversion(\'ct\')"></label>' +
+    '<label class="champ"><span>Date</span>' +
+      '<input type="date" id="ct-date" value="' + aujourdhui() + '"></label>' +
+    '<label class="champ"><span>Note</span>' +
+      '<input type="text" id="ct-note" placeholder="Moyen, référence…"></label>' +
+    '<div id="ct-res"></div>' +
+    '<button class="btn" id="ct-btn" onclick="validerContribution()">Enregistrer</button>' +
+  '</div>';
+}
+
+function chargerAssociesPourApport() {
+  api('parts_associes').then(function (d) {
+    var sel = document.getElementById('ct-associe');
+    if (!sel) return;
+    sel.innerHTML = d.associes.map(function (a) {
+      return '<option value="' + e(a.id) + '">' + e(a.nom) + ' — ' +
+             n2(a.part_detenue) + ' %</option>';
+    }).join('');
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function validerContribution() {
+  var res = document.getElementById('ct-res');
+  var b = document.getElementById('ct-btn');
+  var associe = document.getElementById('ct-associe').value;
+  var montant = Number(document.getElementById('ct-montant').value);
+
+  if (!associe) { res.innerHTML = bloc('Choisis un associé.', 'ko', '⚠️'); return; }
+  if (!montant) { res.innerHTML = bloc('Le montant est requis.', 'ko', '⚠️'); return; }
+
+  var p = {
+    associe_id: associe,
+    type_contribution: document.getElementById('ct-type').value,
+    montant_saisi: montant,
+    devise_saisie: document.getElementById('ct-devise').value,
+    date: document.getElementById('ct-date').value,
+    note: document.getElementById('ct-note').value
+  };
+  var taux = document.getElementById('ct-taux').value;
+  if (taux) p.taux_applique = taux;
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('contribution', p).then(function () {
+    toast('Apport enregistré.', 'ok');
+    ongletSaisie();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET ASSOCIÉS
+// ═══════════════════════════════════════════════════════════════════
+
+function ongletAssocies() {
+  poser(chargement('Parts et vesting…'));
+
+  Promise.all([api('parts_associes'), api('appel_fonds'), api('parts_integrite')])
+    .then(function (r) {
+      var d = r[0], appel = r[1], integ = r[2];
+
+      var h =
+        '<div class="stats" style="margin-bottom:14px">' +
+          '<div class="stat"><div class="v">' + d.nb_associes + '</div>' +
+            '<div class="l">associés</div></div>' +
+          '<div class="stat"><div class="v">' + n2(d.total_detenue) + ' %</div>' +
+            '<div class="l">parts détenues</div></div>' +
+          '<div class="stat"><div class="v" style="color:' +
+            (d.places_restantes ? 'var(--vert)' : 'var(--doux)') + '">' +
+            d.places_restantes + '</div><div class="l">places libres</div></div>' +
+        '</div>';
+
+      if (!integ.ok_global && integ.problemes && integ.problemes.length) {
+        h += bloc('Intégrité : ' + integ.problemes.join(' · '), 'ko', '⚠️');
+      } else if (integ.ok) {
+        h += bloc('Parts cohérentes avec le journal.', 'ok', '✅');
+      }
+
+      if (Number(appel.capital_manquant_gdes) > 0) {
+        h += bloc('Appel de fonds en cours : ' + htg(appel.capital_manquant_gdes) +
+                  ' restent à verser sur ' + htg(appel.capital_cible_gdes) + '.',
+                  'attention', '💰');
+      }
+
+      var parAppel = {};
+      (appel.associes || []).forEach(function (a) { parAppel[a.associe_id] = a; });
+
+      h += '<div class="titre-section">Les associés</div>';
+      h += d.associes.map(function (a) {
+        var f = parAppel[a.id] || {};
+        var taux = Number(f.taux_atteinte_pct) || 0;
+        return '<button class="ligne" style="align-items:flex-start" ' +
+          'onclick="ouvrirAssocie(\'' + e(a.id) + '\')">' +
+          '<div class="corps">' +
+            '<div class="t1">' + e(a.nom) +
+              (a.role_actif ? '' : ' <span class="badge">sans rôle</span>') + '</div>' +
+            '<div class="t2">rang ' + a.rang_entree +
+              (a.role ? ' · ' + e(a.role) : '') + '</div>' +
+            (Number(f.cible_gdes) > 0
+              ? '<div class="jauge' + (taux >= 100 ? ' plein' : '') + '">' +
+                '<div style="width:' + Math.min(taux, 100) + '%"></div></div>' +
+                '<div style="font-size:11.5px;color:var(--doux);margin-top:4px">' +
+                htg(f.verse_gdes) + ' sur ' + htg(f.cible_gdes) +
+                ' · ' + n2(taux) + ' %</div>'
+              : '') +
+          '</div>' +
+          '<div class="droite"><div style="font-weight:800;font-size:16px">' +
+            n2(a.part_detenue) + ' %</div>' +
+            (a.part_acquise !== a.part_detenue
+              ? '<div style="font-size:11.5px;color:var(--orange)">acquis ' +
+                n2(a.part_acquise) + ' %</div>' : '') +
+          '</div></button>';
+      }).join('');
+
+      h += '<button class="btn" style="margin-top:12px" onclick="ouvrirNouvelAssocie()">' +
+        '➕ Faire entrer un associé</button>' +
+        '<button class="btn vide" onclick="ouvrirAppelFonds()">💰 Appel de fonds</button>';
+
+      poser(h);
+    }).catch(function (err) { poser(bloc(err.message, 'ko', '❌')); });
+}
+
+function ouvrirAssocie(id) {
+  modale('Associé', chargement());
+  Promise.all([api('parts_associes'), api('parts_historique', { id_associe: id }),
+               api('soldes')])
+    .then(function (r) {
+      var a = r[0].associes.filter(function (x) { return x.id === id; })[0];
+      if (!a) { majModale('Associé', bloc('Introuvable.', 'ko', '❌')); return; }
+      var sol = (r[2].associes || []).filter(function (x) {
+        return x.associe_id === id; })[0] || {};
+
+      var h = '<div style="margin-bottom:14px">' +
+        '<div style="font-weight:800;font-size:18px">' + e(a.nom) + '</div>' +
+        '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
+          e(a.id) + ' · rang ' + a.rang_entree + ' · entré le ' +
+          dateCourte(a.date_entree) + '</div></div>' +
+
+        '<div class="stats" style="margin-bottom:14px">' +
+          '<div class="stat"><div class="v">' + n2(a.part_detenue) + ' %</div>' +
+            '<div class="l">détenue</div></div>' +
+          '<div class="stat"><div class="v">' + n2(a.part_acquise) + ' %</div>' +
+            '<div class="l">acquise</div></div>' +
+          '<div class="stat"><div class="v">' + court(sol.solde_gdes) + '</div>' +
+            '<div class="l">solde HTG</div></div>' +
+        '</div>';
+
+      if (a.vesting_mois > 0) {
+        h += '<div class="titre-section">Vesting</div>' +
+          '<div class="carte serree">' +
+          '<div class="total"><span class="l">Durée</span><b>' + a.vesting_mois +
+            ' mois</b></div>' +
+          '<div class="total"><span class="l">Cliff</span><b>' + a.cliff_mois +
+            ' mois</b></div>' +
+          '<div class="jauge"><div style="width:' +
+            Math.round((a.progression_vesting || 0) * 100) + '%"></div></div>' +
+          '<div style="font-size:12px;color:var(--doux);margin-top:6px">' +
+            (a.vesting_termine ? 'Vesting terminé — part entièrement acquise.'
+              : (a.cliff_franchi
+                  ? 'Cliff franchi, acquisition en cours.'
+                  : 'Cliff non franchi : aucune part acquise à ce jour.')) +
+          '</div></div>';
+      }
+
+      h += '<div class="titre-section">Rôle</div><div class="carte serree">' +
+        '<div class="total"><span class="l">Fonction</span><b>' +
+          e(a.role || '— aucune —') + '</b></div>' +
+        '<div class="total"><span class="l">Rôle actif</span><b style="color:' +
+          (a.role_actif ? 'var(--vert)' : 'var(--orange)') + '">' +
+          (a.role_actif ? 'OUI' : 'NON') + '</b></div>' +
+        '<button class="btn vide petit" style="margin-top:10px" ' +
+          'onclick="ouvrirRole(' + e(JSON.stringify({ id: a.id, nom: a.nom,
+            role: a.role || '', actif: !!a.role_actif })).replace(/'/g, '&#39;') +
+          ')">Modifier le rôle</button>' +
+        (a.role_actif ? '' :
+          bloc('En mode mixte, un associé sans rôle laisse ses points de rôle ' +
+               'aux autres.', 'attention', '⚠️')) +
+      '</div>';
+
+      // ── Détail du solde ──
+      h += '<div class="titre-section">Détail du solde</div>' +
+        '<div class="total"><span class="l">Apports en espèces</span><span>' +
+          htg(sol.apports_cash_gdes) + '</span></div>' +
+        (Number(sol.apports_nature_gdes) ?
+          '<div class="total"><span class="l">Apports en nature</span><span>' +
+          htg(sol.apports_nature_gdes) + '</span></div>' : '') +
+        (Number(sol.retraits_gdes) ?
+          '<div class="total"><span class="l">Retraits</span><span>−' +
+          htg(sol.retraits_gdes) + '</span></div>' : '') +
+        '<div class="total"><span class="l">Part du bénéfice</span><span>' +
+          htg(sol.part_profit_gdes) + '</span></div>' +
+        '<div class="total gros"><span class="l">Solde</span><span>' +
+          htg(sol.solde_gdes) + '</span></div>';
+
+      // ── Journal des parts ──
+      var hist = r[1].evenements || r[1] || [];
+      if (hist.length) {
+        h += '<div class="titre-section">Journal des parts</div>';
+        h += hist.slice().reverse().map(function (x) {
+          return '<div class="ligne"><div class="corps">' +
+            '<div class="t1" style="font-size:13.5px">' + e(x.libelle || x.type) +
+              '</div><div class="t2">' + dateCourte(x.date) + '</div></div>' +
+            '<div class="droite"><div style="font-weight:700">' +
+              n2(x.part_avant) + ' → ' + n2(x.part_apres) + ' %</div></div></div>';
+        }).join('');
+      }
+
+      majModale(a.nom, h);
+    }).catch(function (err) {
+      majModale('Associé', bloc(err.message, 'ko', '❌'));
+    });
+}
+
+function ouvrirRole(a) {
+  modale('Rôle de ' + a.nom,
+    bloc('« Rôle actif » n\'est pas un titre : c\'est une fonction réellement ' +
+         'exercée. En mode mixte, elle ouvre droit à une part du bénéfice. ' +
+         'À décider entre associés, pas à cocher par habitude.', 'attention', '⚖️') +
+    '<label class="champ"><span>Fonction</span>' +
+      '<input type="text" id="rl-nom" value="' + e(a.role) + '" ' +
+      'placeholder="Directeur Logistique…"></label>' +
+    '<label class="champ"><span>Rôle réellement exercé ?</span>' +
+      '<select id="rl-actif">' +
+      '<option value="OUI"' + (a.actif ? ' selected' : '') + '>Oui</option>' +
+      '<option value="NON"' + (a.actif ? '' : ' selected') + '>Non</option>' +
+      '</select></label>' +
+    '<div id="rl-res"></div>' +
+    '<button class="btn" onclick="validerRole(\'' + e(a.id) + '\')">Enregistrer</button>');
+}
+
+function validerRole(id) {
+  api('admin_role', {
+    associe_id: id,
+    role: document.getElementById('rl-nom').value,
+    role_actif: document.getElementById('rl-actif').value
+  }).then(function () {
+    fermerModale();
+    toast('Rôle mis à jour.', 'ok');
+    ongletAssocies();
+  }).catch(function (err) {
+    document.getElementById('rl-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ── Faire entrer un associé ───────────────────────────────────────
+
+var Entree = { rang: null, simulation: null };
+
+/**
+ * On simule AVANT d'écrire, et on montre les six règles, vertes comme
+ * rouges. Savoir qu'une entrée viole deux règles vaut mieux que de
+ * n'en voir qu'une — et que de découvrir la dilution une fois faite.
+ */
+function ouvrirNouvelAssocie() {
+  Entree = { rang: null, simulation: null };
+  modale('Faire entrer un associé', chargement());
+
+  api('parts_associes').then(function (d) {
+    Entree.rang = d.nb_associes + 1;
+    var plafondConnu = (Etat.ref && Etat.ref.parametres &&
+                        Etat.ref.parametres.MAX_ASSOCIES) || '—';
+
+    majModale('Faire entrer un associé',
+      (d.places_restantes
+        ? bloc('Rang ' + Entree.rang + '. Les rangs se suivent sans trou : ' +
+               'c\'est ce qui garantit que chaque entrant reste sous le ' +
+               'précédent.', 'info', '📋')
+        : bloc('Plus de place : ' + d.nb_associes + ' associés sur ' +
+               plafondConnu + ' prévus. Relève MAX_ASSOCIES dans ⚙️ Réglages ' +
+               'si les statuts le permettent.', 'attention', '⚠️')) +
+
+      '<label class="champ"><span>Nom complet</span>' +
+        '<input type="text" id="na-nom" autocapitalize="words"></label>' +
+      '<label class="champ"><span>Part d\'entrée (%)</span>' +
+        '<input type="number" id="na-part" step="0.5" min="0" inputmode="decimal" ' +
+        'oninput="simulerEntree()"></label>' +
+      '<div id="na-simul"></div>' +
+
+      '<div class="titre-section">Ses spécificités</div>' +
+      '<label class="champ"><span>Apport en espèces (HTG)</span>' +
+        '<input type="number" id="na-apport" step="1000" min="0" inputmode="decimal" ' +
+        'value="0"></label>' +
+      '<label class="champ"><span>Fonction</span>' +
+        '<input type="text" id="na-role" placeholder="laisser vide si aucune"></label>' +
+      '<label class="champ"><span>Rôle réellement exercé ?</span>' +
+        '<select id="na-actif"><option value="NON">Non</option>' +
+        '<option value="OUI">Oui</option></select></label>' +
+      '<div class="duo">' +
+        '<label class="champ"><span>Vesting (mois)</span>' +
+          '<input type="number" id="na-vesting" step="1" min="0" value="0" ' +
+          'inputmode="numeric"></label>' +
+        '<label class="champ"><span>Cliff (mois)</span>' +
+          '<input type="number" id="na-cliff" step="1" min="0" value="0" ' +
+          'inputmode="numeric"></label>' +
+      '</div>' +
+      '<label class="champ"><span>Téléphone</span>' +
+        '<input type="tel" id="na-tel" inputmode="tel"></label>' +
+      '<label class="champ"><span>Date d\'entrée</span>' +
+        '<input type="date" id="na-date" value="' + aujourdhui() + '"></label>' +
+      '<div id="na-res"></div>' +
+      '<button class="btn" id="na-btn" disabled onclick="validerEntreeAssocie()">' +
+        'Saisis une part pour continuer</button>');
+  }).catch(function (err) {
+    majModale('Faire entrer un associé', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+var minuteurSim = null;
+function simulerEntree() {
+  clearTimeout(minuteurSim);
+  var z = document.getElementById('na-simul');
+  var b = document.getElementById('na-btn');
+  var part = Number(document.getElementById('na-part').value);
+
+  if (!part) {
+    z.innerHTML = '';
+    b.disabled = true; b.textContent = 'Saisis une part pour continuer';
+    return;
+  }
+
+  z.innerHTML = chargement('Simulation…');
+  minuteurSim = setTimeout(function () {
+    api('parts_simuler', { part: part, rang: Entree.rang })
+      .then(function (s) { afficherSimulation(s, part); })
+      .catch(function (err) {
+        // Une entrée refusée renvoie quand même les règles : on les montre.
+        var s = err.detail && err.detail.data;
+        if (s && s.regles) { afficherSimulation(s, part); return; }
+        z.innerHTML = bloc(err.message, 'ko', '❌');
+        b.disabled = true; b.textContent = 'Entrée impossible';
+      });
+  }, 400);
+}
+
+function afficherSimulation(s, part) {
+  Entree.simulation = s;
+  var z = document.getElementById('na-simul');
+  var b = document.getElementById('na-btn');
+
+  var h = '<div class="titre-section">Les six règles</div>';
+  (s.regles || []).forEach(function (r) {
+    h += '<div class="regle ' + (r.ok ? 'oui' : 'non') + '">' +
+      '<span class="ic">' + (r.ok ? '✓' : '✕') + '</span>' +
+      '<span>' + e(r.libelle) +
+      (r.detail ? '<span class="detail">' + e(r.detail) + '</span>' : '') +
+      '</span></div>';
+  });
+
+  if (s.projection && s.projection.length) {
+    h += '<div class="titre-section">Effet sur chacun</div>';
+    s.projection.forEach(function (a) {
+      var delta = a.part_apres - a.part_avant;
+      h += '<div class="total"><span class="l">' + e(a.nom) + '</span>' +
+        '<span>' + n2(a.part_avant) + ' → <b>' + n2(a.part_apres) + ' %</b>' +
+        '<span style="color:var(--rouge);font-size:12px"> ' + n2(delta) + '</span>' +
+        '</span></div>';
+    });
+    h += '<div class="total gros"><span class="l">Nouvel entrant</span><span>' +
+      n2(part) + ' %</span></div>';
+  }
+
+  z.innerHTML = h;
+  b.disabled = !s.valide;
+  b.textContent = s.valide
+    ? 'Faire entrer à ' + n2(part) + ' %'
+    : 'Règles non respectées';
+}
+
+function validerEntreeAssocie() {
+  var res = document.getElementById('na-res');
+  var b = document.getElementById('na-btn');
+  var nom = document.getElementById('na-nom').value.trim();
+  var part = Number(document.getElementById('na-part').value);
+
+  if (!nom) { res.innerHTML = bloc('Le nom est requis.', 'ko', '⚠️'); return; }
+
+  if (!confirm('Faire entrer ' + nom + ' à ' + n2(part) + ' % ?\n\n' +
+               'Toutes les parts existantes seront diluées. ' +
+               'L\'opération est tracée au journal.')) return;
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('parts_enregistrer', {
+    nom: nom,
+    part: part,
+    rang: Entree.rang,
+    rang_entree: Entree.rang,
+    date_entree: document.getElementById('na-date').value,
+    apport_espece: Number(document.getElementById('na-apport').value) || 0,
+    role: document.getElementById('na-role').value,
+    role_actif: document.getElementById('na-actif').value,
+    vesting_mois: Number(document.getElementById('na-vesting').value) || 0,
+    cliff_mois: Number(document.getElementById('na-cliff').value) || 0,
+    telephone: document.getElementById('na-tel').value
+  }).then(function (d) {
+    fermerModale();
+    toast(nom + ' est entré à ' + n2(part) + ' %.', 'ok');
+    ongletAssocies();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Faire entrer à ' + n2(part) + ' %';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ── Appel de fonds ────────────────────────────────────────────────
+
+function ouvrirAppelFonds() {
+  modale('Appel de fonds', chargement());
+
+  api('appel_fonds').then(function (d) {
+    var h = '';
+
+    if (!d.appel_en_cours) {
+      h += bloc('Aucun appel en cours. Fixe CAPITAL_CIBLE_GDES dans ⚙️ Réglages ' +
+                'pour en ouvrir un : chaque associé devra alors verser sa part ' +
+                'statutaire de ce capital.', 'info', 'ℹ️');
+    } else {
+      h += '<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v">' + court(d.capital_cible_gdes) +
+          '</div><div class="l">appelé</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--vert)">' +
+          court(d.capital_verse_gdes) + '</div><div class="l">versé</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+          court(d.capital_manquant_gdes) + '</div><div class="l">manquant</div></div>' +
+        '</div>' +
+        bloc(d.nb_a_jour + ' associé(s) à jour sur ' + d.nb_associes + '.',
+             d.tous_a_jour ? 'ok' : 'attention', d.tous_a_jour ? '✅' : '⏳');
+    }
+
+    h += (d.associes || []).map(function (a) {
+      var taux = Number(a.taux_atteinte_pct) || 0;
+      return '<div class="carte serree" style="margin-bottom:9px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+          '<b>' + e(a.nom) + '</b>' +
+          '<span style="font-weight:800;color:' +
+            (a.a_jour ? 'var(--vert)' : 'var(--orange)') + '">' +
+            n2(taux) + ' %</span></div>' +
+        '<div class="jauge' + (taux >= 100 ? ' plein' : '') + '">' +
+          '<div style="width:' + Math.min(taux, 100) + '%"></div></div>' +
+        '<div style="font-size:12px;color:var(--doux);margin-top:6px">' +
+          htg(a.verse_gdes) + ' versés sur ' + htg(a.cible_gdes) +
+          (Number(a.reste_a_verser_gdes) > 0
+            ? ' · reste ' + htg(a.reste_a_verser_gdes) : '') +
+          ' · ' + a.nb_versements + ' versement(s)</div>' +
+      '</div>';
+    }).join('');
+
+    h += bloc('Un associé peut verser en plusieurs fois. Sa part du bénéfice ' +
+              'suit ce qu\'il a réellement versé, pas ce qu\'il a promis — ' +
+              'c\'est le sens du mode « financement » et de la moitié du mode ' +
+              '« mixte ».', 'info', '💡');
+
+    majModale('Appel de fonds', h);
+  }).catch(function (err) {
+    majModale('Appel de fonds', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET CLÔTURE
+// ═══════════════════════════════════════════════════════════════════
+
+function ongletCloture() {
+  poser(
+    bloc('Clôturer fige une période : le bénéfice est réparti entre les ' +
+         'associés et porté à leur solde. Les calculs suivants repartent de ' +
+         'ce point. Une clôture s\'annule, mais laisse une trace.',
+         'info', '🔒') +
+    '<div class="carte">' +
+      '<div class="duo">' +
+        '<label class="champ"><span>Du</span><input type="date" id="cl-debut" ' +
+          'value="' + premierDuMois() + '"></label>' +
+        '<label class="champ"><span>Au</span><input type="date" id="cl-fin" ' +
+          'value="' + aujourdhui() + '"></label>' +
+      '</div>' +
+      '<button class="btn" onclick="preparerCloture()">Préparer la clôture</button>' +
+    '</div>' +
+    '<div id="cl-prep"></div>' +
+    '<div class="titre-section">Clôtures passées</div>' +
+    '<div id="cl-liste">' + chargement() + '</div>'
+  );
+  chargerClotures();
+}
+
+function chargerClotures() {
+  api('clotures').then(function (liste) {
+    var z = document.getElementById('cl-liste');
+    if (!z) return;
+    var l = liste.clotures || liste;
+    if (!l || !l.length) { z.innerHTML = vide('🔓', 'Aucune clôture.'); return; }
+    z.innerHTML = l.map(function (c) {
+      return '<div class="ligne"><div class="corps">' +
+        '<div class="t1">' + dateCourte(c.debut) + ' → ' + dateCourte(c.fin) + '</div>' +
+        '<div class="t2">' + e(c.type_periode || '') + ' · ' +
+          (c.nb_associes || 0) + ' associé(s)</div></div>' +
+        '<div class="droite"><b>' + court(c.profit_gdes) + '</b>' +
+        '<div style="font-size:11.5px;color:var(--doux)">HTG</div></div></div>';
+    }).join('');
+  }).catch(function (err) {
+    var z = document.getElementById('cl-liste');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function preparerCloture() {
+  var debut = document.getElementById('cl-debut').value;
+  var fin = document.getElementById('cl-fin').value;
+  var z = document.getElementById('cl-prep');
+  z.innerHTML = chargement('Préparation…');
+
+  api('preparer_cloture', { debut: debut, fin: fin }).then(function (d) {
+    var h = '<div class="carte">' +
+      '<div class="total"><span class="l">Revenus</span><span>' +
+        htg(d.revenus_gdes) + '</span></div>' +
+      '<div class="total"><span class="l">Dépenses</span><span>−' +
+        htg(d.depenses_gdes) + '</span></div>' +
+      '<div class="total gros"><span class="l">Bénéfice à répartir</span>' +
+        '<span style="color:' + (d.profit_gdes < 0 ? 'var(--rouge)' : '#0E4429') +
+        '">' + htg(d.profit_gdes) + '</span></div>';
+
+    (d.alertes || []).forEach(function (a) { h += bloc(a, 'attention', '⚠️'); });
+
+    if (d.lignes && d.lignes.length) {
+      h += '<div class="titre-section">Ce que chacun recevra</div>';
+      d.lignes.forEach(function (l) {
+        h += '<div class="total"><span class="l">' + e(l.nom) + '</span>' +
+          '<span>' + pct(l.part_pct || l.part_pourcentage) + ' → <b>' +
+          htg(l.montant_gdes || l.part_profit_gdes) + '</b></span></div>';
+      });
+    }
+
+    h += d.pret
+      ? '<button class="btn" style="margin-top:14px" onclick="executerCloture()">' +
+        '🔒 Clôturer définitivement</button>'
+      : bloc('Corrige les alertes avant de clôturer.', 'ko', '⛔');
+
+    h += '</div>';
+    z.innerHTML = h;
+  }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+}
+
+function executerCloture() {
+  var debut = document.getElementById('cl-debut').value;
+  var fin = document.getElementById('cl-fin').value;
+
+  if (!confirm('Clôturer du ' + dateCourte(debut) + ' au ' + dateCourte(fin) + ' ?\n\n' +
+               'Le bénéfice sera réparti et porté au solde de chaque associé. ' +
+               'Les calculs suivants repartiront de ce point.')) return;
+
+  api('cloturer', { type_periode: 'mensuel', debut: debut, fin: fin })
+    .then(function (d) {
+      toast(d.message || 'Période clôturée.', 'ok');
+      ongletCloture();
+    }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  PARAMÈTRES — réservé à l'administrateur
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Chaque paramètre porte ici sa propre unité et sa propre explication.
+ *
+ * Le point à retenir, écrit à l'écran plutôt que dans une note que
+ * personne ne lira : changer une valeur ne retouche JAMAIS une
+ * opération déjà enregistrée. Un colis garde le prix au livre du jour
+ * de sa réception, une facture son taux, une commande ses frais, un
+ * revenu ses gourdes. Seules les opérations suivantes changent.
+ */
+var PARAMS_EDITABLES = [
+  { cle:'PRIX_LB_USD', nom:'Prix par livre', unite:'$', pas:0.25,
+    aide:'Appliqué à la réception d\'un colis. Les colis déjà reçus gardent le leur.' },
+  { cle:'POIDS_MINIMUM_LB', nom:'Poids minimum facturé', unite:'lb', pas:0.1,
+    aide:'Un colis plus léger est facturé à ce poids.' },
+  { cle:'TAUX_ACHAT_USD', nom:'Taux d\'achat du dollar', unite:'HTG', pas:1,
+    aide:'Quand le client paie en gourdes et que tu achètes du dollar.' },
+  { cle:'TAUX_VENTE_USD', nom:'Taux de vente du dollar', unite:'HTG', pas:1,
+    aide:'Quand le client paie en dollars. Toujours sous le taux d\'achat.' },
+  { cle:'TAUX_COMMISSION_DEFAUT', nom:'Frais de commande', unite:'%', pas:0.5,
+    fraction:true,
+    aide:'Proposé à la saisie. 0 pour une promotion. Le taux fidèle d\'un client passe devant.' },
+  { cle:'JOURS_ALERTE_NON_RECLAME', nom:'Alerte colis non réclamé', unite:'jours', pas:1,
+    aide:'Au-delà, le colis est signalé comme oublié.' },
+  { cle:'DUREE_SESSION_HEURES', nom:'Durée d\'une session', unite:'h', pas:1,
+    aide:'Au-delà, l\'agent doit retaper son code.' },
+  { cle:'MAX_TENTATIVES_CODE', nom:'Codes faux avant blocage', unite:'', pas:1,
+    aide:'Le compte se bloque ensuite ; un admin le débloque.' }
+];
+
+function ouvrirParametres() {
+  if (!Etat.user || Etat.user.role !== 'admin') {
+    toast('Réservé à l\'administrateur.', 'ko');
+    return;
+  }
+  modale('Paramètres', chargement());
+
+  Promise.all([api('admin_parametres'), api('admin_tarifs_depot')])
+    .then(function (r) {
+      var valeurs = {};
+      r[0].forEach(function (x) { valeurs[x.cle] = x.valeur; });
+      rendreParametres(valeurs, r[1].tarifs);
+    }).catch(function (err) {
+      majModale('Paramètres', bloc(err.message, 'ko', '❌'));
+    });
+}
+
+function rendreParametres(valeurs, tarifs) {
+  var h = bloc('Une modification ne touche jamais une opération déjà ' +
+               'enregistrée. Un colis garde le prix du jour de sa réception, ' +
+               'une facture son taux, une commande ses frais. Seules les ' +
+               'opérations suivantes changent.', 'info', '🔒');
+
+  PARAMS_EDITABLES.forEach(function (p) {
+    var brut = valeurs[p.cle];
+    if (brut === undefined) return;
+    var affiche = p.fraction ? (Number(brut) * 100) : brut;
+
+    h += '<div class="carte serree" style="margin-bottom:10px">' +
+      '<div style="font-weight:700;font-size:14.5px">' + e(p.nom) + '</div>' +
+      '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;' +
+        'line-height:1.35">' + e(p.aide) + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input type="number" id="pm-' + e(p.cle) + '" value="' + e(affiche) + '" ' +
+          'step="' + p.pas + '" inputmode="decimal" style="flex:1">' +
+        (p.unite ? '<span style="font-weight:700;color:var(--doux);' +
+          'min-width:34px">' + e(p.unite) + '</span>' : '') +
+        '<button class="btn petit" style="width:auto;padding:11px 15px" ' +
+          'onclick="enregistrerParametre(\'' + e(p.cle) + '\',' +
+          (p.fraction ? 'true' : 'false') + ')">OK</button>' +
+      '</div></div>';
+  });
+
+  // ── Paliers de frais de dépôt ──
+  h += '<div class="titre-section">Paliers de frais de dépôt</div>' +
+    bloc('Ce que TOI tu paies pour recharger la carte. Ces paliers ne ' +
+         'servent qu\'à estimer : le frais réellement prélevé est saisi à ' +
+         'la main sur chaque dépôt, et c\'est lui qui entre en comptabilité.',
+         'attention', '💳');
+
+  (tarifs || []).forEach(function (t) {
+    h += '<div class="carte serree" style="margin-bottom:10px' +
+        (t.actif ? '' : ';opacity:.5') + '">' +
+      '<div style="font-weight:700;font-size:14px;margin-bottom:8px">' +
+        n0(t.min_usd) + ' $ – ' + (t.max_usd === '' ? '∞' : n0(t.max_usd) + ' $') +
+        (t.note ? ' <span style="font-weight:400;color:var(--doux);font-size:12px">· ' +
+          e(t.note) + '</span>' : '') + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input type="number" id="td-' + e(t.tarif_id) + '" ' +
+          'value="' + (t.taux * 100) + '" step="0.5" inputmode="decimal" style="flex:1">' +
+        '<span style="font-weight:700;color:var(--doux);min-width:34px">%</span>' +
+        '<button class="btn petit" style="width:auto;padding:11px 15px" ' +
+          'onclick="enregistrerTarif(\'' + e(t.tarif_id) + '\')">OK</button>' +
+      '</div>' +
+      '<button class="btn vide petit" style="margin-top:8px" onclick="basculerTarif(\'' +
+        e(t.tarif_id) + '\',' + (t.actif ? 'false' : 'true') + ')">' +
+        (t.actif ? 'Désactiver ce palier' : 'Réactiver ce palier') + '</button>' +
+    '</div>';
+  });
+
+  h += '<div id="pm-res"></div>';
+  majModale('Paramètres', h);
+}
+
+function enregistrerParametre(cle, fraction) {
+  var champ = document.getElementById('pm-' + cle);
+  var saisi = champ.value;
+  if (saisi === '') { toast('Valeur vide.', 'ko'); return; }
+
+  // L'écran parle en pourcentage, le serveur attend une fraction :
+  // la conversion se fait ici, jamais dans la tête de l'utilisateur.
+  var valeur = fraction ? (Number(saisi) / 100) : saisi;
+
+  api('admin_parametres', { cle: cle, valeur: valeur }).then(function () {
+    toast(cle + ' enregistré.', 'ok');
+    champ.style.borderColor = 'var(--vert)';
+    return chargerReferentiels();
+  }).catch(function (err) {
+    champ.style.borderColor = 'var(--rouge)';
+    var z = document.getElementById('pm-res');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+    toast(err.message, 'ko');
+  });
+}
+
+function enregistrerTarif(id) {
+  var champ = document.getElementById('td-' + id);
+  api('admin_tarifs_depot', { tarif_id: id, taux: Number(champ.value) / 100 })
+    .then(function () {
+      toast('Palier enregistré.', 'ok');
+      champ.style.borderColor = 'var(--vert)';
+      return chargerReferentiels();
+    }).catch(function (err) {
+      champ.style.borderColor = 'var(--rouge)';
+      toast(err.message, 'ko');
+    });
+}
+
+function basculerTarif(id, actif) {
+  api('admin_tarifs_depot', { tarif_id: id, actif: actif ? 'OUI' : 'NON' })
+    .then(function () {
+      toast(actif ? 'Palier réactivé.' : 'Palier désactivé.', 'ok');
+      return chargerReferentiels();
+    }).then(ouvrirParametres)
+    .catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function rafraichirRef() {
+  toast('Rechargement…');
+  chargerReferentiels().then(function () {
+    fermerModale(); toast('Référentiels à jour.', 'ok'); rendreOnglet();
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function ouvrirChangerCode() {
+  modale('Changer mon code',
+    bloc('Six chiffres. Le code est haché : personne ne peut le retrouver, ' +
+         'seulement le régénérer.', 'info', '🔑') +
+    '<label class="champ"><span>Code actuel</span><input type="password" id="k-a" ' +
+      'inputmode="numeric" maxlength="6"></label>' +
+    '<label class="champ"><span>Nouveau code</span><input type="password" id="k-b" ' +
+      'inputmode="numeric" maxlength="6"></label>' +
+    '<label class="champ"><span>Confirmer</span><input type="password" id="k-c" ' +
+      'inputmode="numeric" maxlength="6"></label>' +
+    '<div id="k-res"></div>' +
+    '<button class="btn vert" onclick="validerCode()">Changer</button>');
+}
+
+function validerCode() {
+  var a = document.getElementById('k-a').value;
+  var b = document.getElementById('k-b').value;
+  var c = document.getElementById('k-c').value;
+  var res = document.getElementById('k-res');
+  if (!/^\d{6}$/.test(b)) { res.innerHTML = bloc('Six chiffres exactement.', 'ko', '⚠️'); return; }
+  if (b !== c) { res.innerHTML = bloc('Les deux codes diffèrent.', 'ko', '⚠️'); return; }
+  api('changer_code', { ancien_code: a, nouveau_code: b }).then(function () {
+    fermerModale(); toast('Code modifié.', 'ok');
+  }).catch(function (err) { res.innerHTML = bloc(err.message, 'ko', '❌'); });
+}
+
+function ouvrirReglages() {
+  var u = Etat.user || {};
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  modale('Réglages',
+    '<div class="carte serree" style="margin-bottom:12px">' +
+      '<div style="font-weight:800;font-size:16px">' + e(u.nom) + '</div>' +
+      '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
+        e(u.user_id) + ' · ' + e(u.role) + '</div></div>' +
+
+    '<div class="carte"><div class="titre-section" style="margin-top:0">' +
+      'Gouvernance en vigueur</div>' +
+      '<div class="total"><span class="l">Clé de répartition</span><b>' +
+        e(p.MODE_REPARTITION || 'mixte') + '</b></div>' +
+      '<div class="total"><span class="l">Poids du rôle</span><b>' +
+        n0(p.POIDS_ROLE_PCT) + ' %</b></div>' +
+      '<div class="total"><span class="l">Poids du cash</span><b>' +
+        n0(p.POIDS_CASH_PCT) + ' %</b></div>' +
+      '<div class="total"><span class="l">Associés maximum</span><b>' +
+        n0(p.MAX_ASSOCIES) + '</b></div>' +
+      '<div class="total"><span class="l">Capital appelé</span><b>' +
+        htg(p.CAPITAL_CIBLE_GDES) + '</b></div>' +
+    '</div>' +
+
+    '<button class="btn vide" onclick="ouvrirParametres()">' +
+      '⚙️ Paramètres et tarifs</button>' +
+    '<button class="btn vide" onclick="ouvrirGouvernance()">' +
+      '⚖️ Règles d\'entrée des associés</button>' +
+    '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
+    '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
+    '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
+    '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>');
+}
+
+/**
+ * Les règles d'entrée d'un associé — plafonds, planchers, dégressivité.
+ *
+ * Elles vivaient en dur dans le code : le huitième associé était refusé
+ * par un trou dans une table, pas par une décision. Elles sont
+ * maintenant des paramètres, donc des choix que les associés peuvent
+ * prendre et inscrire eux-mêmes.
+ */
+var PARAMS_GOUVERNANCE = [
+  { cle:'MAX_ASSOCIES', nom:'Nombre maximum d\'associés', unite:'', pas:1,
+    aide:'Prévu par les statuts. Au-delà, toute entrée est refusée.' },
+  { cle:'PLANCHER_FONDATEUR_PCT', nom:'Plancher du fondateur', unite:'%', pas:1,
+    aide:'Part sous laquelle le rang 1 ne peut jamais descendre, quelle que soit la dilution.' },
+  { cle:'PLAFOND_NOUVEAUX_PCT', nom:'Plafond collectif des nouveaux', unite:'%', pas:1,
+    aide:'Total maximal détenu ensemble par les associés de rang 5 et plus.' },
+  { cle:'PART_MAX_RANG5_PCT', nom:'Part maximale au rang 5', unite:'%', pas:0.5,
+    aide:'Point de départ de la dégressivité.' },
+  { cle:'DEGRESSION_PART_PCT', nom:'Dégressivité par rang', unite:'pts', pas:0.5,
+    aide:'Points retirés au plafond à chaque rang suivant. Avec 10 et 2 : 10, 8, 6, 4…' },
+  { cle:'PART_MIN_NOUVEAU_PCT', nom:'Plancher du plafond', unite:'%', pas:0.5,
+    aide:'La dégressivité ne descend jamais sous cette valeur.' },
+  { cle:'CAPITAL_CIBLE_GDES', nom:'Capital appelé', unite:'HTG', pas:10000,
+    aide:'0 = aucun appel en cours. Sinon, chacun doit verser sa part statutaire de ce montant.' },
+  { cle:'POIDS_ROLE_PCT', nom:'Poids du rôle', unite:'%', pas:5,
+    aide:'Part du bénéfice qui suit les rôles occupés. Avec le poids du cash, doit faire 100.' },
+  { cle:'POIDS_CASH_PCT', nom:'Poids du cash', unite:'%', pas:5,
+    aide:'Part du bénéfice qui suit l\'argent réellement versé.' }
+];
+
+function ouvrirGouvernance() {
+  modale('Règles d\'entrée', chargement());
+
+  api('admin_parametres').then(function (liste) {
+    var v = {};
+    liste.forEach(function (x) { v[x.cle] = x.valeur; });
+
+    var h = bloc('Ces règles décident qui peut entrer, à quelle part, et ' +
+                 'comment le bénéfice se partage. Les changer ne retouche ' +
+                 'aucune entrée déjà enregistrée — seulement les suivantes. ' +
+                 'À décider entre associés, puis à inscrire ici.',
+                 'attention', '⚖️');
+
+    PARAMS_GOUVERNANCE.forEach(function (p) {
+      if (v[p.cle] === undefined) return;
+      h += '<div class="carte serree" style="margin-bottom:10px">' +
+        '<div style="font-weight:700;font-size:14.5px">' + e(p.nom) + '</div>' +
+        '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;' +
+          'line-height:1.35">' + e(p.aide) + '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+          '<input type="number" id="gv-' + e(p.cle) + '" value="' + e(v[p.cle]) + '" ' +
+            'step="' + p.pas + '" inputmode="decimal" style="flex:1">' +
+          (p.unite ? '<span style="font-weight:700;color:var(--doux);' +
+            'min-width:34px">' + e(p.unite) + '</span>' : '') +
+          '<button class="btn petit" style="width:auto;padding:11px 15px" ' +
+            'onclick="enregistrerGouvernance(\'' + e(p.cle) + '\')">OK</button>' +
+        '</div></div>';
+    });
+
+    // Le mode de répartition n'est pas un nombre : il mérite sa liste.
+    h += '<div class="carte serree">' +
+      '<div style="font-weight:700;font-size:14.5px">Clé de répartition</div>' +
+      '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;line-height:1.35">' +
+        'statutaire = les parts du capital · financement = le cash versé · ' +
+        'mixte = les deux, selon les poids ci-dessus.</div>' +
+      '<select id="gv-MODE_REPARTITION" onchange="enregistrerMode()">' +
+        ['statutaire', 'financement', 'mixte'].map(function (m) {
+          return '<option value="' + m + '"' +
+            (String(v.MODE_REPARTITION) === m ? ' selected' : '') + '>' + m + '</option>';
+        }).join('') + '</select></div>' +
+
+      bloc('La clé ne touche PAS aux parts du capital social. Elle ne partage ' +
+           'que le bénéfice. Juridiquement, un apport en travail ouvre droit ' +
+           'aux bénéfices, jamais au capital — c\'est exactement ce que fait ' +
+           'le mode mixte. À faire écrire dans un accord entre associés, ' +
+           'séparé des statuts.', 'info', '⚖️') +
+      '<div id="gv-res"></div>';
+
+    majModale('Règles d\'entrée', h);
+  }).catch(function (err) {
+    majModale('Règles d\'entrée', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function enregistrerGouvernance(cle) {
+  var champ = document.getElementById('gv-' + cle);
+  api('admin_parametres', { cle: cle, valeur: champ.value }).then(function () {
+    toast(cle + ' enregistré.', 'ok');
+    champ.style.borderColor = 'var(--vert)';
+    return chargerReferentiels();
+  }).catch(function (err) {
+    champ.style.borderColor = 'var(--rouge)';
+    var z = document.getElementById('gv-res');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+    toast(err.message, 'ko');
+  });
+}
+
+function enregistrerMode() {
+  var v = document.getElementById('gv-MODE_REPARTITION').value;
+  api('admin_parametres', { cle: 'MODE_REPARTITION', valeur: v }).then(function () {
+    toast('Clé de répartition : ' + v, 'ok');
+    return chargerReferentiels();
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  MODALE ET DÉMARRAGE
+// ═══════════════════════════════════════════════════════════════════
+
+function modale(titre, html) {
+  var dejaOuverte = Nav.modaleOuverte;
+  fermerModaleDom();
+  var v = document.createElement('div');
+  v.className = 'voile'; v.id = 'voile';
+  v.innerHTML = '<div class="modale" onclick="event.stopPropagation()">' +
+    '<div class="poignee"></div><h3>' + e(titre) + '</h3>' +
+    '<div id="corps-modale">' + html + '</div></div>';
+  v.onclick = fermerModale;
+  document.body.appendChild(v);
+  document.body.style.overflow = 'hidden';
+  Nav.modaleOuverte = true;
+  if (!dejaOuverte) { try { history.pushState({ modale: true }, ''); } catch (e2) {} }
+}
+
+function majModale(titre, html) {
+  var c = document.getElementById('corps-modale');
+  var t = document.querySelector('.modale h3');
+  if (c) { c.innerHTML = html; if (t) t.textContent = titre; }
+  else modale(titre, html);
+}
+
+/** Ferme sans toucher à l'historique — réservé à popstate. */
+function fermerModaleDom() {
+  var v = document.getElementById('voile');
+  if (v) v.remove();
+  document.body.style.overflow = '';
+  Nav.modaleOuverte = false;
+}
+
+function fermerModale() {
+  if (Nav.modaleOuverte) {
+    Nav.modaleOuverte = false;
+    fermerModaleDom();
+    try { history.back(); } catch (e2) {}
+    return;
+  }
+  fermerModaleDom();
+}
+
+window.addEventListener('online',  function () { majBandeau(); toast('Réseau revenu.', 'ok'); });
+window.addEventListener('offline', function () { majBandeau(); toast('Réseau perdu.', 'ko'); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+
+(function demarrer() {
+  try {
+    var h = (location.hash || '').replace('#', '');
+    if (h && ONGLETS.some(function (o) { return o.id === h; })) Etat.onglet = h;
+    history.replaceState({ onglet: Etat.onglet }, '', '#' + Etat.onglet);
+  } catch (e2) {}
+
+  if (Etat.url && Etat.token) {
+    document.getElementById('app').innerHTML =
+      '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
+      '</span></h1></header><main>' + chargement() + '</main>';
+    chargerReferentiels().then(dessiner).catch(function (err) {
+      if (/Session|Jeton/i.test(err.message)) { deconnecter(); return; }
+      toast(err.message, 'ko'); dessiner();
+    });
+  } else {
+    dessiner();
+  }
+})();
+</script>
+</body>
+</html>
