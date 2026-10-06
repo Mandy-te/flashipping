@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#5A3A00">
+<title>Flashipping — Commandes</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   Même grammaire visuelle que l'app Logistique, mais l'en-tête est
+   ambre : quand un agent a les deux applications installées, il voit
+   d'un coup d'œil laquelle est ouverte.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --marine:#5A3A00; --or:#F0A818; --or-fonce:#C98500;
+  --vert:#1B7F4B; --rouge:#C62828; --orange:#E67E22; --bleu:#1565C0;
+  --fond:#F7F5F0; --carte:#FFFFFF; --bord:#E4DDD0;
+  --texte:#241A08; --doux:#7A6A52;
+  --ombre:0 1px 3px rgba(90,58,0,.12);
+  --haut:env(safe-area-inset-top,0px);
+  --bas:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--fond); color:var(--texte); overscroll-behavior-y:none;
+}
+input,select,textarea,button{font:inherit;color:inherit}
+a{color:var(--bleu)}
+
+#app{min-height:100vh;display:flex;flex-direction:column}
+.entete{
+  background:var(--marine); color:#fff;
+  padding:calc(var(--haut) + 10px) 14px 10px;
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;
+}
+.entete h1{font-size:16px;margin:0;font-weight:700;flex:1;letter-spacing:.2px}
+.entete .sous{font-size:11.5px;opacity:.78;font-weight:400;display:block}
+.pastille{width:9px;height:9px;border-radius:50%;background:#7ED6A5;flex:none}
+.pastille.hors{background:#FF8A80}
+.btn-entete{
+  background:rgba(255,255,255,.16);border:0;color:#fff;
+  width:38px;height:38px;border-radius:10px;font-size:17px;flex:none;
+}
+main{flex:1;padding:12px 12px 96px;max-width:760px;margin:0 auto;width:100%}
+
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;
+  border-top:1px solid var(--bord);display:flex;padding-bottom:var(--bas);
+  box-shadow:0 -1px 8px rgba(90,58,0,.08);
+}
+nav button{
+  flex:1;background:none;border:0;padding:8px 2px 7px;display:flex;
+  flex-direction:column;align-items:center;gap:3px;font-size:10.5px;
+  color:var(--doux);font-weight:600;
+}
+nav button .ic{font-size:21px;line-height:1}
+nav button.actif{color:var(--marine)}
+
+.carte{
+  background:var(--carte);border:1px solid var(--bord);border-radius:12px;
+  padding:14px;margin-bottom:12px;box-shadow:var(--ombre);
+}
+.carte.serree{padding:11px 12px}
+.titre-section{
+  font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--doux);margin:18px 2px 8px;
+}
+.titre-section:first-child{margin-top:2px}
+
+label.champ{display:block;margin-bottom:12px}
+label.champ > span{
+  display:block;font-size:12px;font-weight:700;color:var(--doux);
+  margin-bottom:5px;letter-spacing:.2px;
+}
+input[type=text],input[type=tel],input[type=number],input[type=password],
+input[type=email],input[type=url],select,textarea{
+  width:100%;padding:13px 12px;border:1.5px solid var(--bord);
+  border-radius:10px;background:#fff;font-size:16px;
+}
+input:focus,select:focus,textarea:focus{
+  outline:0;border-color:var(--or-fonce);box-shadow:0 0 0 3px rgba(240,168,24,.2);
+}
+input[readonly]{background:#F5F2EC;color:var(--doux)}
+textarea{min-height:60px;resize:vertical}
+.duo{display:flex;gap:10px}
+.duo > *{flex:1;min-width:0}
+.trio{display:flex;gap:8px}
+.trio > *{min-width:0}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:14px;border:0;border-radius:11px;background:var(--or);
+  color:#3A2600;font-weight:800;font-size:15.5px;
+}
+.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.45}
+.btn.vert{background:var(--vert);color:#fff}
+.btn.rouge{background:var(--rouge);color:#fff}
+.btn.sombre{background:var(--marine);color:#fff}
+.btn.vide{background:#fff;color:var(--marine);border:1.5px solid var(--bord);font-weight:700}
+.btn.petit{padding:10px;font-size:14px;border-radius:9px}
+.btn + .btn{margin-top:9px}
+.rangee-btn{display:flex;gap:9px}
+.rangee-btn .btn + .btn{margin-top:0}
+
+.puces{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 8px;
+  scrollbar-width:none;-ms-overflow-style:none}
+.puces::-webkit-scrollbar{display:none}
+.puce{
+  flex:none;padding:8px 13px;border-radius:999px;border:1.5px solid var(--bord);
+  background:#fff;font-size:13px;font-weight:650;white-space:nowrap;color:var(--doux);
+}
+.puce.actif{background:var(--marine);color:#fff;border-color:var(--marine)}
+
+.ligne{
+  display:flex;align-items:center;gap:11px;padding:12px 13px;background:#fff;
+  border:1px solid var(--bord);border-radius:11px;margin-bottom:8px;
+  text-align:left;width:100%;
+}
+.ligne:active{background:#FBF9F5}
+.ligne .corps{flex:1;min-width:0}
+.ligne .t1{font-weight:700;font-size:14.5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ligne .t2{font-size:12.5px;color:var(--doux);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ligne .droite{text-align:right;flex:none}
+.mono{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;
+  letter-spacing:-.2px;word-break:break-all}
+
+.etat{display:inline-block;padding:3px 9px;border-radius:7px;
+  font-size:11px;font-weight:800;letter-spacing:.3px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;
+  border-radius:7px;font-size:11px;font-weight:700;background:#F2EDE4;color:var(--doux)}
+.badge.ok{background:#E8F5E9;color:var(--vert)}
+.badge.ko{background:#FFEBEE;color:var(--rouge)}
+
+.msg{padding:12px 13px;border-radius:11px;margin-bottom:12px;font-size:14px;
+  font-weight:500;line-height:1.4;display:flex;gap:9px;align-items:flex-start}
+.msg.ok{background:#E8F5E9;color:#145A32;border:1px solid #BEE3C8}
+.msg.ko{background:#FFEBEE;color:#8E1F1F;border:1px solid #F5C6C6}
+.msg.info{background:#EAF3FB;color:#0D3C6E;border:1px solid #C3DEF3}
+.msg.attention{background:#FFF8E1;color:#7A4F00;border:1px solid #FFE0A3}
+.msg .ic{font-size:17px;flex:none;line-height:1.3}
+
+.vide{text-align:center;padding:42px 20px;color:var(--doux)}
+.vide .gros{font-size:40px;margin-bottom:10px;opacity:.5}
+.chargement{text-align:center;padding:30px;color:var(--doux);font-size:14px}
+.tourne{display:inline-block;width:19px;height:19px;border:2.5px solid var(--bord);
+  border-top-color:var(--or-fonce);border-radius:50%;animation:t .7s linear infinite;
+  vertical-align:-4px;margin-right:8px}
+@keyframes t{to{transform:rotate(360deg)}}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:9px}
+.stat{background:#fff;border:1px solid var(--bord);border-radius:11px;
+  padding:12px 9px;text-align:center}
+.stat .v{font-size:20px;font-weight:800;line-height:1.1}
+.stat .l{font-size:10.5px;color:var(--doux);margin-top:3px;font-weight:650;
+  text-transform:uppercase;letter-spacing:.4px}
+
+.total{display:flex;justify-content:space-between;align-items:baseline;
+  padding:8px 0;font-size:14.5px}
+.total + .total{border-top:1px solid var(--bord)}
+.total.gros{font-size:19px;font-weight:800;padding-top:12px;
+  border-top:2px solid var(--marine);margin-top:4px}
+.total .l{color:var(--doux);font-weight:650}
+.total.gros .l{color:var(--texte)}
+
+/* ── Article du panier ── */
+.article{
+  border:1.5px solid var(--bord);border-radius:11px;padding:12px;
+  margin-bottom:9px;background:#fff;
+}
+.article .tete{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.article .num{
+  width:24px;height:24px;border-radius:7px;background:var(--or);
+  color:#3A2600;font-weight:800;font-size:12.5px;display:flex;
+  align-items:center;justify-content:center;flex:none;
+}
+.article .tete .sup{
+  margin-left:auto;background:none;border:0;color:var(--rouge);
+  font-size:17px;padding:2px 6px;
+}
+.article label.champ{margin-bottom:8px}
+
+/* ── Jalons du cycle de vie ── */
+.jalons{display:flex;gap:4px;margin:4px 0 14px}
+.jalon{flex:1;text-align:center}
+.jalon .pt{
+  height:5px;border-radius:9px;background:var(--bord);margin-bottom:6px;
+}
+.jalon.faite .pt{background:var(--vert)}
+.jalon.ici .pt{background:var(--or)}
+.jalon .l{font-size:9.5px;color:var(--doux);font-weight:700;
+  text-transform:uppercase;letter-spacing:.2px;line-height:1.2}
+.jalon.ici .l{color:var(--texte)}
+
+/* ── Marge ── */
+.marge{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 13px;border-radius:11px;margin-bottom:12px;font-weight:700;
+}
+.marge.positive{background:#E8F5E9;color:#145A32}
+.marge.negative{background:#FFEBEE;color:#8E1F1F}
+.marge .v{font-size:20px;font-weight:800}
+
+.voile{position:fixed;inset:0;background:rgba(36,26,8,.5);z-index:60;
+  display:flex;align-items:flex-end;justify-content:center}
+.modale{
+  background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;
+  padding:18px 16px calc(18px + var(--bas));max-height:92vh;overflow-y:auto;
+  animation:monte .22s ease-out;
+}
+@keyframes monte{from{transform:translateY(18px);opacity:.4}}
+.modale h3{margin:0 0 14px;font-size:17px}
+.poignee{width:40px;height:4px;background:var(--bord);border-radius:9px;
+  margin:0 auto 14px}
+
+.suggestions{border:1.5px solid var(--bord);border-radius:11px;overflow:hidden;
+  margin-top:-4px;margin-bottom:12px;background:#fff}
+.suggestions button{display:block;width:100%;text-align:left;padding:12px 13px;
+  background:none;border:0;border-bottom:1px solid var(--bord)}
+.suggestions button:last-child{border-bottom:0}
+.suggestions button:active{background:#F7F3EC}
+
+.coche{
+  display:flex;gap:12px;align-items:center;padding:13px;border:1.5px solid var(--bord);
+  border-radius:11px;background:#fff;margin-bottom:8px;
+}
+.coche.on{border-color:var(--or-fonce);background:#FFFBF2}
+.coche input{width:23px;height:23px;flex:none;accent-color:var(--or-fonce)}
+.coche .corps{flex:1;min-width:0}
+
+#bandeau{
+  background:var(--rouge);color:#fff;padding:9px 13px;font-size:13px;
+  font-weight:700;display:none;align-items:center;gap:8px;
+  position:sticky;top:0;z-index:29;
+}
+#bandeau.vu{display:flex}
+
+#toast{position:fixed;left:12px;right:12px;bottom:calc(84px + var(--bas));
+  z-index:80;pointer-events:none}
+#toast div{
+  background:var(--marine);color:#fff;padding:13px 15px;border-radius:11px;
+  font-size:14px;font-weight:650;box-shadow:0 5px 22px rgba(90,58,0,.3);
+  animation:monte .2s ease-out;margin-top:8px;
+}
+#toast div.ko{background:var(--rouge)}
+#toast div.ok{background:var(--vert)}
+
+/* ── Impression 50 mm : reçu de commande ── */
+#zone-impression{display:none}
+@media print{
+  @page{size:50mm auto;margin:2mm}
+  body{background:#fff}
+  #app,#toast,#bandeau,nav{display:none!important}
+  #zone-impression{display:block!important}
+  .etiquette{width:46mm;font-family:Arial,Helvetica,sans-serif;color:#000}
+  .et-haut{text-align:center;font-size:8pt;font-weight:bold;
+    border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1.5mm;
+    letter-spacing:.5px}
+  .rec-t{font-size:12pt;font-weight:bold;text-align:center}
+  .rec-l{font-size:8pt;display:flex;justify-content:space-between;padding:.5mm 0}
+  .rec-art{font-size:7.5pt;padding:.4mm 0;border-bottom:1px dotted #999}
+  .rec-sep{border-top:1px dashed #000;margin:1.5mm 0}
+  .rec-tot{font-size:12pt;font-weight:bold;display:flex;justify-content:space-between;
+    border-top:1.5px solid #000;padding-top:1mm;margin-top:1mm}
+  .et-pied{font-size:6.5pt;text-align:center;margin-top:1.5mm;
+    border-top:1px solid #000;padding-top:.8mm}
+}
+</style>
+</head>
+<body>
+
+<div id="bandeau"><span>📴</span><span id="bandeau-txt">Hors ligne</span></div>
+<div id="app"></div>
+<div id="toast"></div>
+<div id="zone-impression"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLASHIPPING — COMMANDES CLIENT
+   Achat par procuration sur Shein, Temu, Amazon, AliExpress, eBay.
+
+   Le client paie le panier + la commission pour PLACER la commande.
+   Le transport se paie à la livraison, dans l'app Logistique.
+
+   Les frais de dépôt sont une charge de Flashipping, jamais refacturée
+   au client. C'est pourquoi la marge réelle d'une commande ne se
+   connaît qu'une fois le dépôt fait, et dépend du nombre de commandes
+   qui partagent ce dépôt.
+
+   Cette application exige le réseau. Chaque écriture touche la caisse :
+   un paiement crée deux revenus, un dépôt crée une charge, un achat
+   crée une sortie. Rien de tout cela ne peut être deviné hors ligne.
+   ═══════════════════════════════════════════════════════════════════ */
+
+var CLE_URL   = 'fls_api_url';
+var CLE_TOKEN = 'fls_cmd_token';
+var CLE_USER  = 'fls_cmd_user';
+var CLE_CACHE = 'fls_cmd_cache';
+
+var S = {
+  lire: function (c, d) {
+    try { var v = localStorage.getItem(c); return v === null ? d : v; }
+    catch (e) { return d; }
+  },
+  ecrire: function (c, v) { try { localStorage.setItem(c, v); } catch (e) {} },
+  effacer: function (c) { try { localStorage.removeItem(c); } catch (e) {} },
+  lireJson: function (c, d) {
+    try { return JSON.parse(localStorage.getItem(c)) || d; } catch (e) { return d; }
+  },
+  ecrireJson: function (c, v) { S.ecrire(c, JSON.stringify(v)); }
+};
+
+var Etat = {
+  url: S.lire(CLE_URL, ''),
+  token: S.lire(CLE_TOKEN, ''),
+  user: S.lireJson(CLE_USER, null),
+  ref: null,
+  onglet: 'nouvelle',
+  vue: null
+};
+
+var PLATEFORMES = ['Shein', 'Temu', 'Amazon', 'AliExpress', 'eBay', 'Autre'];
+
+var CYCLE = [
+  { code: 'devis',     libelle: 'Devis',      couleur: '#F2EDE4' },
+  { code: 'payee',     libelle: 'Payée',      couleur: '#E8F5E9' },
+  { code: 'commandee', libelle: 'Commandée',  couleur: '#FFF8E1' },
+  { code: 'recue_usa', libelle: 'Reçue USA',  couleur: '#E3F2FD' },
+  { code: 'cloturee',  libelle: 'Clôturée',   couleur: '#ECEFF1' }
+];
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  API
+// ═══════════════════════════════════════════════════════════════════
+
+function api(action, params) {
+  params = params || {};
+  if (!Etat.url) return Promise.reject(new Error('Aucune URL d\'API configurée.'));
+  if (!navigator.onLine) {
+    return Promise.reject(new Error(
+      'Pas de réseau. Cette application écrit directement en caisse : ' +
+      'elle ne peut pas travailler hors ligne.'));
+  }
+
+  var corps = Object.assign({ action: action }, params);
+  if (Etat.token && !corps.token) corps.token = Etat.token;
+
+  // text/plain : Apps Script ne répond pas au préalable CORS
+  return fetch(Etat.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(corps),
+    redirect: 'follow'
+  })
+  .then(function (r) { return r.text(); })
+  .then(function (txt) {
+    var d;
+    try { d = JSON.parse(txt); }
+    catch (e) {
+      if (txt.indexOf('<!DOCTYPE') === 0 || txt.indexOf('<html') === 0) {
+        throw new Error('L\'API a renvoyé une page web. Vérifie que le ' +
+          'déploiement est réglé sur « Accès : Tout le monde ».');
+      }
+      throw new Error('Réponse illisible du serveur.');
+    }
+    if (d.ok === false) { var x = new Error(d.erreur || 'Erreur inconnue.');
+                          x.metier = true; throw x; }
+    return d.data !== undefined ? d.data : d;
+  })
+  .catch(function (e) {
+    if (e.metier) throw e;
+    if (/Session expirée|Jeton/i.test(e.message)) { deconnecter(); throw e; }
+    throw e;
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  OUTILS
+// ═══════════════════════════════════════════════════════════════════
+
+function e(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function n2(v) { return (Math.round((Number(v) || 0) * 100) / 100).toFixed(2); }
+function n0(v) { return Math.round(Number(v) || 0).toLocaleString('fr-FR'); }
+function usd(v) { return n2(v) + ' $'; }
+function htg(v) { return n0(v) + ' HTG'; }
+function pct(v) { return (Math.round((Number(v) || 0) * 1000) / 10) + ' %'; }
+
+function dateCourte(d) {
+  if (!d) return '';
+  var x = new Date(d);
+  if (isNaN(x)) return String(d).substring(0, 16);
+  return ('0' + x.getDate()).slice(-2) + '/' + ('0' + (x.getMonth() + 1)).slice(-2) +
+         '/' + x.getFullYear();
+}
+
+function toast(txt, genre) {
+  var z = document.getElementById('toast');
+  var d = document.createElement('div');
+  if (genre) d.className = genre;
+  d.textContent = txt;
+  z.appendChild(d);
+  setTimeout(function () { d.remove(); }, genre === 'ko' ? 5200 : 3000);
+}
+
+function infoCycle(code) {
+  var c = CYCLE.filter(function (x) { return x.code === code; })[0];
+  if (c) return c;
+  if (code === 'annulee') return { code:'annulee', libelle:'Annulée', couleur:'#FFEBEE' };
+  return { code: code, libelle: code, couleur: '#EEEEEE' };
+}
+function puceCycle(code) {
+  var c = infoCycle(code);
+  return '<span class="etat" style="background:' + c.couleur + '">' +
+         e(c.libelle) + '</span>';
+}
+
+function bloc(msg, genre, icone) {
+  return '<div class="msg ' + genre + '"><span class="ic">' + (icone || 'ℹ️') +
+         '</span><span>' + e(msg) + '</span></div>';
+}
+function chargement(t) {
+  return '<div class="chargement"><span class="tourne"></span>' +
+         e(t || 'Chargement…') + '</div>';
+}
+function vide(ic, t) {
+  return '<div class="vide"><div class="gros">' + ic + '</div>' + e(t) + '</div>';
+}
+function tauxUsd() {
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  return Number(p.TAUX_ACHAT_USD) || 135;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  IMPRESSION — reçu de commande
+// ═══════════════════════════════════════════════════════════════════
+
+function imprimer(html) {
+  document.getElementById('zone-impression').innerHTML = html;
+  setTimeout(function () { window.print(); }, 120);
+}
+
+function recuCommande(d) {
+  var c = d.commande, cl = d.client || {};
+  var ent = (Etat.ref && Etat.ref.parametres &&
+             Etat.ref.parametres.NOM_ENTREPRISE) || 'FLASHIPPING';
+  var taux = tauxUsd();
+
+  var h = '<div class="etiquette">' +
+    '<div class="et-haut">' + e(ent) + '</div>' +
+    '<div class="rec-t">' + e(c.commande_id) + '</div>' +
+    '<div class="rec-sep"></div>' +
+    '<div class="rec-l"><span>Client</span><b>' + e(cl.nom_complet || '') + '</b></div>' +
+    '<div class="rec-l"><span>Date</span><span>' + dateCourte(c.date) + '</span></div>' +
+    '<div class="rec-l"><span>Plateforme</span><b>' + e(c.plateforme) + '</b></div>' +
+    '<div class="rec-sep"></div>';
+
+  (d.lignes || []).forEach(function (l) {
+    h += '<div class="rec-art">' + l.quantite + ' × ' + e(l.designation) +
+         (l.variante ? ' (' + e(l.variante) + ')' : '') +
+         '<div style="text-align:right">' + usd(l.total_usd) + '</div></div>';
+  });
+
+  h += '<div class="rec-sep"></div>' +
+    '<div class="rec-l"><span>Panier</span><span>' + usd(c.montant_panier_usd) + '</span></div>' +
+    '<div class="rec-l"><span>Frais ' + pct(c.taux_commission) + '</span><span>' +
+      usd(c.commission_usd) + '</span></div>' +
+    '<div class="rec-tot"><span>À PAYER</span><span>' + usd(c.total_client_usd) + '</span></div>' +
+    '<div class="rec-l"><span>Au taux ' + n0(taux) + '</span><b>' +
+      htg(c.total_client_usd * taux) + '</b></div>' +
+    '<div class="rec-sep"></div>' +
+    '<div class="rec-l" style="font-size:7pt"><span>Transport</span>' +
+      '<span>payable à la livraison</span></div>' +
+    '<div class="et-pied">Merci de votre confiance</div></div>';
+  return h;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  SQUELETTE
+// ═══════════════════════════════════════════════════════════════════
+
+var ONGLETS = [
+  { id: 'nouvelle',  ic: '➕', nom: 'Nouvelle' },
+  { id: 'commandes', ic: '🛒', nom: 'Commandes' },
+  { id: 'depots',    ic: '💳', nom: 'Dépôts' },
+  { id: 'marges',    ic: '📊', nom: 'Marges' }
+];
+
+function dessiner() {
+  var app = document.getElementById('app');
+  if (!Etat.url)   { app.innerHTML = ecranReglage(); return; }
+  if (!Etat.token) { app.innerHTML = ecranConnexion(); chargerUtilisateurs(); return; }
+
+  var u = Etat.user || {};
+  app.innerHTML =
+    '<header class="entete">' +
+      '<span class="pastille' + (navigator.onLine ? '' : ' hors') + '"></span>' +
+      '<h1>' + e(titreOnglet()) + '<span class="sous">' + e(u.nom || '') +
+        ' · ' + e(u.role || '') + '</span></h1>' +
+      '<button class="btn-entete" onclick="ouvrirReglages()">⚙️</button>' +
+    '</header>' +
+    '<main id="contenu">' + chargement() + '</main>' +
+    '<nav>' + ONGLETS.map(function (o) {
+      return '<button class="' + (Etat.onglet === o.id ? 'actif' : '') +
+        '" onclick="allerA(\'' + o.id + '\')"><span class="ic">' + o.ic +
+        '</span>' + e(o.nom) + '</button>';
+    }).join('') + '</nav>';
+
+  majBandeau();
+  rendreOnglet();
+}
+
+function titreOnglet() {
+  var o = ONGLETS.filter(function (x) { return x.id === Etat.onglet; })[0];
+  return o ? o.nom : 'Commandes';
+}
+/**
+ * Le bouton Retour du téléphone. Sans entrées d'historique, une
+ * application d'une seule page se referme au premier Retour, même
+ * avec une fiche ouverte.
+ */
+var Nav = { modaleOuverte: false };
+
+function allerA(id) {
+  if (Etat.onglet === id) return;
+  Etat.onglet = id; Etat.vue = null;
+  try { history.pushState({ onglet: id }, '', '#' + id); } catch (e) {}
+  dessiner();
+}
+
+window.addEventListener('popstate', function (ev) {
+  if (Nav.modaleOuverte) { fermerModaleDom(); return; }
+  var st = ev.state || {};
+  if (st.onglet && st.onglet !== Etat.onglet) {
+    Etat.onglet = st.onglet; Etat.vue = null; dessiner();
+  }
+});
+function poser(h) { var c = document.getElementById('contenu'); if (c) c.innerHTML = h; }
+
+function rendreOnglet() {
+  switch (Etat.onglet) {
+    case 'nouvelle':  return ongletNouvelle();
+    case 'commandes': return ongletCommandes();
+    case 'depots':    return ongletDepots();
+    case 'marges':    return ongletMarges();
+  }
+}
+
+function majBandeau() {
+  var b = document.getElementById('bandeau');
+  if (!b) return;
+  b.className = navigator.onLine ? '' : 'vu';
+  if (!navigator.onLine) {
+    document.getElementById('bandeau-txt').textContent =
+      'Hors ligne — les commandes touchent la caisse, rien ne peut être saisi';
+  }
+  var p = document.querySelector('.pastille');
+  if (p) p.className = 'pastille' + (navigator.onLine ? '' : ' hors');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  RÉGLAGE INITIAL ET CONNEXION
+// ═══════════════════════════════════════════════════════════════════
+
+function ecranReglage() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">' +
+    'Première configuration</span></h1></header><main><div class="carte">' +
+    bloc('Colle l\'URL de ton déploiement Apps Script — la même que pour ' +
+         'l\'app Logistique. Elle se termine par /exec.', 'info', '🔗') +
+    '<label class="champ"><span>URL de l\'API</span>' +
+    '<input type="url" id="in-url" placeholder="https://script.google.com/macros/s/…/exec" ' +
+    'autocomplete="off" autocapitalize="off" spellcheck="false"></label>' +
+    '<button class="btn" onclick="validerUrl()">Vérifier et continuer</button>' +
+    '<div id="res-url"></div></div></main>';
+}
+
+function validerUrl() {
+  var v = (document.getElementById('in-url').value || '').trim();
+  var res = document.getElementById('res-url');
+
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec$/.test(v)) {
+    res.innerHTML = bloc('L\'URL doit finir par /exec, pas /dev.', 'ko', '⚠️');
+    return;
+  }
+  res.innerHTML = chargement('Vérification…');
+  Etat.url = v;
+
+  api('diag').then(function (d) {
+    if (d.modules && !d.modules.commandes) {
+      Etat.url = '';
+      res.innerHTML = bloc('L\'API répond, mais le fichier Commandes.gs n\'y est ' +
+        'pas enregistré. Ouvre le projet Apps Script, enregistre-le, puis ' +
+        'redéploie une nouvelle version.', 'ko', '❌');
+      return;
+    }
+    S.ecrire(CLE_URL, v);
+    toast('API joignable.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    Etat.url = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ecranConnexion() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">Commandes' +
+    '</span></h1></header><main><div class="carte">' +
+    '<div id="liste-users">' + chargement('Chargement des comptes…') + '</div></div>' +
+    '<button class="btn vide petit" onclick="changerUrl()">Changer l\'URL de l\'API</button>' +
+    '</main>';
+}
+
+function chargerUtilisateurs() {
+  api('utilisateurs_publics').then(function (liste) {
+    var z = document.getElementById('liste-users');
+    if (!z) return;
+    if (!liste.length) {
+      z.innerHTML = bloc('Aucun compte actif.', 'attention', '⚠️'); return;
+    }
+    z.innerHTML =
+      '<label class="champ"><span>Qui es-tu ?</span><select id="in-user">' +
+      liste.map(function (u) {
+        return '<option value="' + e(u.user_id) + '">' + e(u.nom) + ' — ' +
+               e(u.role) + '</option>';
+      }).join('') + '</select></label>' +
+      '<label class="champ"><span>Code à 6 chiffres</span>' +
+      '<input type="password" id="in-code" inputmode="numeric" maxlength="6" ' +
+      'autocomplete="current-password" style="text-align:center;font-size:25px;' +
+      'letter-spacing:9px;font-weight:700"></label>' +
+      '<button class="btn" id="btn-login" onclick="connecter()">Entrer</button>' +
+      '<div id="res-login"></div>';
+
+    var ic = document.getElementById('in-code');
+    ic.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') connecter(); });
+    ic.addEventListener('input', function () { if (ic.value.length === 6) connecter(); });
+  }).catch(function (err) {
+    var z = document.getElementById('liste-users');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function connecter() {
+  var uid = document.getElementById('in-user').value;
+  var code = document.getElementById('in-code').value;
+  var b = document.getElementById('btn-login');
+  var res = document.getElementById('res-login');
+
+  if (!/^\d{6}$/.test(code)) { res.innerHTML = bloc('Six chiffres.', 'ko', '⚠️'); return; }
+  b.disabled = true; b.textContent = 'Connexion…'; res.innerHTML = '';
+
+  api('login', { user_id: uid, code: code }).then(function (d) {
+    Etat.token = d.token; Etat.user = d.utilisateur;
+    S.ecrire(CLE_TOKEN, d.token); S.ecrireJson(CLE_USER, d.utilisateur);
+    return chargerReferentiels();
+  }).then(function () {
+    toast('Bienvenue ' + (Etat.user.nom || '') + '.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Entrer';
+    document.getElementById('in-code').value = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function chargerReferentiels() {
+  return api('referentiels').then(function (r) {
+    Etat.ref = r;
+    S.ecrireJson(CLE_CACHE, { ref: r, date: Date.now() });
+    return r;
+  }).catch(function (err) {
+    var c = S.lireJson(CLE_CACHE, null);
+    if (c && c.ref) { Etat.ref = c.ref; return c.ref; }
+    throw err;
+  });
+}
+
+function deconnecter() {
+  S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  Etat.token = ''; Etat.user = null; Etat.onglet = 'nouvelle';
+  dessiner();
+}
+
+function changerUrl() {
+  if (!confirm('Changer l\'URL de l\'API ? Tu devras te reconnecter.')) return;
+  S.effacer(CLE_URL); S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  Etat.url = ''; Etat.token = ''; Etat.user = null;
+  dessiner();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET NOUVELLE COMMANDE
+// ═══════════════════════════════════════════════════════════════════
+
+var Nouv = { client: null, articles: [], tauxPropose: null };
+
+function ongletNouvelle() {
+  if (!Nouv.articles.length) Nouv.articles = [articleVide()];
+
+  var peutTaux = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
+  var defaut = (Etat.ref && Etat.ref.parametres &&
+                Etat.ref.parametres.TAUX_COMMISSION_DEFAUT);
+  var tauxAffiche = Nouv.tauxPropose !== null ? Nouv.tauxPropose : Number(defaut || 0.10);
+
+  poser(
+    '<div class="carte serree">' +
+      '<label class="champ" style="margin:0"><span>Client</span>' +
+      '<input type="text" id="n-cli" placeholder="Nom, code ou téléphone" ' +
+      'autocomplete="off" oninput="chercherClientNouv()" value="' +
+      e(Nouv.client ? Nouv.client.nom_complet : '') + '"></label></div>' +
+    '<div id="n-sugg"></div>' +
+    (Nouv.client
+      ? '<div class="msg ok"><span class="ic">👤</span><span>' +
+        e(Nouv.client.nom_complet) + ' · ' + e(Nouv.client.code_client) +
+        (Nouv.client.taux_commission_defaut
+          ? ' · taux fidèle ' + pct(Nouv.client.taux_commission_defaut) : '') +
+        '</span></div>'
+      : '') +
+
+    '<label class="champ"><span>Plateforme</span><select id="n-plat">' +
+      PLATEFORMES.map(function (p) {
+        return '<option value="' + e(p) + '">' + e(p) + '</option>';
+      }).join('') + '</select></label>' +
+
+    '<div class="titre-section">Articles</div>' +
+    '<div id="n-articles">' + Nouv.articles.map(articleHtml).join('') + '</div>' +
+    '<button class="btn vide petit" onclick="ajouterArticle()">➕ Ajouter un article</button>' +
+
+    '<div class="titre-section">Panier et frais</div>' +
+    '<div class="carte">' +
+      bloc('Le panier est le montant au passage en caisse chez le marchand — ' +
+           'livraison US et taxes comprises. C\'est lui qui porte la commission, ' +
+           'pas la somme des articles.', 'info', '🧮') +
+
+      '<label class="champ"><span>Panier réel ($) — laisse vide pour la somme ' +
+        'des articles</span><input type="number" id="n-panier" step="0.01" ' +
+        'min="0" inputmode="decimal" placeholder="' + n2(sommeArticles()) + '" ' +
+        'oninput="simuler()"></label>' +
+
+      '<label class="champ"><span>Frais demandés au client (%)' +
+        (peutTaux ? '' : ' — réservé admin / responsable') + '</span>' +
+        '<input type="number" id="n-taux" step="0.5" min="0" max="100" ' +
+        'inputmode="decimal" value="' + (tauxAffiche * 100) + '" ' +
+        (peutTaux ? '' : 'readonly ') + 'oninput="simuler()"></label>' +
+      (peutTaux
+        ? '<div class="rangee-btn" style="margin:-4px 0 12px">' +
+          [0, 8, 10].map(function (v) {
+            return '<button class="btn vide petit" onclick="poserTaux(' + v + ')">' +
+                   v + ' %</button>';
+          }).join('') + '</div>'
+        : '') +
+
+      '<div id="n-simul">' + chargement('Calcul…') + '</div>' +
+    '</div>' +
+
+    '<div class="carte">' +
+      '<label class="champ"><span>Le client paie maintenant ?</span>' +
+        '<select id="n-paye" onchange="simuler()">' +
+        '<option value="oui">Oui — enregistrer le paiement</option>' +
+        '<option value="non">Non — garder en devis</option></select></label>' +
+      '<label class="champ"><span>Devise reçue</span><select id="n-devise" ' +
+        'onchange="simuler()">' +
+        '<option value="USD">Dollars</option>' +
+        '<option value="Gourdes">Gourdes</option></select></label>' +
+      '<label class="champ"><span>Note</span><textarea id="n-note" ' +
+        'placeholder="Précisions, délai annoncé…"></textarea></label>' +
+      '<div id="n-res"></div>' +
+      '<button class="btn" id="n-btn" onclick="validerCommande()">' +
+        'Enregistrer la commande</button>' +
+    '</div>'
+  );
+  simuler();
+}
+
+function articleVide() {
+  return { designation: '', variante: '', url_produit: '', quantite: 1, prix_unitaire_usd: '' };
+}
+
+function articleHtml(a, i) {
+  return '<div class="article">' +
+    '<div class="tete"><span class="num">' + (i + 1) + '</span>' +
+      '<b style="font-size:13.5px">Article</b>' +
+      '<button class="sup" onclick="retirerArticle(' + i + ')">✕</button></div>' +
+    '<label class="champ"><span>Désignation</span><input type="text" ' +
+      'value="' + e(a.designation) + '" oninput="majArticle(' + i +
+      ',\'designation\',this.value)" placeholder="Robe noire, écouteurs…"></label>' +
+    '<div class="duo">' +
+      '<label class="champ"><span>Variante</span><input type="text" ' +
+        'value="' + e(a.variante) + '" oninput="majArticle(' + i +
+        ',\'variante\',this.value)" placeholder="Taille M, bleu"></label>' +
+      '<label class="champ"><span>Quantité</span><input type="number" min="1" ' +
+        'step="1" inputmode="numeric" value="' + e(a.quantite) + '" ' +
+        'oninput="majArticle(' + i + ',\'quantite\',this.value)"></label>' +
+    '</div>' +
+    '<label class="champ"><span>Prix unitaire ($)</span><input type="number" ' +
+      'step="0.01" min="0" inputmode="decimal" value="' + e(a.prix_unitaire_usd) + '" ' +
+      'oninput="majArticle(' + i + ',\'prix_unitaire_usd\',this.value)"></label>' +
+    '<label class="champ" style="margin-bottom:0"><span>Lien du produit</span>' +
+      '<input type="text" value="' + e(a.url_produit) + '" ' +
+      'oninput="majArticle(' + i + ',\'url_produit\',this.value)" ' +
+      'placeholder="https://…" autocapitalize="off" spellcheck="false"></label>' +
+  '</div>';
+}
+
+function majArticle(i, champ, val) {
+  Nouv.articles[i][champ] = val;
+  if (champ === 'quantite' || champ === 'prix_unitaire_usd') {
+    var p = document.getElementById('n-panier');
+    if (p) p.placeholder = n2(sommeArticles());
+    simuler();
+  }
+}
+function ajouterArticle() {
+  Nouv.articles.push(articleVide());
+  rendreOnglet();
+}
+function retirerArticle(i) {
+  if (Nouv.articles.length === 1) { Nouv.articles = [articleVide()]; }
+  else Nouv.articles.splice(i, 1);
+  rendreOnglet();
+}
+function sommeArticles() {
+  return Nouv.articles.reduce(function (s, a) {
+    return s + (Number(a.quantite) || 1) * (Number(a.prix_unitaire_usd) || 0);
+  }, 0);
+}
+function poserTaux(v) {
+  document.getElementById('n-taux').value = v;
+  simuler();
+}
+
+var minuteurCli = null;
+function chercherClientNouv() {
+  clearTimeout(minuteurCli);
+  var q = document.getElementById('n-cli').value.trim();
+  var z = document.getElementById('n-sugg');
+  if (q.length < 2) { z.innerHTML = ''; return; }
+
+  minuteurCli = setTimeout(function () {
+    api('client_chercher', { q: q }).then(function (liste) {
+      if (!liste.length) { z.innerHTML = bloc('Aucun client. Crée-le depuis ' +
+        'l\'app Logistique.', 'info', '🔍'); return; }
+      z.innerHTML = '<div class="suggestions">' + liste.map(function (c) {
+        return '<button onclick="choisirClientNouv(' +
+          e(JSON.stringify(c)).replace(/'/g, '&#39;') + ')"><b>' +
+          e(c.nom_complet) + '</b> <span style="color:var(--doux)">' +
+          e(c.code_client) + '</span>' +
+          (c.taux_commission_defaut
+            ? '<div style="font-size:12px;color:var(--vert);font-weight:700">' +
+              'taux fidèle ' + pct(c.taux_commission_defaut) + '</div>' : '') +
+          '</button>';
+      }).join('') + '</div>';
+    }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+  }, 330);
+}
+
+function choisirClientNouv(c) {
+  Nouv.client = c;
+  // Le taux fidèle du client prime sur le défaut : c'est la règle du backend,
+  // on la montre ici pour que l'agent voie le même chiffre que le serveur.
+  Nouv.tauxPropose = (c.taux_commission_defaut !== '' &&
+                      c.taux_commission_defaut !== null &&
+                      c.taux_commission_defaut !== undefined &&
+                      Number(c.taux_commission_defaut) > 0)
+    ? Number(c.taux_commission_defaut) : null;
+  rendreOnglet();
+}
+
+var minuteurSim = null;
+function simuler() {
+  clearTimeout(minuteurSim);
+  var z = document.getElementById('n-simul');
+  if (!z) return;
+
+  var panier = Number(document.getElementById('n-panier').value) || sommeArticles();
+  var tauxPct = Number(document.getElementById('n-taux').value);
+  if (isNaN(tauxPct)) tauxPct = 0;
+
+  if (tauxPct > 100) {
+    z.innerHTML = bloc('Un taux au-dessus de 100 % n\'a pas de sens.', 'ko', '⚠️');
+    return;
+  }
+  if (panier <= 0) {
+    z.innerHTML = bloc('Saisis au moins un prix pour voir le calcul.', 'info', '🧮');
+    return;
+  }
+
+  minuteurSim = setTimeout(function () {
+    // Le calcul vient du serveur : les paliers de frais de dépôt y vivent,
+    // et un barème recopié ici finirait par diverger du vrai.
+    api('commande_simuler', {
+      montant_panier_usd: panier,
+      taux_commission: tauxPct / 100
+    }).then(function (c) {
+      var taux = tauxUsd();
+      var neg = c.marge_estimee_usd < 0;
+      z.innerHTML =
+        '<div class="total"><span class="l">Panier</span><span>' +
+          usd(c.montant_panier_usd) + '</span></div>' +
+        '<div class="total"><span class="l">Frais client ' + pct(c.taux_commission) +
+          '</span><span>' + usd(c.commission_usd) + '</span></div>' +
+        '<div class="total gros"><span class="l">Le client paie</span><span>' +
+          usd(c.total_client_usd) + '</span></div>' +
+        '<div class="total"><span class="l">Au taux ' + n0(taux) + '</span><b>' +
+          htg(c.total_client_usd * taux) + '</b></div>' +
+
+        '<div class="titre-section">Ce que ça te coûte</div>' +
+        '<div class="total"><span class="l">Frais de dépôt estimés ' +
+          pct(c.taux_depot_estime) + '</span><span>−' +
+          usd(c.frais_depot_estimes_usd) + '</span></div>' +
+        '<div class="marge ' + (neg ? 'negative' : 'positive') + '">' +
+          '<span>Marge estimée</span><span class="v">' +
+          usd(c.marge_estimee_usd) + '</span></div>' +
+        (neg
+          ? bloc('Les frais de dépôt dépassent la commission. C\'est jouable si ' +
+                 'cette commande part dans un dépôt groupé — les frais se ' +
+                 'partagent alors entre toutes les commandes du dépôt.',
+                 'attention', '⚠️')
+          : '') +
+        '<div style="font-size:12px;color:var(--doux);text-align:center">' +
+          'Estimation. La marge réelle se fige au moment du dépôt.</div>';
+    }).catch(function (err) {
+      z.innerHTML = bloc(err.message, 'ko', '❌');
+    });
+  }, 420);
+}
+
+function validerCommande() {
+  var res = document.getElementById('n-res');
+  var b = document.getElementById('n-btn');
+
+  if (!Nouv.client) { res.innerHTML = bloc('Choisis un client.', 'ko', '⚠️'); return; }
+
+  var articles = Nouv.articles.filter(function (a) {
+    return a.designation.trim() || Number(a.prix_unitaire_usd) > 0;
+  });
+  if (!articles.length) {
+    res.innerHTML = bloc('Ajoute au moins un article.', 'ko', '⚠️'); return;
+  }
+
+  var panierSaisi = document.getElementById('n-panier').value;
+  var tauxPct = Number(document.getElementById('n-taux').value) || 0;
+  var panier = Number(panierSaisi) || sommeArticles();
+  if (panier <= 0) { res.innerHTML = bloc('Le panier doit être positif.', 'ko', '⚠️'); return; }
+
+  var p = {
+    client_id: Nouv.client.client_id,
+    plateforme: document.getElementById('n-plat').value,
+    lignes: JSON.stringify(articles.map(function (a) {
+      return { designation: a.designation, variante: a.variante,
+               url_produit: a.url_produit,
+               quantite: Number(a.quantite) || 1,
+               prix_unitaire_usd: Number(a.prix_unitaire_usd) || 0 };
+    })),
+    // Le taux part toujours en FRACTION : le serveur refuse « 10 » pour 10 %.
+    taux_commission: tauxPct / 100,
+    note: document.getElementById('n-note').value || ''
+  };
+  if (panierSaisi) p.montant_panier_usd = panier;
+
+  var paieMaintenant = document.getElementById('n-paye').value === 'oui';
+  if (paieMaintenant) {
+    // Le backend exige le total exact : on le lui laisse recalculer en
+    // envoyant le total qu'il vient lui-même de nous annoncer.
+    p.montant_paye_usd = Math.round((panier + panier * tauxPct / 100) * 100) / 100;
+    p.devise_saisie = document.getElementById('n-devise').value;
+  }
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('commande_creer', p).then(function (d) {
+    if (d.paiement && d.paiement.erreur) {
+      // La commande existe, mais le paiement a échoué : on le dit sans
+      // laisser croire que tout s'est bien passé.
+      toast('Commande créée, paiement refusé.', 'ko');
+      Nouv = { client: null, articles: [], tauxPropose: null };
+      Etat.onglet = 'commandes'; dessiner();
+      setTimeout(function () {
+        ouvrirCommande(d.commande_id);
+        toast('Paiement à reprendre : ' + d.paiement.erreur, 'ko');
+      }, 400);
+      return;
+    }
+    Nouv = { client: null, articles: [], tauxPropose: null };
+    Etat.onglet = 'commandes'; dessiner();
+    setTimeout(function () { ouvrirCommande(d.commande_id); }, 350);
+    toast(d.commande_id + ' enregistrée.', 'ok');
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer la commande';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET COMMANDES
+// ═══════════════════════════════════════════════════════════════════
+
+var FiltreCmd = { statut: '', sans_depot: false };
+
+function ongletCommandes() {
+  poser(
+    '<div class="puces">' +
+      '<button class="puce ' + (!FiltreCmd.statut && !FiltreCmd.sans_depot ? 'actif' : '') +
+        '" onclick="filtreCmd(\'\')">Toutes</button>' +
+      '<button class="puce ' + (FiltreCmd.sans_depot ? 'actif' : '') +
+        '" onclick="filtreSansDepot()">💳 À déposer</button>' +
+      CYCLE.map(function (c) {
+        return '<button class="puce ' + (FiltreCmd.statut === c.code ? 'actif' : '') +
+          '" onclick="filtreCmd(\'' + c.code + '\')">' + e(c.libelle) + '</button>';
+      }).join('') +
+      '<button class="puce ' + (FiltreCmd.statut === 'annulee' ? 'actif' : '') +
+        '" onclick="filtreCmd(\'annulee\')">Annulées</button>' +
+    '</div>' +
+    '<div id="liste-cmd">' + chargement() + '</div>'
+  );
+  chargerCommandes();
+}
+
+function filtreCmd(s) { FiltreCmd.statut = s; FiltreCmd.sans_depot = false; ongletCommandes(); }
+function filtreSansDepot() {
+  FiltreCmd.sans_depot = !FiltreCmd.sans_depot; FiltreCmd.statut = ''; ongletCommandes();
+}
+
+function chargerCommandes() {
+  var z = document.getElementById('liste-cmd');
+  if (!z) return;
+  z.innerHTML = chargement();
+
+  var p = { limite: 150 };
+  if (FiltreCmd.statut) p.statut = FiltreCmd.statut;
+  if (FiltreCmd.sans_depot) p.sans_depot = 1;
+
+  api('commande_lister', p).then(function (d) {
+    var h = '<div class="stats" style="margin-bottom:14px">' +
+      '<div class="stat"><div class="v">' + d.total + '</div><div class="l">commandes</div></div>' +
+      '<div class="stat"><div class="v">' + n0(d.totaux.paniers_usd) +
+        '</div><div class="l">$ paniers</div></div>' +
+      '<div class="stat"><div class="v" style="color:var(--vert)">' +
+        n2(d.totaux.commissions_usd) + '</div><div class="l">$ frais</div></div>' +
+      '<div class="stat"><div class="v" style="color:' +
+        (d.totaux.marge_estimee_usd < 0 ? 'var(--rouge)' : 'var(--vert)') + '">' +
+        n2(d.totaux.marge_estimee_usd) + '</div><div class="l">$ marge est.</div></div>' +
+    '</div>';
+
+    if (!d.commandes.length) { z.innerHTML = h + vide('🛒', 'Aucune commande.'); return; }
+
+    if (FiltreCmd.sans_depot && d.commandes.length) {
+      h += bloc(d.commandes.length + ' commande(s) payée(s) attendent un dépôt. ' +
+        'Groupe-les dans un seul dépôt : les frais de carte se partagent, et la ' +
+        'marge de chacune remonte.', 'attention', '💳') +
+        '<button class="btn" onclick="ouvrirNouveauDepot()">💳 Créer un dépôt ' +
+        'pour ces commandes</button>';
+    }
+
+    z.innerHTML = h + d.commandes.map(ligneCommande).join('');
+  }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+}
+
+function ligneCommande(c) {
+  var neg = c.marge_estimee_usd < 0;
+  return '<button class="ligne" onclick="ouvrirCommande(\'' + e(c.commande_id) + '\')">' +
+    '<div class="corps">' +
+      '<div class="t1">' + e(c.client_nom) + '</div>' +
+      '<div class="t2">' + e(c.commande_id) + ' · ' + e(c.plateforme) + ' · ' +
+        dateCourte(c.date) + '</div>' +
+      '<div style="margin-top:5px">' + puceCycle(c.statut) +
+        (c.depot_id ? ' <span class="badge">💳 ' + e(c.depot_id) + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div class="droite">' +
+      '<div style="font-weight:800;font-size:14.5px">' + usd(c.total_client_usd) + '</div>' +
+      '<div style="font-size:12px;color:var(--doux)">panier ' + n2(c.montant_panier_usd) +
+        '</div>' +
+      '<div style="font-size:11.5px;font-weight:700;margin-top:3px;color:' +
+        (neg ? 'var(--rouge)' : 'var(--vert)') + '">' +
+        (neg ? '' : '+') + n2(c.marge_estimee_usd) + ' $</div>' +
+    '</div></button>';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  DÉTAIL D'UNE COMMANDE — c'est ici que le cycle avance
+// ═══════════════════════════════════════════════════════════════════
+
+function ouvrirCommande(id) {
+  modale('Commande', chargement());
+  api('commande_detail', { commande_id: id }).then(function (d) {
+    majModale('Commande ' + d.commande.commande_id, htmlCommande(d));
+  }).catch(function (err) {
+    majModale('Commande', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function htmlCommande(d) {
+  var c = d.commande, cl = d.client || {};
+  var admin = Etat.user && Etat.user.droits && Etat.user.droits.retrograder_statut;
+  var peutDepot = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
+  var annulee = c.statut === 'annulee';
+  var iCourant = CYCLE.map(function (x) { return x.code; }).indexOf(c.statut);
+
+  var h = '<div style="margin-bottom:12px">' +
+    '<div style="font-weight:800;font-size:17px">' + e(cl.nom_complet || '') + '</div>' +
+    '<div style="color:var(--doux);font-size:13px;margin:2px 0 8px">' +
+      e(c.commande_id) + ' · ' + e(c.plateforme) + ' · ' + dateCourte(c.date) + '</div>' +
+    puceCycle(c.statut) + '</div>';
+
+  if (!annulee) {
+    h += '<div class="jalons">' + CYCLE.map(function (x, i) {
+      return '<div class="jalon ' + (i < iCourant ? 'faite' : (i === iCourant ? 'ici' : '')) +
+        '"><div class="pt"></div><div class="l">' + e(x.libelle) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  h += '<div class="total"><span class="l">Panier</span><span>' +
+      usd(c.montant_panier_usd) + '</span></div>' +
+    '<div class="total"><span class="l">Frais ' + pct(c.taux_commission) +
+      (c.taux_fixe_par && c.taux_fixe_par !== 'auto'
+        ? ' · fixé par ' + e(c.taux_fixe_par) : '') +
+      '</span><span>' + usd(c.commission_usd) + '</span></div>' +
+    '<div class="total gros"><span class="l">Total client</span><span>' +
+      usd(c.total_client_usd) + '</span></div>' +
+    '<div class="total"><span class="l">Payé</span><b>' +
+      usd(c.montant_paye_usd) + '</b></div>';
+
+  // ── Marge : estimée tant qu'il n'y a pas de dépôt, réelle ensuite ──
+  if (c.marge_reelle_usd !== null && c.marge_reelle_usd !== undefined) {
+    var negR = c.marge_reelle_usd < 0;
+    h += '<div class="titre-section">Marge réelle</div>' +
+      '<div class="total"><span class="l">Quote-part des frais de dépôt</span>' +
+        '<span>−' + usd(c.quote_part_frais_usd) + '</span></div>' +
+      '<div class="marge ' + (negR ? 'negative' : 'positive') + '">' +
+        '<span>Marge réelle</span><span class="v">' + usd(c.marge_reelle_usd) +
+        '</span></div>' +
+      (negR
+        ? bloc('Cette commande porte plus de frais qu\'elle ne rapporte. Ajouter ' +
+               'd\'autres commandes au même dépôt ferait remonter sa part.',
+               'attention', '⚠️')
+        : '');
+  } else {
+    h += '<div class="titre-section">Marge</div>' +
+      '<div class="marge ' + (c.marge_estimee_usd < 0 ? 'negative' : 'positive') + '">' +
+        '<span>Estimée</span><span class="v">' + usd(c.marge_estimee_usd) + '</span></div>' +
+      '<div style="font-size:12.5px;color:var(--doux);margin:-6px 0 12px">' +
+        'Elle se figera au moment du dépôt, selon les frais réels et le nombre ' +
+        'de commandes qui le partagent.</div>';
+  }
+
+  if (d.depot) {
+    h += '<div class="titre-section">Dépôt</div>' +
+      '<button class="ligne" onclick="fermerModale();ouvrirDepot(\'' +
+        e(d.depot.depot_id) + '\')"><div class="corps">' +
+        '<div class="t1">' + e(d.depot.depot_id) + '</div>' +
+        '<div class="t2">' + usd(d.depot.montant_depose_usd) + ' déposés · frais ' +
+        usd(d.depot.frais_reels_usd) + ' (' + n2(d.depot.taux_effectif_pct) +
+        ' %)</div></div></button>';
+  }
+
+  // ── Articles ──
+  if (d.lignes && d.lignes.length) {
+    h += '<div class="titre-section">Articles — ' + d.lignes.length + '</div>';
+    h += d.lignes.map(function (l) {
+      var rupture = l.statut_ligne === 'rupture';
+      var rembourse = l.statut_ligne === 'rembourse';
+      return '<div class="ligne"><div class="corps">' +
+        '<div class="t1">' + l.quantite + ' × ' + e(l.designation || '(sans nom)') +
+          '</div>' +
+        '<div class="t2">' + (l.variante ? e(l.variante) + ' · ' : '') +
+          n2(l.prix_unitaire_usd) + ' $ l\'unité' + '</div>' +
+        (rupture || rembourse
+          ? '<div style="margin-top:4px"><span class="badge ko">' +
+            (rupture ? 'rupture' : 'remboursé') + '</span></div>' : '') +
+        (l.url_produit
+          ? '<div style="margin-top:4px"><a href="' + e(l.url_produit) +
+            '" target="_blank" rel="noopener" style="font-size:12px">voir le produit ↗</a></div>'
+          : '') +
+      '</div><div class="droite"><b>' + usd(l.total_usd) + '</b>' +
+        (admin && !rembourse
+          ? '<div><button class="btn vide petit" style="width:auto;padding:5px 9px;' +
+            'margin-top:5px;font-size:11.5px" onclick="ouvrirLigne(\'' + e(l.ligne_id) +
+            '\',\'' + e(l.statut_ligne) + '\',\'' + e(c.commande_id) + '\')">état</button></div>'
+          : '') +
+      '</div></div>';
+    }).join('');
+  }
+
+  // ── Colis engendrés ──
+  if (d.colis && d.colis.length) {
+    h += '<div class="titre-section">Colis — suivis dans l\'app Logistique</div>';
+    h += d.colis.map(function (x) {
+      return '<div class="ligne"><div class="corps">' +
+        '<div class="t2 mono" style="color:var(--texte);font-weight:650">' +
+        e(x.tracking) + '</div></div><div class="droite">' +
+        '<span class="badge">' + e(x.statut) + '</span>' +
+        '<div style="font-size:11.5px;color:var(--doux);margin-top:3px">' +
+        n2(x.poids_lb) + ' lb</div></div></div>';
+    }).join('');
+  }
+
+  if (c.tracking_marchand) {
+    h += '<div class="total"><span class="l">Tracking marchand</span>' +
+         '<span class="mono">' + e(c.tracking_marchand) + '</span></div>';
+  }
+
+  // ── L'action du moment, et une seule ──
+  h += '<div class="titre-section">Prochaine étape</div>';
+
+  if (annulee) {
+    h += bloc('Commande annulée.', 'info', '🚫');
+  } else if (c.statut === 'devis') {
+    h += bloc('Le client paie le total pour que la commande parte. Un paiement ' +
+              'partiel ferait avancer l\'argent à sa place.', 'info', '💵') +
+      '<button class="btn vert" onclick="ouvrirPaiement(' +
+        e(JSON.stringify({ id: c.commande_id, total: c.total_client_usd,
+                           nom: cl.nom_complet || '' })).replace(/'/g, '&#39;') +
+        ')">💵 Encaisser ' + usd(c.total_client_usd) + '</button>';
+  } else if (c.statut === 'payee') {
+    if (!d.depot) {
+      h += bloc('Rattache cette commande à un dépôt avant d\'acheter : c\'est le ' +
+                'dépôt qui porte les frais de carte.', 'attention', '💳') +
+        (peutDepot
+          ? '<button class="btn" onclick="fermerModale();ouvrirNouveauDepot(\'' +
+            e(c.commande_id) + '\')">💳 Créer un dépôt</button>' +
+            '<button class="btn vide" onclick="ouvrirRattacher(\'' +
+            e(c.commande_id) + '\')">🔗 Rattacher à un dépôt existant</button>'
+          : bloc('Seuls un admin ou un responsable enregistrent un dépôt.',
+                 'info', '🔒'));
+    } else {
+      h += '<button class="btn sombre" onclick="ouvrirAchat(' +
+        e(JSON.stringify({ id: c.commande_id, panier: c.montant_panier_usd,
+                           depot: d.depot.depot_id, plateforme: c.plateforme }))
+          .replace(/'/g, '&#39;') + ')">🛍 Marquer comme achetée chez ' +
+        e(c.plateforme) + '</button>';
+    }
+  } else if (c.statut === 'commandee') {
+    h += bloc('Quand le colis arrive à Miami, saisis son tracking : il entre ' +
+              'dans la logistique avec le numéro de commande attaché.', 'info', '📦') +
+      '<button class="btn sombre" onclick="ouvrirReception(' +
+        e(JSON.stringify({ id: c.commande_id, tracking: c.tracking_marchand || '' }))
+          .replace(/'/g, '&#39;') + ')">📦 Réceptionner à Miami</button>';
+  } else if (c.statut === 'recue_usa') {
+    h += bloc('Le colis voyage. La commande se clôturera toute seule quand il ' +
+              'sera livré et facturé dans l\'app Logistique.', 'info', '🚚');
+  } else if (c.statut === 'cloturee') {
+    h += bloc('Commande terminée : colis livré et facturé.', 'ok', '✅');
+  }
+
+  h += '<button class="btn vide" style="margin-top:12px" onclick="imprimer(recuCommande(' +
+    e(JSON.stringify(d)).replace(/'/g, '&#39;') + '))">🖨 Imprimer le reçu 50 mm</button>';
+
+  if (admin && (c.statut === 'devis' || c.statut === 'payee')) {
+    h += '<button class="btn rouge" onclick="ouvrirAnnulation(\'' +
+      e(c.commande_id) + '\')">Annuler la commande (admin)</button>';
+  }
+  return h;
+}
+
+
+// ── Paiement ──
+
+function ouvrirPaiement(c) {
+  var taux = tauxUsd();
+  modale('Encaisser ' + c.id,
+    '<div class="total gros"><span class="l">' + e(c.nom) + '</span><span>' +
+      usd(c.total) + '</span></div>' +
+    '<div class="total"><span class="l">Au taux ' + n0(taux) + '</span><b>' +
+      htg(c.total * taux) + '</b></div>' +
+    bloc('Le montant est imposé : le client paie la commande en entier pour ' +
+         'la placer. Deux écritures partent en comptabilité — le panier en flux ' +
+         'neutre, la commission en produit.', 'info', '💵') +
+    '<label class="champ"><span>Devise reçue</span><select id="y-devise">' +
+      '<option value="USD">Dollars — ' + usd(c.total) + '</option>' +
+      '<option value="Gourdes">Gourdes — ' + htg(c.total * taux) + '</option>' +
+    '</select></label>' +
+    '<div id="y-res"></div>' +
+    '<button class="btn vert" id="y-btn" onclick="validerPaiement(\'' + e(c.id) +
+      '\',' + c.total + ')">Encaisser</button>');
+}
+
+function validerPaiement(id, total) {
+  var b = document.getElementById('y-btn');
+  b.disabled = true; b.textContent = 'Encaissement…';
+  api('commande_payer', {
+    commande_id: id, montant_usd: total,
+    devise_saisie: document.getElementById('y-devise').value
+  }).then(function (d) {
+    toast('Payée — avance ' + d.avance.revenu_id +
+          (d.commission.revenu_id ? ', commission ' + d.commission.revenu_id : ''), 'ok');
+    ouvrirCommande(id);
+    if (Etat.onglet === 'commandes') chargerCommandes();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Encaisser';
+    document.getElementById('y-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ── Achat chez le marchand ──
+
+function ouvrirAchat(c) {
+  modale('Achat — ' + c.id,
+    bloc('Saisis le montant réellement débité par ' + c.plateforme + '. S\'il ' +
+         'diffère du devis, l\'écart sort de ta trésorerie, pas de celle du ' +
+         'client — l\'app te le dira.', 'info', '🛍') +
+    '<label class="champ"><span>Montant réel débité ($)</span>' +
+      '<input type="number" id="a-montant" step="0.01" min="0" inputmode="decimal" ' +
+      'value="' + e(c.panier) + '"></label>' +
+    '<label class="champ"><span>Tracking du marchand</span>' +
+      '<input type="text" id="a-tk" class="mono" autocapitalize="characters" ' +
+      'spellcheck="false" placeholder="facultatif, mais utile"></label>' +
+    '<div class="total"><span class="l">Dépôt</span><b>' + e(c.depot) + '</b></div>' +
+    '<div id="a-res"></div>' +
+    '<button class="btn sombre" id="a-btn" style="margin-top:12px" ' +
+      'onclick="validerAchat(\'' + e(c.id) + '\')">Enregistrer l\'achat</button>');
+}
+
+function validerAchat(id) {
+  var b = document.getElementById('a-btn');
+  b.disabled = true; b.textContent = 'Enregistrement…';
+  api('commande_acheter', {
+    commande_id: id,
+    montant_reel_usd: document.getElementById('a-montant').value,
+    tracking_marchand: document.getElementById('a-tk').value.trim()
+  }).then(function (d) {
+    if (d.alerte) toast(d.alerte, 'ko');
+    else toast('Achat enregistré — dépense ' + d.depense_id, 'ok');
+    ouvrirCommande(id);
+    if (Etat.onglet === 'commandes') chargerCommandes();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer l\'achat';
+    document.getElementById('a-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ── Réception à Miami ──
+
+function ouvrirReception(c) {
+  var agences = (Etat.ref && Etat.ref.agences || [])
+    .filter(function (a) { return a.agence_id !== 'AG00'; });
+
+  modale('Réception à Miami — ' + c.id,
+    bloc('Le colis entre dans la logistique avec le numéro de commande attaché. ' +
+         'Tu le suivras ensuite dans l\'app Logistique.', 'info', '📦') +
+    '<label class="champ"><span>Numéro de suivi</span>' +
+      '<input type="text" id="m-tk" class="mono" value="' + e(c.tracking) + '" ' +
+      'autocapitalize="characters" spellcheck="false"></label>' +
+    '<label class="champ"><span>Poids (lb)</span>' +
+      '<input type="number" id="m-poids" step="0.1" min="0" inputmode="decimal" ' +
+      'placeholder="pesé à Miami"></label>' +
+    '<label class="champ"><span>Agence de livraison</span><select id="m-dest">' +
+      '<option value="">— celle du client —</option>' +
+      agences.map(function (a) {
+        return '<option value="' + e(a.agence_id) + '">' + e(a.ville) + '</option>';
+      }).join('') + '</select></label>' +
+    '<label class="champ"><span>Point d\'entrée en Haïti</span><select id="m-entree">' +
+      '<option value="">— identique à la destination —</option>' +
+      agences.filter(function (a) { return String(a.type).trim() === 'hub'; })
+        .map(function (a) {
+          return '<option value="' + e(a.agence_id) + '">' + e(a.ville) + '</option>';
+        }).join('') + '</select></label>' +
+    '<div id="m-res"></div>' +
+    '<button class="btn sombre" id="m-btn" onclick="validerReception(\'' + e(c.id) +
+      '\')">Créer le colis</button>');
+}
+
+function validerReception(id) {
+  var b = document.getElementById('m-btn');
+  var p = { commande_id: id, tracking: document.getElementById('m-tk').value.trim(),
+            poids_lb: document.getElementById('m-poids').value || 0 };
+  var dest = document.getElementById('m-dest').value;
+  var entree = document.getElementById('m-entree').value;
+  if (dest) p.agence_destination = dest;
+  if (entree) p.agence_entree = entree;
+
+  if (!p.tracking) {
+    document.getElementById('m-res').innerHTML =
+      bloc('Le numéro de suivi est requis.', 'ko', '⚠️'); return;
+  }
+
+  b.disabled = true; b.textContent = 'Création…';
+  api('commande_recevoir', p).then(function (d) {
+    toast('Colis créé — ' + d.colis.tracking, 'ok');
+    ouvrirCommande(id);
+    if (Etat.onglet === 'commandes') chargerCommandes();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Créer le colis';
+    document.getElementById('m-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ── État d'une ligne, annulation ──
+
+function ouvrirLigne(ligneId, actuel, cmdId) {
+  modale('État de l\'article',
+    bloc('Une rupture n\'efface pas la ligne : elle garde la trace de ce qui ' +
+         'était commandé.', 'info', 'ℹ️') +
+    '<label class="champ"><span>État</span><select id="g-statut">' +
+      ['disponible', 'rupture', 'rembourse'].map(function (s) {
+        return '<option value="' + s + '"' + (s === actuel ? ' selected' : '') +
+               '>' + s + '</option>';
+      }).join('') + '</select></label>' +
+    '<label class="champ"><span>Note</span><textarea id="g-note"></textarea></label>' +
+    '<div id="g-res"></div>' +
+    '<button class="btn" onclick="validerLigne(\'' + e(ligneId) + '\',\'' +
+      e(cmdId) + '\')">Enregistrer</button>');
+}
+
+function validerLigne(ligneId, cmdId) {
+  api('ligne_statut', {
+    ligne_id: ligneId,
+    statut: document.getElementById('g-statut').value,
+    note: document.getElementById('g-note').value
+  }).then(function () {
+    toast('Article mis à jour.', 'ok');
+    ouvrirCommande(cmdId);
+  }).catch(function (err) {
+    document.getElementById('g-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ouvrirAnnulation(id) {
+  modale('Annuler ' + id,
+    bloc('Les revenus déjà écrits seront annulés en comptabilité. Si le client ' +
+         'avait payé, le montant lui est dû.', 'attention', '⚠️') +
+    '<label class="champ"><span>Motif (obligatoire)</span>' +
+      '<textarea id="z-motif"></textarea></label>' +
+    '<div id="z-res"></div>' +
+    '<button class="btn rouge" onclick="validerAnnulation(\'' + e(id) +
+      '\')">Annuler la commande</button>');
+}
+
+function validerAnnulation(id) {
+  var motif = document.getElementById('z-motif').value.trim();
+  if (!motif) {
+    document.getElementById('z-res').innerHTML = bloc('Le motif est obligatoire.', 'ko', '⚠️');
+    return;
+  }
+  api('commande_annuler', { commande_id: id, motif: motif }).then(function (d) {
+    fermerModale();
+    toast(d.message, 'ok');
+    chargerCommandes();
+  }).catch(function (err) {
+    document.getElementById('z-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET DÉPÔTS
+// ═══════════════════════════════════════════════════════════════════
+
+function ongletDepots() {
+  var peut = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
+  poser(
+    bloc('Un dépôt est une recharge de la carte. Ses frais sont une charge de ' +
+         'Flashipping, jamais refacturée au client. Ils sont calculés sur la ' +
+         'recharge entière, puis répartis entre les seules commandes rattachées : ' +
+         'recharger large en ne rattachant qu\'une commande lui fait porter toute ' +
+         'la facture.', 'info', '💳') +
+    (peut ? '<button class="btn" onclick="ouvrirNouveauDepot()">➕ Nouveau dépôt</button>'
+          : '') +
+    '<div id="liste-dep" style="margin-top:12px">' + chargement() + '</div>'
+  );
+  chargerDepots();
+}
+
+function chargerDepots() {
+  var z = document.getElementById('liste-dep');
+  api('depot_lister').then(function (liste) {
+    if (!liste.length) { z.innerHTML = vide('💳', 'Aucun dépôt.'); return; }
+
+    var totalDep = 0, totalFrais = 0;
+    liste.forEach(function (d) {
+      totalDep += Number(d.montant_depose_usd); totalFrais += Number(d.frais_reels_usd);
+    });
+    var effectif = totalDep > 0 ? totalFrais / totalDep * 100 : 0;
+
+    z.innerHTML =
+      '<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v">' + n0(totalDep) + '</div>' +
+          '<div class="l">$ déposés</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+          n2(totalFrais) + '</div><div class="l">$ de frais</div></div>' +
+        '<div class="stat"><div class="v">' + n2(effectif) + ' %</div>' +
+          '<div class="l">taux moyen</div></div>' +
+      '</div>' +
+      liste.map(function (d) {
+        return '<button class="ligne" onclick="ouvrirDepot(\'' + e(d.depot_id) + '\')">' +
+          '<div class="corps"><div class="t1">' + e(d.depot_id) + ' · ' +
+            usd(d.montant_depose_usd) + '</div>' +
+          '<div class="t2">' + dateCourte(d.date) + ' · ' + d.nb_commandes +
+            ' commande(s)' +
+            (Number(d.non_affecte_usd) > 0.01
+              ? ' · ' + usd(d.non_affecte_usd) + ' non affectés' : '') +
+            '</div></div>' +
+          '<div class="droite"><div style="font-weight:800;color:var(--rouge)">' +
+            n2(d.taux_effectif_pct) + ' %</div>' +
+          '<div style="font-size:12px;color:var(--doux)">' + usd(d.frais_reels_usd) +
+            '</div></div></button>';
+      }).join('');
+  }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+}
+
+var Dep = { commandes: [], coches: {} };
+
+function ouvrirNouveauDepot(preselection) {
+  Dep = { commandes: [], coches: {} };
+  modale('Nouveau dépôt', chargement('Commandes payées sans dépôt…'));
+
+  api('commande_lister', { sans_depot: 1, limite: 200 }).then(function (d) {
+    Dep.commandes = d.commandes;
+    if (preselection) Dep.coches[preselection] = true;
+    rendreNouveauDepot();
+  }).catch(function (err) {
+    majModale('Nouveau dépôt', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function basculerDep(id) { Dep.coches[id] = !Dep.coches[id]; rendreNouveauDepot(); }
+
+function totalPaniersCoches() {
+  return Dep.commandes.reduce(function (s, c) {
+    return s + (Dep.coches[c.commande_id] ? Number(c.montant_panier_usd) : 0);
+  }, 0);
+}
+
+function rendreNouveauDepot() {
+  var choisies = Dep.commandes.filter(function (c) { return Dep.coches[c.commande_id]; });
+  var totalPaniers = totalPaniersCoches();
+  var montantVal = (document.getElementById('d-montant') || {}).value;
+  var fraisVal = (document.getElementById('d-frais') || {}).value;
+  if (montantVal === undefined || montantVal === null) montantVal = '';
+  if (fraisVal === undefined || fraisVal === null) fraisVal = '';
+
+  var h =
+    (Dep.commandes.length
+      ? '<div class="titre-section" style="margin-top:0">Commandes payées en ' +
+        'attente — ' + Dep.commandes.length + '</div>' +
+        Dep.commandes.map(function (c) {
+          var on = !!Dep.coches[c.commande_id];
+          return '<label class="coche ' + (on ? 'on' : '') + '">' +
+            '<input type="checkbox" ' + (on ? 'checked' : '') +
+              ' onchange="basculerDep(\'' + e(c.commande_id) + '\')">' +
+            '<div class="corps"><div style="font-weight:700;font-size:14px">' +
+              e(c.client_nom) + '</div>' +
+            '<div style="font-size:12.5px;color:var(--doux)">' + e(c.commande_id) +
+              ' · ' + e(c.plateforme) + '</div></div>' +
+            '<div style="text-align:right"><b>' + usd(c.montant_panier_usd) + '</b>' +
+            '<div style="font-size:11.5px;color:var(--vert)">frais ' +
+              n2(c.commission_usd) + ' $</div></div></label>';
+        }).join('')
+      : bloc('Aucune commande payée n\'attend de dépôt. Tu peux quand même ' +
+             'enregistrer une recharge : tu y rattacheras des commandes plus tard.',
+             'info', 'ℹ️')) +
+
+    '<div class="carte">' +
+      '<label class="champ"><span>Montant déposé sur la carte ($)</span>' +
+        '<input type="number" id="d-montant" step="0.01" min="0" inputmode="decimal" ' +
+        'value="' + e(montantVal) + '" placeholder="' + n2(totalPaniers) + '" ' +
+        'oninput="rendreNouveauDepot()"></label>' +
+      '<label class="champ"><span>Frais réellement prélevés ($)</span>' +
+        '<input type="number" id="d-frais" step="0.01" min="0" inputmode="decimal" ' +
+        'value="' + e(fraisVal) + '" oninput="rendreNouveauDepot()"></label>' +
+      '<label class="champ"><span>Moyen</span><select id="d-moyen">' +
+        '<option value="carte">Carte</option>' +
+        '<option value="virement">Virement</option>' +
+        '<option value="paypal">PayPal</option>' +
+        '<option value="autre">Autre</option></select></label>' +
+      resumeDepot(choisies, totalPaniers, Number(montantVal), Number(fraisVal)) +
+      '<div id="d-res"></div>' +
+      '<button class="btn" id="d-btn" onclick="validerDepot()">Enregistrer le dépôt' +
+        (choisies.length ? ' et rattacher ' + choisies.length + ' commande(s)' : '') +
+        '</button>' +
+    '</div>';
+
+  majModale('Nouveau dépôt', h);
+}
+
+/**
+ * Le tableau qui décide : il montre, commande par commande, ce que la
+ * marge devient une fois les frais partagés. C'est exactement la vue
+ * qui manque quand on fait un dépôt par commande.
+ */
+function resumeDepot(choisies, totalPaniers, montant, frais) {
+  if (!choisies.length) return '';
+  var m = montant || totalPaniers;
+  var f = frais || 0;
+  var effectif = m > 0 ? f / m * 100 : 0;
+
+  var h = '<div class="titre-section">Effet sur les marges</div>' +
+    '<div class="total"><span class="l">Paniers rattachés</span><span>' +
+      usd(totalPaniers) + '</span></div>' +
+    '<div class="total"><span class="l">Taux effectif du dépôt</span><b>' +
+      n2(effectif) + ' %</b></div>';
+
+  if (totalPaniers > m + 0.01) {
+    h += bloc('Le dépôt ne couvre pas les paniers rattachés (' +
+              usd(totalPaniers) + '). Le serveur refusera.', 'ko', '⚠️');
+  }
+
+  var totalMarge = 0;
+  h += choisies.map(function (c) {
+    var quote = totalPaniers > 0 ? f * Number(c.montant_panier_usd) / totalPaniers : 0;
+    var marge = Number(c.commission_usd) - quote;
+    totalMarge += marge;
+    return '<div class="total"><span class="l">' + e(c.commande_id) + '</span>' +
+      '<span style="font-weight:700;color:' +
+      (marge < 0 ? 'var(--rouge)' : 'var(--vert)') + '">' +
+      (marge < 0 ? '' : '+') + n2(marge) + ' $</span></div>';
+  }).join('');
+
+  h += '<div class="marge ' + (totalMarge < 0 ? 'negative' : 'positive') +
+    '" style="margin-top:10px"><span>Marge totale du lot</span>' +
+    '<span class="v">' + usd(totalMarge) + '</span></div>';
+  return h;
+}
+
+function validerDepot() {
+  var choisies = Dep.commandes.filter(function (c) { return Dep.coches[c.commande_id]; })
+                              .map(function (c) { return c.commande_id; });
+  var montant = document.getElementById('d-montant').value || totalPaniersCoches();
+  var frais = document.getElementById('d-frais').value || 0;
+  var b = document.getElementById('d-btn');
+
+  if (Number(montant) <= 0) {
+    document.getElementById('d-res').innerHTML =
+      bloc('Le montant déposé doit être positif.', 'ko', '⚠️'); return;
+  }
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+  api('depot_creer', {
+    montant_depose_usd: montant,
+    frais_reels_usd: frais,
+    moyen: document.getElementById('d-moyen').value,
+    commande_ids: JSON.stringify(choisies)
+  }).then(function (d) {
+    toast(d.depot_id + ' — taux effectif ' + n2(d.taux_effectif) + ' %', 'ok');
+    ouvrirDepot(d.depot_id);
+    if (Etat.onglet === 'depots') chargerDepots();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer le dépôt';
+    document.getElementById('d-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ouvrirDepot(id) {
+  modale('Dépôt', chargement());
+  api('depot_detail', { depot_id: id }).then(function (d) {
+    var dep = d.depot;
+    var h = '<div class="stats" style="margin-bottom:14px">' +
+      '<div class="stat"><div class="v">' + n0(dep.montant_depose_usd) + '</div>' +
+        '<div class="l">$ déposés</div></div>' +
+      '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+        n2(dep.frais_reels_usd) + '</div><div class="l">$ de frais</div></div>' +
+      '<div class="stat"><div class="v">' + n2(dep.taux_effectif_pct) + ' %</div>' +
+        '<div class="l">taux effectif</div></div></div>' +
+      '<div class="total"><span class="l">Date</span><span>' + dateCourte(dep.date) +
+        '</span></div>' +
+      '<div class="total"><span class="l">Moyen</span><span>' + e(dep.moyen) + '</span></div>' +
+      '<div class="total"><span class="l">Paniers couverts</span><span>' +
+        usd(d.total_paniers_usd) + '</span></div>' +
+      (Number(d.non_affecte_usd) > 0.01
+        ? '<div class="total"><span class="l">Reste sur la carte</span><b>' +
+          usd(d.non_affecte_usd) + '</b></div>' : '');
+
+    if (!d.commandes.length) {
+      h += bloc('Aucune commande rattachée. Les frais de ce dépôt pèsent donc ' +
+                'sur rien : rattache des commandes payées pour que la marge se ' +
+                'calcule.', 'attention', '⚠️') +
+        '<button class="btn" onclick="ouvrirRattacherVers(\'' + e(dep.depot_id) +
+        '\')">🔗 Rattacher des commandes</button>';
+    } else {
+      var totalMarge = 0;
+      h += '<div class="titre-section">Marge réelle par commande</div>';
+      h += d.commandes.map(function (c) {
+        totalMarge += Number(c.marge_reelle_usd);
+        var neg = c.marge_reelle_usd < 0;
+        return '<button class="ligne" onclick="fermerModale();ouvrirCommande(\'' +
+          e(c.commande_id) + '\')"><div class="corps">' +
+          '<div class="t1">' + e(c.commande_id) + '</div>' +
+          '<div class="t2">panier ' + usd(c.montant_panier_usd) + ' · frais ' +
+            usd(c.commission_usd) + ' − part ' + usd(c.quote_part_frais_usd) +
+            '</div></div>' +
+          '<div class="droite"><b style="color:' +
+            (neg ? 'var(--rouge)' : 'var(--vert)') + '">' +
+            (neg ? '' : '+') + n2(c.marge_reelle_usd) + ' $</b></div></button>';
+      }).join('');
+
+      h += '<div class="marge ' + (totalMarge < 0 ? 'negative' : 'positive') + '">' +
+        '<span>Marge totale du dépôt</span><span class="v">' + usd(totalMarge) +
+        '</span></div>' +
+        '<button class="btn vide" onclick="ouvrirRattacherVers(\'' + e(dep.depot_id) +
+        '\')">🔗 Ajouter une commande à ce dépôt</button>';
+    }
+
+    majModale('Dépôt ' + dep.depot_id, h);
+  }).catch(function (err) {
+    majModale('Dépôt', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+/** Rattacher : depuis une commande, on choisit le dépôt. */
+function ouvrirRattacher(commandeId) {
+  modale('Rattacher ' + commandeId, chargement());
+  api('depot_lister').then(function (liste) {
+    if (!liste.length) {
+      majModale('Rattacher', bloc('Aucun dépôt existant. Crée-en un.', 'info', 'ℹ️'));
+      return;
+    }
+    majModale('Rattacher ' + commandeId,
+      bloc('Choisis le dépôt qui a payé cette commande. Sa quote-part de frais ' +
+           'sera recalculée pour toutes les commandes du dépôt.', 'info', '🔗') +
+      liste.map(function (d) {
+        return '<button class="ligne" onclick="validerRattacher(\'' + e(d.depot_id) +
+          '\',\'' + e(commandeId) + '\')"><div class="corps">' +
+          '<div class="t1">' + e(d.depot_id) + ' · ' + usd(d.montant_depose_usd) +
+          '</div><div class="t2">' + dateCourte(d.date) + ' · ' + d.nb_commandes +
+          ' commande(s) · reste ' + usd(d.non_affecte_usd) + '</div></div>' +
+          '<div class="droite"><b>' + n2(d.taux_effectif_pct) + ' %</b></div></button>';
+      }).join(''));
+  }).catch(function (err) { majModale('Rattacher', bloc(err.message, 'ko', '❌')); });
+}
+
+/** Rattacher : depuis un dépôt, on choisit la commande. */
+function ouvrirRattacherVers(depotId) {
+  modale('Ajouter au dépôt ' + depotId, chargement());
+  api('commande_lister', { sans_depot: 1, limite: 200 }).then(function (d) {
+    if (!d.commandes.length) {
+      majModale('Ajouter au dépôt',
+        bloc('Aucune commande payée n\'attend de dépôt.', 'info', 'ℹ️'));
+      return;
+    }
+    majModale('Ajouter au dépôt ' + depotId,
+      d.commandes.map(function (c) {
+        return '<button class="ligne" onclick="validerRattacher(\'' + e(depotId) +
+          '\',\'' + e(c.commande_id) + '\')"><div class="corps">' +
+          '<div class="t1">' + e(c.client_nom) + '</div><div class="t2">' +
+          e(c.commande_id) + ' · ' + e(c.plateforme) + '</div></div>' +
+          '<div class="droite"><b>' + usd(c.montant_panier_usd) + '</b></div></button>';
+      }).join(''));
+  }).catch(function (err) { majModale('Ajouter au dépôt', bloc(err.message, 'ko', '❌')); });
+}
+
+function validerRattacher(depotId, commandeId) {
+  api('depot_rattacher', { depot_id: depotId, commande_id: commandeId })
+    .then(function () {
+      toast('Rattachée au ' + depotId + '.', 'ok');
+      ouvrirDepot(depotId);
+    }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET MARGES — la vue qui tranche entre « grouper » et « pas grouper »
+// ═══════════════════════════════════════════════════════════════════
+
+function ongletMarges() {
+  poser(chargement('Calcul des marges…'));
+
+  Promise.all([
+    api('commande_lister', { limite: 500 }),
+    api('depot_lister')
+  ]).then(function (r) {
+    var cmds = r[0], depots = r[1];
+
+    var totalDep = 0, totalFrais = 0, nbAvecDepot = 0;
+    depots.forEach(function (d) {
+      totalDep += Number(d.montant_depose_usd);
+      totalFrais += Number(d.frais_reels_usd);
+      nbAvecDepot += Number(d.nb_commandes);
+    });
+    var effectifMoyen = totalDep > 0 ? totalFrais / totalDep * 100 : 0;
+    var parDepot = depots.length ? nbAvecDepot / depots.length : 0;
+
+    var commissions = cmds.totaux.commissions_usd;
+    var margeReelle = commissions - totalFrais;
+
+    var h =
+      '<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v" style="color:var(--vert)">' +
+          n2(commissions) + '</div><div class="l">$ encaissés</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+          n2(totalFrais) + '</div><div class="l">$ de frais</div></div>' +
+        '<div class="stat"><div class="v" style="color:' +
+          (margeReelle < 0 ? 'var(--rouge)' : 'var(--vert)') + '">' +
+          n2(margeReelle) + '</div><div class="l">$ de marge</div></div>' +
+      '</div>' +
+
+      '<div class="marge ' + (margeReelle < 0 ? 'negative' : 'positive') + '">' +
+        '<span>Marge nette du service</span><span class="v">' + usd(margeReelle) +
+        '</span></div>' +
+
+      '<div class="titre-section">Le levier</div>' +
+      '<div class="carte">' +
+        '<div class="total"><span class="l">Taux de frais effectif</span><b>' +
+          n2(effectifMoyen) + ' %</b></div>' +
+        '<div class="total"><span class="l">Commandes par dépôt</span><b>' +
+          n2(parDepot) + '</b></div>' +
+        bloc(parDepot < 2
+          ? 'Moins de deux commandes par dépôt : chaque commande porte presque ' +
+            'tous les frais de sa recharge. C\'est là que la marge se perd. ' +
+            'Attendre d\'avoir trois ou quatre commandes payées avant de ' +
+            'recharger change le résultat plus que n\'importe quel ajustement ' +
+            'de taux.'
+          : 'Avec ' + n2(parDepot) + ' commandes par dépôt, les frais se ' +
+            'partagent correctement. Continue à grouper avant de recharger.',
+          parDepot < 2 ? 'attention' : 'ok', parDepot < 2 ? '⚠️' : '✅') +
+      '</div>';
+
+    // Simulateur : à quoi ressemblerait la marge avec un autre groupage
+    h += '<div class="titre-section">Simuler une recharge</div>' +
+      '<div class="carte">' +
+        bloc('Tu recharges la carte d\'un montant donné. Les frais portent sur ' +
+             'cette recharge entière, puis se répartissent entre les seules ' +
+             'commandes rattachées. Moins tu en rattaches, plus chacune en porte.',
+             'info', '🧮') +
+        '<label class="champ"><span>Montant de la recharge ($)</span>' +
+          '<input type="number" id="s-recharge" step="10" inputmode="decimal" ' +
+          'value="300" oninput="simulerGroupage()"></label>' +
+        '<div class="duo">' +
+          '<label class="champ"><span>Panier moyen ($)</span>' +
+            '<input type="number" id="s-panier" step="5" inputmode="decimal" ' +
+            'value="75" oninput="simulerGroupage()"></label>' +
+          '<label class="champ"><span>Frais client (%)</span>' +
+            '<input type="number" id="s-taux" step="0.5" inputmode="decimal" ' +
+            'value="10" oninput="simulerGroupage()"></label>' +
+        '</div>' +
+        '<div id="s-res"></div>' +
+      '</div>';
+
+    poser(h);
+    simulerGroupage();
+  }).catch(function (err) { poser(bloc(err.message, 'ko', '❌')); });
+}
+
+/** Taux de frais pour un montant, lu dans les paliers réels de Tarifs_Depot. */
+function tauxDepotPour(montant) {
+  var tarifs = (Etat.ref && Etat.ref.tarifs_depot) || [];
+  for (var i = 0; i < tarifs.length; i++) {
+    var min = Number(tarifs[i].min_usd) || 0;
+    var brut = tarifs[i].max_usd;
+    var max = (brut === '' || brut === null || brut === undefined)
+      ? Infinity : Number(brut);
+    if (montant >= min && montant < max) return Number(tarifs[i].taux) || 0;
+  }
+  return 0;
+}
+
+/**
+ * Le vrai levier n'est pas « grouper fait baisser le pourcentage » — la
+ * quote-part est proportionnelle au panier, donc à paliers égaux chaque
+ * commande porte le même taux. Le levier, c'est que les frais sont
+ * calculés sur la RECHARGE, pas sur les paniers rattachés : recharger
+ * 300 $ et n'y rattacher qu'une commande de 75 $ fait porter à cette
+ * seule commande les frais des 300 $.
+ */
+function simulerGroupage() {
+  var z = document.getElementById('s-res');
+  if (!z) return;
+
+  var recharge = Number(document.getElementById('s-recharge').value) || 0;
+  var panier = Number(document.getElementById('s-panier').value) || 0;
+  var taux = (Number(document.getElementById('s-taux').value) || 0) / 100;
+
+  if (recharge <= 0 || panier <= 0) { z.innerHTML = ''; return; }
+
+  var tDepot = tauxDepotPour(recharge);
+  var frais = recharge * tDepot;
+  var commission = panier * taux;
+  var maxN = Math.max(1, Math.floor(recharge / panier));
+
+  var h = '<div class="total"><span class="l">Frais sur ' + usd(recharge) +
+      ' (' + pct(tDepot) + ')</span><b style="color:var(--rouge)">' +
+      usd(frais) + '</b></div>' +
+    '<div class="total"><span class="l">Frais encaissés par commande</span><b>' +
+      usd(commission) + '</b></div>' +
+    '<div class="titre-section">Marge de chaque commande</div>';
+
+  var seuil = null;
+  var ns = [];
+  for (var n = 1; n <= Math.min(maxN, 8); n++) ns.push(n);
+  if (maxN > 8) ns.push(maxN);
+
+  ns.forEach(function (n) {
+    var quote = frais / n;                 // paniers égaux : part identique
+    var marge = commission - quote;
+    if (seuil === null && marge >= 0) seuil = n;
+    var neg = marge < 0;
+    h += '<div class="total"><span class="l">' + n + ' commande' +
+      (n > 1 ? 's' : '') + ' rattachée' + (n > 1 ? 's' : '') +
+      '</span><span style="font-weight:800;color:' +
+      (neg ? 'var(--rouge)' : 'var(--vert)') + '">' +
+      (neg ? '' : '+') + n2(marge) + ' $</span></div>';
+  });
+
+  if (tDepot === 0) {
+    h += bloc('Aucun palier de frais n\'est défini dans Tarifs_Depot : la ' +
+              'simulation suppose 0 % de frais, donc une marge toujours égale ' +
+              'à la commission. Renseigne tes vrais paliers pour que ce ' +
+              'tableau serve à quelque chose.', 'attention', '⚠️');
+  } else if (seuil === null) {
+    h += bloc('À ce taux, même en remplissant la recharge, chaque commande ' +
+              'reste perdante. Il faut soit remonter les frais client, soit ' +
+              'trouver un moyen de dépôt moins cher.', 'ko', '⚠️');
+  } else {
+    h += bloc('Il faut ' + seuil + ' commande' + (seuil > 1 ? 's' : '') +
+              ' rattachée' + (seuil > 1 ? 's' : '') + ' à cette recharge pour ' +
+              'que chacune devienne rentable. En dessous, tu paies pour ' +
+              'travailler.' +
+              (maxN > seuil
+                ? ' La recharge peut en porter ' + maxN + ' : attends d\'en ' +
+                  'avoir assez avant de recharger.'
+                : ''),
+              seuil === 1 ? 'ok' : 'attention', seuil === 1 ? '✅' : '💡');
+  }
+  z.innerHTML = h;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  RÉGLAGES ET MODALE
+// ═══════════════════════════════════════════════════════════════════
+
+function ouvrirReglages() {
+  var u = Etat.user || {};
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  modale('Réglages',
+    '<div class="carte serree" style="margin-bottom:12px">' +
+      '<div style="font-weight:800;font-size:16px">' + e(u.nom) + '</div>' +
+      '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
+        e(u.user_id) + ' · ' + e(u.role) + '</div></div>' +
+
+    '<div class="carte"><div class="titre-section" style="margin-top:0">' +
+      'Paramètres en vigueur</div>' +
+      '<div class="total"><span class="l">Frais par défaut</span><b>' +
+        pct(p.TAUX_COMMISSION_DEFAUT) + '</b></div>' +
+      '<div class="total"><span class="l">Taux d\'achat USD</span><b>' +
+        n0(p.TAUX_ACHAT_USD) + '</b></div>' +
+      '<div class="total"><span class="l">Taux de vente USD</span><b>' +
+        n0(p.TAUX_VENTE_USD) + '</b></div>' +
+      ((Etat.ref && Etat.ref.tarifs_depot && Etat.ref.tarifs_depot.length)
+        ? '<div class="titre-section">Paliers de frais de dépôt</div>' +
+          Etat.ref.tarifs_depot.map(function (t) {
+            return '<div class="total"><span class="l">' + n0(t.min_usd) + ' $ – ' +
+              (t.max_usd === '' || t.max_usd === null ? '∞' : n0(t.max_usd) + ' $') +
+              '</span><b>' + pct(t.taux) + '</b></div>';
+          }).join('')
+        : bloc('Aucun palier de frais de dépôt n\'est défini dans Tarifs_Depot. ' +
+               'Les marges estimées supposeront donc 0 % de frais — elles seront ' +
+               'trop optimistes.', 'attention', '⚠️')) +
+    '</div>' +
+
+    '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
+    '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
+    '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
+    '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>');
+}
+
+function rafraichirRef() {
+  toast('Rechargement…');
+  chargerReferentiels().then(function () {
+    fermerModale(); toast('Référentiels à jour.', 'ok'); rendreOnglet();
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function ouvrirChangerCode() {
+  modale('Changer mon code',
+    bloc('Six chiffres. Le code est haché : personne ne peut le retrouver, ' +
+         'seulement le régénérer.', 'info', '🔑') +
+    '<label class="champ"><span>Code actuel</span><input type="password" id="k-a" ' +
+      'inputmode="numeric" maxlength="6"></label>' +
+    '<label class="champ"><span>Nouveau code</span><input type="password" id="k-b" ' +
+      'inputmode="numeric" maxlength="6"></label>' +
+    '<label class="champ"><span>Confirmer</span><input type="password" id="k-c" ' +
+      'inputmode="numeric" maxlength="6"></label>' +
+    '<div id="k-res"></div>' +
+    '<button class="btn vert" onclick="validerCode()">Changer</button>');
+}
+
+function validerCode() {
+  var a = document.getElementById('k-a').value;
+  var b = document.getElementById('k-b').value;
+  var c = document.getElementById('k-c').value;
+  var res = document.getElementById('k-res');
+  if (!/^\d{6}$/.test(b)) { res.innerHTML = bloc('Six chiffres exactement.', 'ko', '⚠️'); return; }
+  if (b !== c) { res.innerHTML = bloc('Les deux codes diffèrent.', 'ko', '⚠️'); return; }
+  api('changer_code', { ancien_code: a, nouveau_code: b }).then(function () {
+    fermerModale(); toast('Code modifié.', 'ok');
+  }).catch(function (err) { res.innerHTML = bloc(err.message, 'ko', '❌'); });
+}
+
+function modale(titre, html) {
+  var dejaOuverte = Nav.modaleOuverte;
+  fermerModaleDom();
+  var v = document.createElement('div');
+  v.className = 'voile'; v.id = 'voile';
+  v.innerHTML = '<div class="modale" onclick="event.stopPropagation()">' +
+    '<div class="poignee"></div><h3>' + e(titre) + '</h3>' +
+    '<div id="corps-modale">' + html + '</div></div>';
+  v.onclick = fermerModale;
+  document.body.appendChild(v);
+  document.body.style.overflow = 'hidden';
+  Nav.modaleOuverte = true;
+  if (!dejaOuverte) { try { history.pushState({ modale: true }, ''); } catch (e) {} }
+}
+function majModale(titre, html) {
+  var c = document.getElementById('corps-modale');
+  var t = document.querySelector('.modale h3');
+  if (c) { c.innerHTML = html; if (t) t.textContent = titre; }
+  else modale(titre, html);
+}
+/** Ferme sans toucher à l'historique — réservé à popstate. */
+function fermerModaleDom() {
+  var v = document.getElementById('voile');
+  if (v) v.remove();
+  document.body.style.overflow = '';
+  Nav.modaleOuverte = false;
+}
+function fermerModale() {
+  if (Nav.modaleOuverte) {
+    Nav.modaleOuverte = false;
+    fermerModaleDom();
+    try { history.back(); } catch (e) {}
+    return;
+  }
+  fermerModaleDom();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  DÉMARRAGE
+// ═══════════════════════════════════════════════════════════════════
+
+window.addEventListener('online',  function () { majBandeau(); toast('Réseau revenu.', 'ok'); });
+window.addEventListener('offline', function () { majBandeau(); toast('Réseau perdu.', 'ko'); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+
+(function demarrer() {
+  try {
+    var h = (location.hash || '').replace('#', '');
+    if (h && ONGLETS.some(function (o) { return o.id === h; })) Etat.onglet = h;
+    history.replaceState({ onglet: Etat.onglet }, '', '#' + Etat.onglet);
+  } catch (e) {}
+
+  if (Etat.url && Etat.token) {
+    document.getElementById('app').innerHTML =
+      '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
+      '</span></h1></header><main>' + chargement() + '</main>';
+    chargerReferentiels().then(dessiner).catch(function (err) {
+      if (/Session|Jeton/i.test(err.message)) { deconnecter(); return; }
+      toast(err.message, 'ko'); dessiner();
+    });
+  } else {
+    dessiner();
+  }
+})();
+</script>
+</body>
+</html>
