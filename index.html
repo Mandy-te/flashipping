@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B2545">
+<title>Flashipping</title>
+<link rel="apple-touch-icon" href="logistique/icone-192.png">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   Page d'accueil du dépôt. Elle existe parce que GitHub Pages sert
+   la racine : sans index.html ici, l'adresse du site renvoie 404 et
+   seule l'adresse complète d'une application fonctionne.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --marine:#0B2545; --or:#F0A818; --ambre:#5A3A00;
+  --fond:#F4F6F8; --bord:#D9E0E6; --texte:#16222E; --doux:#5F7183;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--fond);color:var(--texte);
+  min-height:100vh;display:flex;flex-direction:column;
+}
+header{
+  background:var(--marine);color:#fff;
+  padding:calc(env(safe-area-inset-top,0px) + 30px) 16px 26px;
+  text-align:center;
+}
+header .logo{
+  width:52px;height:52px;border-radius:14px;background:var(--or);
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:27px;margin-bottom:12px;
+}
+header h1{margin:0;font-size:23px;letter-spacing:.3px}
+header p{margin:6px 0 0;font-size:13.5px;opacity:.72}
+
+main{flex:1;padding:18px 16px calc(28px + env(safe-area-inset-bottom,0px));
+  max-width:620px;margin:0 auto;width:100%}
+
+a.app{
+  display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;
+  background:#fff;border:1px solid var(--bord);border-radius:14px;
+  padding:16px;margin-bottom:12px;
+  box-shadow:0 1px 3px rgba(11,37,69,.1);
+}
+a.app:active{transform:scale(.99)}
+a.app .ic{
+  width:50px;height:50px;border-radius:13px;flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:25px;
+}
+a.app .ic.bleu{background:var(--marine);color:#fff}
+a.app .ic.ambre{background:var(--ambre);color:var(--or)}
+a.app .corps{flex:1;min-width:0;display:block}
+a.app .t1{display:block;font-weight:800;font-size:16.5px}
+a.app .t2{display:block;font-size:13px;color:var(--doux);
+  margin-top:3px;line-height:1.35}
+a.app .fleche{color:var(--doux);font-size:21px;flex:none}
+
+.bientot{opacity:.5;pointer-events:none}
+.bientot .ic{background:var(--bord);color:var(--doux)}
+
+.note{
+  background:#EAF3FB;border:1px solid #C3DEF3;color:#0D3C6E;
+  border-radius:12px;padding:13px 14px;font-size:13.5px;margin-top:18px;
+}
+.note b{display:block;margin-bottom:4px}
+footer{
+  text-align:center;color:var(--doux);font-size:11.5px;
+  padding:0 16px calc(22px + env(safe-area-inset-bottom,0px));
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📦</div>
+  <h1>Flashipping</h1>
+  <p>Cap-Haïtien · Ouanaminthe · Miami</p>
+</header>
+
+<main>
+  <a class="app" href="logistique/">
+    <span class="ic bleu">🔍</span>
+    <span class="corps">
+      <span class="t1">Logistique</span>
+      <span class="t2">Scanner, réceptionner, suivre et livrer les colis</span>
+    </span>
+    <span class="fleche">›</span>
+  </a>
+
+  <a class="app" href="commandes/">
+    <span class="ic ambre">🛒</span>
+    <span class="corps">
+      <span class="t1">Commandes</span>
+      <span class="t2">Achats pour les clients, dépôts et marges</span>
+    </span>
+    <span class="fleche">›</span>
+  </a>
+
+  <a class="app bientot" href="#">
+    <span class="ic">📊</span>
+    <span class="corps">
+      <span class="t1">Finance</span>
+      <span class="t2">Comptabilité, parts des associés — à venir</span>
+    </span>
+  </a>
+
+  <div class="note">
+    <b>À installer sur le téléphone</b>
+    Ouvre une application, puis menu ⋮ de Chrome → « Ajouter à l'écran
+    d'accueil ». Elle s'ouvrira alors en plein écran, sans barre d'adresse.
+  </div>
+</main>
+
+<footer>Accès réservé — chaque agent entre avec son propre code.</footer>
+
+</body>
+</html>
