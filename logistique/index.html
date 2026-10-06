@@ -787,13 +787,40 @@ function titreOnglet() {
   return o ? o.nom : 'Flashipping';
 }
 
-function allerA(id) {
+/**
+ * Le bouton Retour du téléphone.
+ *
+ * Une application d'une seule page n'empile rien dans l'historique :
+ * Retour sortait donc du site, même avec une fiche ouverte. On pose
+ * une entrée d'historique par onglet visité et une par modale, pour
+ * que Retour ferme la modale puis remonte les onglets, comme dans
+ * n'importe quelle application.
+ */
+var Nav = { modaleOuverte: false };
+
+function allerA(id, sansHistorique) {
   if (Etat.onglet === id) return;
   arreterCamera();
   Etat.onglet = id;
   Etat.vue = null;
+  if (!sansHistorique) {
+    try { history.pushState({ onglet: id }, '', '#' + id); } catch (e) {}
+  }
   dessiner();
 }
+
+window.addEventListener('popstate', function (ev) {
+  // Une modale ouverte se ferme en premier : c'est ce que l'utilisateur attend.
+  if (Nav.modaleOuverte) { fermerModaleDom(); return; }
+
+  var st = ev.state || {};
+  if (st.onglet && st.onglet !== Etat.onglet) {
+    arreterCamera();
+    Etat.onglet = st.onglet;
+    Etat.vue = null;
+    dessiner();
+  }
+});
 
 function poser(html) {
   var c = document.getElementById('contenu');
@@ -997,7 +1024,8 @@ function changerUrl() {
 //  ONGLET SCAN
 // ═══════════════════════════════════════════════════════════════════
 
-var Cam = { flux: null, detecteur: null, boucle: null, dernier: '', quand: 0 };
+var Cam = { flux: null, detecteur: null, boucle: null, dernier: '', quand: 0,
+            pause: false };
 var ModeRafale = false;
 var Rafale = [];
 
@@ -1174,17 +1202,20 @@ function lancerScan(valeur) {
            'quand même enregistrer son passage — le serveur appliquera la ' +
            'bonne étape au retour du réseau.', 'attention', '📴') +
       '<button class="btn vert" onclick="avancerHorsLigne(\'' + e(t) + '\')">' +
-      'Enregistrer le passage</button></div>';
+      'Enregistrer le passage</button></div>' + boutonReprise();
+    pauserCamera();
     return;
   }
 
   document.getElementById('res-scan').innerHTML = chargement('Lecture…');
+  pauserCamera();
   api('colis_scanner', { tracking: t }).then(function (d) {
     bip();
-    document.getElementById('res-scan').innerHTML = carteScan(d);
+    document.getElementById('res-scan').innerHTML = carteScan(d) + boutonReprise();
     redonnerFocus();
   }).catch(function (err) {
-    document.getElementById('res-scan').innerHTML = bloc(err.message, 'ko', '❌');
+    document.getElementById('res-scan').innerHTML =
+      bloc(err.message, 'ko', '❌') + boutonReprise();
     redonnerFocus();
   });
 }
@@ -1292,6 +1323,8 @@ function confirmerAvance(t) {
       h += bloc('Le colis est disponible : prévenez le client.', 'info', '💬');
     }
     h += '<button class="btn vide" onclick="lancerScan(\'' + e(t) + '\')">Revoir ce colis</button>';
+    // Ce colis est traité : la caméra peut reprendre sans qu'on le lui demande.
+    Cam.pause = false; Cam.dernier = '';
     z.innerHTML = h;
     redonnerFocus();
   }).catch(function (err) {
@@ -1355,7 +1388,7 @@ function brancherFlux() {
 
   // 300 ms suffisent : au-delà le téléphone chauffe pour rien
   Cam.boucle = setInterval(function () {
-    if (!Cam.flux || v.readyState < 2) return;
+    if (!Cam.flux || Cam.pause || v.readyState < 2) return;
     Cam.detecteur.detect(v).then(function (codes) {
       if (!codes || !codes.length) return;
       var val = String(codes[0].rawValue || '').trim().toUpperCase();
@@ -1368,7 +1401,35 @@ function brancherFlux() {
   }, 300);
 }
 
+/**
+ * La caméra se met en pause dès qu'un résultat demande une décision.
+ *
+ * Sans cela elle relit le même code toutes les trois secondes et
+ * remplace l'écran que l'agent est en train de lire — c'est
+ * particulièrement pénible sur un colis inconnu, où il faut remplir un
+ * formulaire pendant que la caméra insiste.
+ */
+function pauserCamera() {
+  if (Cam.flux) Cam.pause = true;
+}
+
+function reprendreCamera() {
+  Cam.pause = false;
+  Cam.dernier = '';                       // le même code redevient scannable
+  var z = document.getElementById('res-scan');
+  if (z) z.innerHTML = '';
+  redonnerFocus();
+}
+
+/** Bouton de reprise, affiché seulement quand la caméra est en pause. */
+function boutonReprise() {
+  if (!Cam.flux || !Cam.pause) return '';
+  return '<button class="btn or" onclick="reprendreCamera()">' +
+         '▶ Scanner le colis suivant</button>';
+}
+
 function arreterCamera() {
+  Cam.pause = false;
   if (Cam.boucle) { clearInterval(Cam.boucle); Cam.boucle = null; }
   if (Cam.flux) {
     Cam.flux.getTracks().forEach(function (t) { t.stop(); });
@@ -1583,7 +1644,8 @@ function validerReception() {
         e(JSON.stringify(pourEtiquette)).replace(/'/g, '&#39;') + '))">' +
         '🏷 Imprimer l\'étiquette 50 mm</button>' +
       '<button class="btn vide petit" onclick="ouvrirReception()">' +
-        '➕ Réceptionner le suivant</button></div>';
+        '➕ Réceptionner le suivant</button></div>' + boutonReprise();
+    Cam.pause = false; Cam.dernier = '';
   }).catch(function (err) {
     b.disabled = false; b.textContent = 'Enregistrer';
     res.innerHTML = bloc(err.message, 'ko', '❌');
@@ -2688,7 +2750,11 @@ function validerCode() {
 // ═══════════════════════════════════════════════════════════════════
 
 function modale(titre, html) {
-  fermerModale();
+  // Une modale qui en remplace une autre ne crée pas d'entrée
+  // supplémentaire : un seul Retour doit suffire à tout refermer.
+  var dejaOuverte = Nav.modaleOuverte;
+  fermerModaleDom();
+
   var v = document.createElement('div');
   v.className = 'voile';
   v.id = 'voile';
@@ -2698,18 +2764,41 @@ function modale(titre, html) {
   v.onclick = fermerModale;
   document.body.appendChild(v);
   document.body.style.overflow = 'hidden';
+
+  Nav.modaleOuverte = true;
+  if (!dejaOuverte) {
+    try { history.pushState({ modale: true }, ''); } catch (e) {}
+  }
 }
 
 function majModale(titre, html) {
   var c = document.getElementById('corps-modale');
-  if (c) c.innerHTML = html;
+  var t = document.querySelector('.modale h3');
+  if (c) { c.innerHTML = html; if (t) t.textContent = titre; }
   else modale(titre, html);
 }
 
-function fermerModale() {
+/** Ferme sans toucher à l'historique — réservé à popstate. */
+function fermerModaleDom() {
   var v = document.getElementById('voile');
   if (v) v.remove();
   document.body.style.overflow = '';
+  Nav.modaleOuverte = false;
+}
+
+/**
+ * Fermeture demandée par l'utilisateur : on repasse par l'historique
+ * pour que l'entrée empilée soit consommée. Sans ça, un Retour après
+ * une fermeture au doigt reviendrait sur une modale déjà fermée.
+ */
+function fermerModale() {
+  if (Nav.modaleOuverte) {
+    Nav.modaleOuverte = false;
+    fermerModaleDom();
+    try { history.back(); } catch (e) {}
+    return;
+  }
+  fermerModaleDom();
 }
 
 
@@ -2744,6 +2833,14 @@ if ('serviceWorker' in navigator) {
 // référentiels avant de peindre : sans eux les libellés et les villes
 // seraient affichés en codes bruts.
 (function demarrer() {
+  try {
+    var depuisLien = (location.hash || '').replace('#', '');
+    if (depuisLien && ONGLETS.some(function (o) { return o.id === depuisLien; })) {
+      Etat.onglet = depuisLien;
+    }
+    history.replaceState({ onglet: Etat.onglet }, '', '#' + Etat.onglet);
+  } catch (e) {}
+
   if (Etat.url && Etat.token) {
     document.getElementById('app').innerHTML =
       '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
