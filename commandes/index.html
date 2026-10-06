@@ -1970,10 +1970,163 @@ function ouvrirReglages() {
                'trop optimistes.', 'attention', '⚠️')) +
     '</div>' +
 
+    (Etat.user && Etat.user.role === 'admin'
+      ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>'
+      : '') +
     '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
     '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PARAMÈTRES — réservé à l'administrateur
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Chaque paramètre porte ici sa propre unité et sa propre explication.
+ *
+ * Le point à retenir, écrit à l'écran plutôt que dans une note que
+ * personne ne lira : changer une valeur ne retouche JAMAIS une
+ * opération déjà enregistrée. Un colis garde le prix au livre du jour
+ * de sa réception, une facture son taux, une commande ses frais, un
+ * revenu ses gourdes. Seules les opérations suivantes changent.
+ */
+var PARAMS_EDITABLES = [
+  { cle:'PRIX_LB_USD', nom:'Prix par livre', unite:'$', pas:0.25,
+    aide:'Appliqué à la réception d\'un colis. Les colis déjà reçus gardent le leur.' },
+  { cle:'POIDS_MINIMUM_LB', nom:'Poids minimum facturé', unite:'lb', pas:0.1,
+    aide:'Un colis plus léger est facturé à ce poids.' },
+  { cle:'TAUX_ACHAT_USD', nom:'Taux d\'achat du dollar', unite:'HTG', pas:1,
+    aide:'Quand le client paie en gourdes et que tu achètes du dollar.' },
+  { cle:'TAUX_VENTE_USD', nom:'Taux de vente du dollar', unite:'HTG', pas:1,
+    aide:'Quand le client paie en dollars. Toujours sous le taux d\'achat.' },
+  { cle:'TAUX_COMMISSION_DEFAUT', nom:'Frais de commande', unite:'%', pas:0.5,
+    fraction:true,
+    aide:'Proposé à la saisie. 0 pour une promotion. Le taux fidèle d\'un client passe devant.' },
+  { cle:'JOURS_ALERTE_NON_RECLAME', nom:'Alerte colis non réclamé', unite:'jours', pas:1,
+    aide:'Au-delà, le colis est signalé comme oublié.' },
+  { cle:'DUREE_SESSION_HEURES', nom:'Durée d\'une session', unite:'h', pas:1,
+    aide:'Au-delà, l\'agent doit retaper son code.' },
+  { cle:'MAX_TENTATIVES_CODE', nom:'Codes faux avant blocage', unite:'', pas:1,
+    aide:'Le compte se bloque ensuite ; un admin le débloque.' }
+];
+
+function ouvrirParametres() {
+  if (!Etat.user || Etat.user.role !== 'admin') {
+    toast('Réservé à l\'administrateur.', 'ko');
+    return;
+  }
+  modale('Paramètres', chargement());
+
+  Promise.all([api('admin_parametres'), api('admin_tarifs_depot')])
+    .then(function (r) {
+      var valeurs = {};
+      r[0].forEach(function (x) { valeurs[x.cle] = x.valeur; });
+      rendreParametres(valeurs, r[1].tarifs);
+    }).catch(function (err) {
+      majModale('Paramètres', bloc(err.message, 'ko', '❌'));
+    });
+}
+
+function rendreParametres(valeurs, tarifs) {
+  var h = bloc('Une modification ne touche jamais une opération déjà ' +
+               'enregistrée. Un colis garde le prix du jour de sa réception, ' +
+               'une facture son taux, une commande ses frais. Seules les ' +
+               'opérations suivantes changent.', 'info', '🔒');
+
+  PARAMS_EDITABLES.forEach(function (p) {
+    var brut = valeurs[p.cle];
+    if (brut === undefined) return;
+    var affiche = p.fraction ? (Number(brut) * 100) : brut;
+
+    h += '<div class="carte serree" style="margin-bottom:10px">' +
+      '<div style="font-weight:700;font-size:14.5px">' + e(p.nom) + '</div>' +
+      '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;' +
+        'line-height:1.35">' + e(p.aide) + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input type="number" id="pm-' + e(p.cle) + '" value="' + e(affiche) + '" ' +
+          'step="' + p.pas + '" inputmode="decimal" style="flex:1">' +
+        (p.unite ? '<span style="font-weight:700;color:var(--doux);' +
+          'min-width:34px">' + e(p.unite) + '</span>' : '') +
+        '<button class="btn petit" style="width:auto;padding:11px 15px" ' +
+          'onclick="enregistrerParametre(\'' + e(p.cle) + '\',' +
+          (p.fraction ? 'true' : 'false') + ')">OK</button>' +
+      '</div></div>';
+  });
+
+  // ── Paliers de frais de dépôt ──
+  h += '<div class="titre-section">Paliers de frais de dépôt</div>' +
+    bloc('Ce que TOI tu paies pour recharger la carte. Ces paliers ne ' +
+         'servent qu\'à estimer : le frais réellement prélevé est saisi à ' +
+         'la main sur chaque dépôt, et c\'est lui qui entre en comptabilité.',
+         'attention', '💳');
+
+  (tarifs || []).forEach(function (t) {
+    h += '<div class="carte serree" style="margin-bottom:10px' +
+        (t.actif ? '' : ';opacity:.5') + '">' +
+      '<div style="font-weight:700;font-size:14px;margin-bottom:8px">' +
+        n0(t.min_usd) + ' $ – ' + (t.max_usd === '' ? '∞' : n0(t.max_usd) + ' $') +
+        (t.note ? ' <span style="font-weight:400;color:var(--doux);font-size:12px">· ' +
+          e(t.note) + '</span>' : '') + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input type="number" id="td-' + e(t.tarif_id) + '" ' +
+          'value="' + (t.taux * 100) + '" step="0.5" inputmode="decimal" style="flex:1">' +
+        '<span style="font-weight:700;color:var(--doux);min-width:34px">%</span>' +
+        '<button class="btn petit" style="width:auto;padding:11px 15px" ' +
+          'onclick="enregistrerTarif(\'' + e(t.tarif_id) + '\')">OK</button>' +
+      '</div>' +
+      '<button class="btn vide petit" style="margin-top:8px" onclick="basculerTarif(\'' +
+        e(t.tarif_id) + '\',' + (t.actif ? 'false' : 'true') + ')">' +
+        (t.actif ? 'Désactiver ce palier' : 'Réactiver ce palier') + '</button>' +
+    '</div>';
+  });
+
+  h += '<div id="pm-res"></div>';
+  majModale('Paramètres', h);
+}
+
+function enregistrerParametre(cle, fraction) {
+  var champ = document.getElementById('pm-' + cle);
+  var saisi = champ.value;
+  if (saisi === '') { toast('Valeur vide.', 'ko'); return; }
+
+  // L'écran parle en pourcentage, le serveur attend une fraction :
+  // la conversion se fait ici, jamais dans la tête de l'utilisateur.
+  var valeur = fraction ? (Number(saisi) / 100) : saisi;
+
+  api('admin_parametres', { cle: cle, valeur: valeur }).then(function () {
+    toast(cle + ' enregistré.', 'ok');
+    champ.style.borderColor = 'var(--vert)';
+    return chargerReferentiels();
+  }).catch(function (err) {
+    champ.style.borderColor = 'var(--rouge)';
+    var z = document.getElementById('pm-res');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+    toast(err.message, 'ko');
+  });
+}
+
+function enregistrerTarif(id) {
+  var champ = document.getElementById('td-' + id);
+  api('admin_tarifs_depot', { tarif_id: id, taux: Number(champ.value) / 100 })
+    .then(function () {
+      toast('Palier enregistré.', 'ok');
+      champ.style.borderColor = 'var(--vert)';
+      return chargerReferentiels();
+    }).catch(function (err) {
+      champ.style.borderColor = 'var(--rouge)';
+      toast(err.message, 'ko');
+    });
+}
+
+function basculerTarif(id, actif) {
+  api('admin_tarifs_depot', { tarif_id: id, actif: actif ? 'OUI' : 'NON' })
+    .then(function () {
+      toast(actif ? 'Palier réactivé.' : 'Palier désactivé.', 'ok');
+      return chargerReferentiels();
+    }).then(ouvrirParametres)
+    .catch(function (err) { toast(err.message, 'ko'); });
 }
 
 function rafraichirRef() {
