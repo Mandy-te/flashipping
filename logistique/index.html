@@ -431,8 +431,15 @@ function api(action, params) {
     catch (e) {
       // Apps Script renvoie du HTML quand le déploiement est mal réglé
       if (texte.indexOf('<!DOCTYPE') === 0 || texte.indexOf('<html') === 0) {
-        throw new Error('L\'API a renvoyé une page web au lieu de données. ' +
-          'Vérifie que le déploiement est réglé sur « Accès : Tout le monde ».');
+        // Deux causes très différentes, d'où les deux phrases : avant la
+        // première connexion c'est le déploiement, après c'est le script
+        // qui a planté ou dépassé son temps d'exécution.
+        throw new Error(Etat.token
+          ? 'Google a renvoyé une page d\'erreur : le script a échoué ou a ' +
+            'dépassé son temps d\'exécution sur cette opération. Regarde ' +
+            '« Exécutions » dans Apps Script pour la cause exacte.'
+          : 'L\'API a renvoyé une page web au lieu de données. Vérifie que le ' +
+            'déploiement est réglé sur « Accès : Tout le monde ».');
       }
       throw new Error('Réponse illisible du serveur.');
     }
@@ -745,7 +752,7 @@ var ONGLETS = [
   { id: 'colis',      ic: '📦', nom: 'Colis' },
   { id: 'clients',    ic: '👤', nom: 'Clients' },
   { id: 'livraison',  ic: '🧾', nom: 'Livrer' },
-  { id: 'stock',      ic: '🏬', nom: 'Stock' }
+  { id: 'tri',        ic: '🏷', nom: 'Tri' }
 ];
 
 function dessiner() {
@@ -799,6 +806,7 @@ function rendreOnglet() {
     case 'colis':     return ongletColis();
     case 'clients':   return ongletClients();
     case 'livraison': return ongletLivraison();
+    case 'tri':       return ongletTri();
     case 'stock':     return ongletStock();
   }
 }
@@ -993,6 +1001,18 @@ var Cam = { flux: null, detecteur: null, boucle: null, dernier: '', quand: 0 };
 var ModeRafale = false;
 var Rafale = [];
 
+/**
+ * Mode douchette : une douchette USB ou Bluetooth se comporte comme un
+ * clavier — elle tape le code puis envoie Entrée. Il suffit donc que le
+ * champ garde le focus entre deux colis, sinon les caractères se
+ * perdent et l'agent doit retoucher l'écran à chaque fois.
+ *
+ * `inputmode="none"` empêche le clavier du téléphone de s'ouvrir : sur
+ * un appareil sans douchette on le laisse, sur un poste équipé il ne
+ * ferait que masquer l'écran.
+ */
+var ModeScanner = S.lire('fls_mode_scanner', '0') === '1';
+
 function ongletScan() {
   var supporte = 'BarcodeDetector' in window;
 
@@ -1002,9 +1022,10 @@ function ongletScan() {
     '</div>' +
     '<div class="carte serree">' +
       '<div class="saisie-scan">' +
-        '<input type="text" id="in-tk" placeholder="Numéro de suivi" ' +
+        '<input type="text" id="in-tk" placeholder="' +
+          (ModeScanner ? 'Prêt — douchette' : 'Numéro de suivi') + '" ' +
           'autocomplete="off" autocapitalize="characters" spellcheck="false" ' +
-          'inputmode="text">' +
+          'inputmode="' + (ModeScanner ? 'none' : 'text') + '">' +
         '<button class="btn" style="width:58px;flex:none" onclick="lancerScan()">➜</button>' +
       '</div>' +
       '<div class="rangee-btn" style="margin-top:9px">' +
@@ -1013,19 +1034,42 @@ function ongletScan() {
         '<button class="btn ' + (ModeRafale ? 'or' : 'vide') + ' petit" ' +
           'onclick="basculerRafale()">⚡ Rafale' +
           (Rafale.length ? ' (' + Rafale.length + ')' : '') + '</button>' +
+        '<button class="btn ' + (ModeScanner ? 'vert' : 'vide') + ' petit" ' +
+          'onclick="basculerScanner()">🔫 Douchette</button>' +
       '</div>' +
-      (supporte ? '' : '<div style="font-size:12px;color:var(--doux);' +
-        'margin-top:9px">Ce navigateur ne lit pas les codes-barres par la ' +
-        'caméra. Saisis le numéro, ou utilise Chrome sur Android.</div>') +
+      (ModeScanner
+        ? '<div style="font-size:12px;color:var(--vert);margin-top:9px;' +
+          'font-weight:650">Le champ reste actif entre deux colis et le clavier ' +
+          'ne s\'ouvre plus. Avec la rafale, tu enchaînes sans toucher l\'écran.</div>'
+        : (supporte ? '' : '<div style="font-size:12px;color:var(--doux);' +
+          'margin-top:9px">Ce navigateur ne lit pas les codes-barres par la ' +
+          'caméra. Saisis le numéro, branche une douchette, ou utilise ' +
+          'Chrome sur Android.</div>')) +
     '</div>' +
-    (ModeRafale ? zoneRafale() : '') +
+    '<div id="zone-rafale">' + (ModeRafale ? zoneRafale() : '') + '</div>' +
     '<div id="res-scan"></div>'
   );
 
   var i = document.getElementById('in-tk');
   i.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') lancerScan(); });
-  if (!ModeRafale) setTimeout(function () { i.focus(); }, 180);
   if (Cam.flux) brancherFlux();
+  else redonnerFocus();
+}
+
+/** Le champ doit être prêt à recevoir le colis suivant, toujours. */
+function redonnerFocus() {
+  if (Cam.flux) return;
+  if (document.getElementById('voile')) return;   // une modale est ouverte
+  var i = document.getElementById('in-tk');
+  if (i) setTimeout(function () { try { i.focus(); } catch (e) {} }, 60);
+}
+
+function basculerScanner() {
+  ModeScanner = !ModeScanner;
+  S.ecrire('fls_mode_scanner', ModeScanner ? '1' : '0');
+  if (ModeScanner && Cam.flux) arreterCamera();
+  rendreOnglet();
+  toast(ModeScanner ? 'Mode douchette activé.' : 'Mode douchette désactivé.', 'ok');
 }
 
 function zoneRafale() {
@@ -1040,10 +1084,23 @@ function zoneRafale() {
         }).join('') +
         '<button class="btn vert" onclick="envoyerRafale()">Faire avancer les ' +
           Rafale.length + ' colis</button>' +
-        '<button class="btn vide petit" onclick="Rafale=[];rendreOnglet()">Tout effacer</button>'
+        '<button class="btn vide petit" onclick="Rafale=[];majRafale()">Tout effacer</button>'
       : '<div style="color:var(--doux);font-size:13.5px">Scanne les colis les ' +
         'uns après les autres. Ils avanceront tous d\'un cran en une seule fois.</div>') +
   '</div>';
+}
+
+/**
+ * On ne repeint que la liste, pas tout l'onglet : reconstruire l'écran
+ * à chaque colis ferait perdre le focus à la douchette et saccaderait
+ * la saisie.
+ */
+function majRafale() {
+  var z = document.getElementById('zone-rafale');
+  if (z) z.innerHTML = ModeRafale ? zoneRafale() : '';
+  var b = document.querySelector('.rangee-btn .btn.or');
+  if (b) b.innerHTML = '⚡ Rafale' + (Rafale.length ? ' (' + Rafale.length + ')' : '');
+  redonnerFocus();
 }
 
 function basculerRafale() {
@@ -1051,7 +1108,7 @@ function basculerRafale() {
   if (!ModeRafale) Rafale = [];
   rendreOnglet();
 }
-function retirerRafale(i) { Rafale.splice(i, 1); rendreOnglet(); }
+function retirerRafale(i) { Rafale.splice(i, 1); majRafale(); }
 
 function envoyerRafale() {
   if (!Rafale.length) return;
@@ -1102,8 +1159,8 @@ function lancerScan(valeur) {
 
   if (ModeRafale) {
     if (Rafale.indexOf(t) === -1) { Rafale.push(t); bip(); }
-    else toast('Déjà dans la liste.');
-    rendreOnglet();
+    else toast('Déjà scanné.');
+    majRafale();
     return;
   }
 
@@ -1125,8 +1182,10 @@ function lancerScan(valeur) {
   api('colis_scanner', { tracking: t }).then(function (d) {
     bip();
     document.getElementById('res-scan').innerHTML = carteScan(d);
+    redonnerFocus();
   }).catch(function (err) {
     document.getElementById('res-scan').innerHTML = bloc(err.message, 'ko', '❌');
+    redonnerFocus();
   });
 }
 
@@ -1198,6 +1257,10 @@ function carteScan(d) {
       h += '<button class="btn vert" onclick="confirmerAvance(\'' + e(d.tracking) +
         '\')">' + etiq + '</button>';
     }
+  } else if (s.a_identifier) {
+    h += bloc(s.message, 'attention', '🏷') +
+      '<button class="btn or" onclick="fermerModale();allerA(\'tri\')">' +
+      '👤 Aller attribuer ce colis</button>';
   } else {
     h += bloc(s.message || 'Aucune étape suivante.', 'attention', '⏸');
   }
@@ -1230,8 +1293,7 @@ function confirmerAvance(t) {
     }
     h += '<button class="btn vide" onclick="lancerScan(\'' + e(t) + '\')">Revoir ce colis</button>';
     z.innerHTML = h;
-    var i = document.getElementById('in-tk');
-    if (i) i.focus();
+    redonnerFocus();
   }).catch(function (err) {
     z.innerHTML = bloc(err.message, 'ko', '❌');
   });
@@ -1320,10 +1382,11 @@ function arreterCamera() {
 //  RÉCEPTION D'UN COLIS
 // ═══════════════════════════════════════════════════════════════════
 
-var Recep = { client: null };
+var Recep = { client: null, anonyme: false };
 
 function ouvrirReception(tracking) {
   Recep.client = null;
+  Recep.anonyme = false;
   var peutPrix = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
   var prixDef = (Etat.ref && Etat.ref.parametres && Etat.ref.parametres.PRIX_LB_USD) || 5;
 
@@ -1335,11 +1398,14 @@ function ouvrirReception(tracking) {
       '<input type="text" id="r-tk" value="' + e(tracking || '') + '" ' +
       'class="mono" autocapitalize="characters" spellcheck="false"></label>' +
 
-    '<label class="champ"><span>Client</span>' +
+    '<label class="champ"><span>Client <span style="font-weight:400">' +
+      '— facultatif</span></span>' +
       '<input type="text" id="r-cli" placeholder="Nom, code ou téléphone" ' +
       'autocomplete="off" oninput="chercherClientRecep()"></label>' +
     '<div id="r-sugg"></div>' +
     '<div id="r-choisi"></div>' +
+    '<button class="btn vide petit" style="margin:-4px 0 12px" ' +
+      'onclick="sansClient()">⏭ Sans client — à identifier plus tard</button>' +
 
     '<div class="duo">' +
       '<label class="champ"><span>Poids (lb)</span>' +
@@ -1414,7 +1480,28 @@ function chercherClientRecep() {
   }, 330);
 }
 
+/**
+ * Le quai ne s'arrête pas pour chercher un nom. Le colis part sur le
+ * client système et rejoint la file « à identifier » — il circulera
+ * normalement, mais ne pourra pas devenir disponible tant qu'un
+ * responsable ne lui aura pas donné son client.
+ */
+function sansClient() {
+  Recep.client = null;
+  Recep.anonyme = true;
+  document.getElementById('r-sugg').innerHTML = '';
+  document.getElementById('r-cli').value = '';
+  document.getElementById('r-choisi').innerHTML =
+    '<div class="msg attention" style="margin-top:-4px"><span class="ic">🏷</span>' +
+    '<span>À identifier plus tard. Le colis apparaîtra dans la file de tri, ' +
+    'et un responsable lui donnera son client avant la livraison.</span></div>';
+  var d = document.getElementById('r-dest');
+  if (d) d.value = '';
+  document.getElementById('r-poids').focus();
+}
+
 function choisirClientRecep(c) {
+  Recep.anonyme = false;
   Recep.client = c;
   document.getElementById('r-sugg').innerHTML = '';
   document.getElementById('r-cli').value = c.nom_complet;
@@ -1441,14 +1528,20 @@ function validerReception() {
   var b = document.getElementById('r-btn');
 
   if (tk.length < 4) { res.innerHTML = bloc('Numéro de suivi trop court.', 'ko', '⚠️'); return; }
-  if (!Recep.client) { res.innerHTML = bloc('Choisis un client.', 'ko', '⚠️'); return; }
+  if (!Recep.client && !Recep.anonyme) {
+    res.innerHTML = bloc('Choisis un client, ou appuie sur « Sans client » ' +
+                         'pour l\'identifier plus tard.', 'ko', '⚠️');
+    return;
+  }
 
   var p = {
     tracking: tk,
-    client_id: Recep.client.client_id,
     poids_lb: document.getElementById('r-poids').value || 0,
     contenu: document.getElementById('r-contenu').value || ''
   };
+  // Sans client_id, le serveur rattache au client système et marque le
+  // colis « à identifier ».
+  if (Recep.client) p.client_id = Recep.client.client_id;
   var dest = document.getElementById('r-dest').value;
   var entree = document.getElementById('r-entree').value;
   if (dest) p.agence_destination = dest;
@@ -1470,7 +1563,7 @@ function validerReception() {
     bip();
     var pourEtiquette = {
       tracking: d.tracking, client_nom: d.client_nom,
-      code_client: Recep.client.code_client,
+      code_client: Recep.client ? Recep.client.code_client : '?',
       ville_destination: villeAgence(d.agence_destination),
       poids_lb: d.poids_lb, montant_usd: d.montant_usd,
       contenu: p.contenu
@@ -1478,6 +1571,11 @@ function validerReception() {
     document.getElementById('res-scan').innerHTML =
       bloc(d.client_nom + ' · ' + n2(d.poids_lb) + ' lb · ' + usd(d.montant_usd),
            'ok', '✅') +
+      (d.a_identifier
+        ? bloc('Colis sans client : il est dans la file de tri. Un responsable ' +
+               'devra l\'attribuer avant qu\'il puisse être livré.',
+               'attention', '🏷')
+        : '') +
       '<div class="carte"><div class="titre-section" style="margin-top:0">' +
         'Itinéraire prévu</div><div style="font-size:14px;font-weight:650">' +
         (d.route || []).map(e).join(' → ') + '</div>' +
@@ -1640,6 +1738,7 @@ function chargerColis() {
 
 function ligneColis(c) {
   var marques = '';
+  if (c.a_identifier) marques += '<span class="badge passage">🏷 à identifier</span> ';
   if (c.en_camion)  marques += '<span class="badge camion">🚚 en route</span> ';
   if (c.de_passage && !c.en_camion) marques += '<span class="badge passage">↻ de passage</span> ';
   if (c.statut === 'livre') {
@@ -2241,6 +2340,187 @@ function afficherFacture(f) {
 
 
 // ═══════════════════════════════════════════════════════════════════
+//  ONGLET TRI — les colis scannés sans client
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * La contrepartie du scan rapide. Sans cet écran, un colis scanné sans
+ * nom n'apparaîtrait dans la liste de personne et pourrait disparaître
+ * sans que ça se voie. Ici il est compté, daté, et attribuable en lot.
+ */
+var Tri = { colis: [], coches: {}, client: null };
+
+function ongletTri() {
+  poser(chargement('Colis à identifier…'));
+  Tri = { colis: [], coches: {}, client: null };
+
+  api('colis_a_identifier').then(function (d) {
+    Tri.colis = d.colis;
+    rendreTri(d);
+  }).catch(function (err) { poser(bloc(err.message, 'ko', '❌')); });
+}
+
+function rendreTri(d) {
+  if (!d.total) {
+    poser(vide('✅', 'Aucun colis en attente d\'identification.') +
+      '<button class="btn vide" onclick="allerA(\'stock\')">' +
+      '🏬 Voir l\'inventaire</button>');
+    return;
+  }
+
+  var choisis = Object.keys(Tri.coches).filter(function (k) { return Tri.coches[k]; });
+  var vieux = d.colis.filter(function (c) { return c.jours_attente >= 7; }).length;
+
+  poser(
+    '<div class="stats" style="margin-bottom:12px">' +
+      '<div class="stat"><div class="v" style="color:var(--orange)">' + d.total +
+        '</div><div class="l">à identifier</div></div>' +
+      '<div class="stat"><div class="v">' + n2(d.poids_total_lb) + '</div>' +
+        '<div class="l">livres</div></div>' +
+      (vieux ? '<div class="stat"><div class="v" style="color:var(--rouge)">' + vieux +
+        '</div><div class="l">+ de 7 jours</div></div>' : '') +
+    '</div>' +
+
+    bloc('Ces colis circulent normalement, mais aucun ne pourra devenir ' +
+         '« disponible » tant qu\'il n\'aura pas de client. Coche ceux qui ' +
+         'appartiennent à la même personne, puis attribue-les d\'un coup.',
+         'info', '🏷') +
+
+    '<div class="rangee-btn" style="margin-bottom:10px">' +
+      '<button class="btn vide petit" onclick="cocherTri(true)">Tout cocher</button>' +
+      '<button class="btn vide petit" onclick="cocherTri(false)">Tout décocher</button>' +
+    '</div>' +
+
+    d.colis.map(function (c) {
+      var on = !!Tri.coches[c.tracking];
+      return '<label class="coche ' + (on ? 'on' : '') + '">' +
+        '<input type="checkbox" ' + (on ? 'checked' : '') +
+          ' onchange="basculerTri(\'' + e(c.tracking) + '\')">' +
+        '<div class="corps"><div class="mono" style="font-weight:650">' +
+          e(c.tracking) + '</div>' +
+        '<div style="font-size:12.5px;color:var(--doux);margin-top:3px">' +
+          n2(c.poids_lb) + ' lb' + (c.contenu ? ' · ' + e(c.contenu) : '') +
+          ' · ' + e(c.ville_courante) + '</div>' +
+        '<div style="margin-top:5px">' + puceStatut(c.statut, c.libelle) +
+          (c.jours_attente >= 7
+            ? ' <span class="badge impaye">' + c.jours_attente + ' jours</span>'
+            : (c.jours_attente > 0
+               ? ' <span class="badge">' + c.jours_attente + ' j</span>' : '')) +
+        '</div></div></label>';
+    }).join('') +
+
+    (choisis.length
+      ? '<button class="btn or" onclick="ouvrirAttribution()">👤 Attribuer ' +
+        choisis.length + ' colis à un client</button>'
+      : '<div style="text-align:center;color:var(--doux);font-size:13px;' +
+        'padding:10px">Coche au moins un colis.</div>')
+  );
+}
+
+function basculerTri(t) {
+  Tri.coches[t] = !Tri.coches[t];
+  api('colis_a_identifier').then(rendreTri).catch(function () {});
+}
+function cocherTri(on) {
+  Tri.colis.forEach(function (c) { Tri.coches[c.tracking] = on; });
+  api('colis_a_identifier').then(rendreTri).catch(function () {});
+}
+
+function ouvrirAttribution() {
+  var choisis = Object.keys(Tri.coches).filter(function (k) { return Tri.coches[k]; });
+  Tri.client = null;
+
+  var agences = (Etat.ref && Etat.ref.agences || [])
+    .filter(function (a) { return a.agence_id !== 'AG00'; });
+
+  modale('Attribuer ' + choisis.length + ' colis',
+    '<label class="champ"><span>Client</span>' +
+      '<input type="text" id="t-cli" placeholder="Nom, code ou téléphone" ' +
+      'autocomplete="off" oninput="chercherClientTri()"></label>' +
+    '<div id="t-sugg"></div><div id="t-choisi"></div>' +
+    '<label class="champ"><span>Agence de livraison</span><select id="t-dest">' +
+      '<option value="">— celle du client —</option>' +
+      agences.map(function (a) {
+        return '<option value="' + e(a.agence_id) + '">' + e(a.ville) + '</option>';
+      }).join('') + '</select>' +
+      '<span style="font-size:12px;color:var(--doux);font-weight:400;display:block;' +
+      'margin-top:5px">Si la destination change, le colis repartira en camion ' +
+      'au prochain scan — il ne saute pas d\'étape.</span></label>' +
+    '<div id="t-res"></div>' +
+    '<button class="btn vert" id="t-btn" onclick="validerAttribution()">' +
+      'Attribuer</button>');
+  setTimeout(function () { document.getElementById('t-cli').focus(); }, 220);
+}
+
+var minuteurTri = null;
+function chercherClientTri() {
+  clearTimeout(minuteurTri);
+  var q = document.getElementById('t-cli').value.trim();
+  var z = document.getElementById('t-sugg');
+  if (q.length < 2) { z.innerHTML = ''; return; }
+
+  minuteurTri = setTimeout(function () {
+    api('client_chercher', { q: q }).then(function (liste) {
+      // Le client système n'est pas un choix valable ici.
+      liste = liste.filter(function (c) { return c.client_id !== 'CL0000'; });
+      if (!liste.length) {
+        z.innerHTML = '<div class="suggestions"><button onclick="ouvrirNouveauClient()">' +
+          '➕ Créer « ' + e(q) + ' »</button></div>';
+        return;
+      }
+      z.innerHTML = '<div class="suggestions">' + liste.map(function (c) {
+        return '<button onclick="choisirClientTri(' +
+          e(JSON.stringify(c)).replace(/'/g, '&#39;') + ')"><b>' +
+          e(c.nom_complet) + '</b> <span style="color:var(--doux)">' +
+          e(c.code_client) + '</span><div style="font-size:12px;color:var(--doux)">' +
+          e(villeAgence(c.agence_id)) + '</div></button>';
+      }).join('') + '</div>';
+    }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+  }, 330);
+}
+
+function choisirClientTri(c) {
+  Tri.client = c;
+  document.getElementById('t-sugg').innerHTML = '';
+  document.getElementById('t-cli').value = c.nom_complet;
+  document.getElementById('t-choisi').innerHTML =
+    '<div class="msg ok" style="margin-top:-4px"><span class="ic">👤</span><span>' +
+    e(c.nom_complet) + ' · ' + e(c.code_client) + '</span></div>';
+  var d = document.getElementById('t-dest');
+  if (d && c.agence_id) d.value = c.agence_id;
+}
+
+function validerAttribution() {
+  var choisis = Object.keys(Tri.coches).filter(function (k) { return Tri.coches[k]; });
+  var res = document.getElementById('t-res');
+  var b = document.getElementById('t-btn');
+
+  if (!Tri.client) { res.innerHTML = bloc('Choisis un client.', 'ko', '⚠️'); return; }
+
+  var p = { client_id: Tri.client.client_id, trackings: JSON.stringify(choisis) };
+  var dest = document.getElementById('t-dest').value;
+  if (dest) p.agence_destination = dest;
+
+  b.disabled = true; b.textContent = 'Attribution…';
+
+  api('colis_attribuer', p).then(function (d) {
+    fermerModale();
+    bip();
+    toast(d.nb_attribues + ' colis attribués à ' + d.client.nom_complet +
+          ' (' + d.ville_destination + ').', 'ok');
+    if (d.nb_refuses) {
+      toast(d.nb_refuses + ' refusé(s) : ' +
+            d.refuses.map(function (x) { return x.erreur; }).join(' '), 'ko');
+    }
+    ongletTri();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Attribuer';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
 //  ONGLET STOCK — inventaire physique
 // ═══════════════════════════════════════════════════════════════════
 
@@ -2350,7 +2630,9 @@ function ouvrirReglages() {
         'ouvrirReglages()">Effacer cette liste</button></div>';
   }
 
-  h += '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
+  h += '<button class="btn vide" onclick="fermerModale();allerA(\'stock\')">' +
+      '🏬 Inventaire de l\'agence</button>' +
+    '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
     '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>' +
