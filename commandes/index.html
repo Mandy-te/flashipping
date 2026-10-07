@@ -2225,7 +2225,7 @@ function simulerGroupage() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-06.3';
+var VERSION_ATTENDUE = '2026-10-07.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
@@ -2424,6 +2424,8 @@ var TEXTES_EDITABLES = [
   { cle:'MSG_RECU_COMMANDE', nom:'Mention — reçu de commande', lignes:4,
     aide:'L\'encadré au bas du reçu d\'une commande. C\'est là qu\'il faut ' +
          'écrire que le transport n\'est pas compris.' },
+  { cle:'MSG_RAPPORT', nom:'Mention — rapport financier', lignes:3,
+    aide:'L\'encadré au bas du rapport financier imprimé. Document interne : c\'est là qu\'on précise quelle devise fait foi.' },
   { cle:'MSG_DISPONIBLE', nom:'Message WhatsApp « colis disponible »', lignes:4,
     aide:'Les repères {client} {agence} {nb} {poids} {montant} sont remplacés ' +
          'automatiquement. Garde-les tels quels.' }
