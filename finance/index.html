@@ -257,10 +257,115 @@ textarea{min-height:60px;resize:vertical}
 /* ── Impression 50 mm : reçu de commande ── */
 #zone-impression{display:none}
 @media print{
-  @page{size:50mm auto;margin:2mm}
-  body{background:#fff}
-  #app,#toast,#bandeau,nav{display:none!important}
+  /* Le format de page n'est PAS figé ici : imprimer() injecte @page au
+     moment du clic, A4 pour un rapport, 50 mm pour un reçu. Une règle
+     fixe à cet endroit imprimerait tous les rapports sur un ticket. */
+  body{background:#fff;margin:0}
+  /* .voile est frère de #app : sans cette ligne, c'est la modale
+     affichée à l'écran qui part sur le papier. */
+  #app,#toast,#bandeau,nav,.voile{display:none!important}
   #zone-impression{display:block!important}
+
+  /* ── Document A4 ── */
+  .doc{
+    font-family:Arial,Helvetica,sans-serif;color:#16222E;font-size:10.5pt;
+    line-height:1.45;
+  }
+  .doc-tete{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3px solid #0B2545;padding-bottom:4mm;margin-bottom:5mm;
+  }
+  .doc-marque{font-size:21pt;font-weight:bold;letter-spacing:3px;color:#0B2545;
+    line-height:1}
+  .doc-eclair{color:#F0A818}
+  .doc-slogan{font-size:8pt;font-weight:bold;color:#C62828;letter-spacing:2.5px;
+    margin-top:1mm}
+  .doc-coord{font-size:7.5pt;color:#5F7183;text-align:right;line-height:1.5}
+  .doc-titre{
+    background:#0B2545;color:#fff;padding:2.5mm 4mm;font-size:12pt;
+    font-weight:bold;letter-spacing:1px;display:flex;
+    justify-content:space-between;margin-bottom:5mm;
+  }
+  .doc-cols{display:flex;gap:6mm;margin-bottom:5mm}
+  .doc-col{flex:1}
+  .doc-col h4{
+    font-size:7.5pt;letter-spacing:1.2px;color:#5F7183;margin:0 0 1.5mm;
+    text-transform:uppercase;border-bottom:1px solid #D9E0E6;padding-bottom:1mm;
+  }
+  .doc-col .gros{font-size:11pt;font-weight:bold}
+  .doc-col div{font-size:9pt}
+
+  table.doc-t{width:100%;border-collapse:collapse;margin-bottom:4mm}
+  table.doc-t th{
+    background:#EEF2F6;font-size:8pt;text-transform:uppercase;letter-spacing:.8px;
+    color:#0B2545;padding:2mm;text-align:left;border-bottom:1.5px solid #0B2545;
+  }
+  table.doc-t td{padding:2mm;border-bottom:1px solid #E6ECF1;font-size:9.5pt;
+    vertical-align:top}
+  table.doc-t .num{text-align:right;white-space:nowrap}
+  table.doc-t .ref{font-family:'Courier New',monospace;font-size:8.5pt}
+
+  .doc-tot{margin-left:auto;width:72mm}
+  .doc-tot div{display:flex;justify-content:space-between;padding:1.5mm 0;
+    font-size:10pt}
+  .doc-tot .grand{
+    border-top:2px solid #0B2545;margin-top:1mm;padding-top:2mm;
+    font-size:13pt;font-weight:bold;
+  }
+  .doc-tot .gdes{color:#5F7183;font-size:9.5pt}
+
+  .doc-tampon{
+    display:inline-block;border:2px solid;padding:1.5mm 5mm;font-weight:bold;
+    font-size:11pt;letter-spacing:1.5px;transform:rotate(-3deg);margin-top:3mm;
+  }
+  .doc-tampon.paye{color:#1B7F4B;border-color:#1B7F4B}
+  .doc-tampon.du{color:#C62828;border-color:#C62828}
+
+  .doc-note{
+    background:#F7F9FB;border-left:3px solid #F0A818;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-top:5mm;color:#16222E;
+  }
+  .doc-sign{display:flex;gap:10mm;margin-top:14mm}
+  .doc-sign div{flex:1;border-top:1px solid #16222E;padding-top:1.5mm;
+    font-size:8pt;color:#5F7183}
+  .doc-pied{
+    margin-top:8mm;border-top:1px solid #D9E0E6;padding-top:2.5mm;
+    font-size:7.5pt;color:#5F7183;text-align:center;line-height:1.6;
+  }
+  .doc-pied b{color:#C62828;letter-spacing:1.5px}
+
+  /* ── Propre au rapport financier ── */
+  .doc-h2{
+    font-size:9pt;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;
+    color:#0B2545;border-bottom:1.5px solid #0B2545;padding-bottom:1mm;
+    margin:6mm 0 2.5mm;
+  }
+  .doc-h2:first-of-type{margin-top:0}
+  table.doc-t tfoot td{
+    font-weight:bold;border-top:1.5px solid #0B2545;border-bottom:0;
+    background:#F7F9FB;
+  }
+  .doc-t .creux{color:#5F7183;font-size:8.5pt}
+  .doc-cadre{
+    border:1.5px solid #0B2545;padding:3mm 4mm;margin-bottom:5mm;
+  }
+  .doc-cadre .ligne{display:flex;justify-content:space-between;padding:1mm 0;
+    font-size:10pt}
+  .doc-cadre .ligne.fort{font-size:12.5pt;font-weight:bold;border-top:1px solid #0B2545;
+    margin-top:1.5mm;padding-top:2mm}
+  .doc-alerte{
+    border-left:3px solid #C62828;background:#FDF3F3;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-bottom:4mm;color:#8E1F1F;
+  }
+  .doc-ok{
+    border-left:3px solid #1B7F4B;background:#F2F9F5;padding:2mm 3mm;
+    font-size:8.5pt;margin-bottom:4mm;color:#145A32;
+  }
+  .doc-deux{display:flex;gap:6mm}
+  .doc-deux > div{flex:1}
+  .doc-saut{page-break-before:always}
+
+
   .etiquette{width:46mm;font-family:Arial,Helvetica,sans-serif;color:#000}
   .et-haut{text-align:center;font-size:8pt;font-weight:bold;
     border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1.5mm;
@@ -274,6 +379,63 @@ textarea{min-height:60px;resize:vertical}
   .et-pied{font-size:6.5pt;text-align:center;margin-top:1.5mm;
     border-top:1px solid #000;padding-top:.8mm}
 }
+
+/* ── Journal : une ligne = un mouvement ── */
+.mvt{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;
+  border:1px solid var(--bord);border-radius:11px;margin-bottom:7px;
+  text-align:left;width:100%;
+}
+.mvt .pic{
+  flex:none;width:30px;height:30px;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;font-size:15px;
+}
+.mvt.rev .pic{background:#E8F5E9}
+.mvt.dep .pic{background:#FFEBEE}
+.mvt.app .pic{background:#FFF8E1}
+.mvt .corps{flex:1;min-width:0}
+/* Ces spans vivent dans un <button> : sans display:block, le titre et
+   la description se collent l'un à l'autre sur une seule ligne. */
+.mvt .t{display:block;font-size:13.5px;font-weight:700;color:var(--marine)}
+.mvt .s{display:block;font-size:11.5px;color:var(--doux);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.mvt .m{flex:none;text-align:right;font-weight:800;font-size:14px;
+  white-space:nowrap;line-height:1.25}
+.mvt .m .d{display:block;font-size:11px;color:var(--doux);font-weight:600}
+.mvt.rev .m{color:#1B7F4B}
+.mvt.dep .m{color:#C0392B}
+.mvt.app .m{color:#8A6100}
+.mvt.annule{opacity:.5}
+.mvt.annule .t{text-decoration:line-through}
+.etiq{
+  display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.5px;
+  padding:1px 5px;border-radius:5px;background:var(--bord);color:var(--doux);
+  text-transform:uppercase;margin-left:5px;vertical-align:1px;
+}
+.etiq.neutre{background:#E3EAF2;color:#3A5A7A}
+.etiq.stock{background:#EDE7F6;color:#5E35B1}
+
+/* ── Séparateur de jour dans le journal ── */
+.jour-sep{
+  font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--doux);margin:14px 0 7px;display:flex;align-items:center;gap:8px;
+}
+.jour-sep:first-child{margin-top:2px}
+.jour-sep::after{content:'';flex:1;height:1px;background:var(--bord)}
+
+/* ── Filtres compacts ── */
+.filtres{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+.filtres select,.filtres input{
+  flex:1;min-width:116px;padding:9px 10px;border:1px solid var(--bord);
+  border-radius:9px;font-size:13.5px;background:#fff;color:var(--marine);
+  font-family:inherit;
+}
+.puces{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:10px}
+.puce{
+  flex:none;padding:7px 12px;border-radius:999px;border:1px solid var(--bord);
+  background:#fff;font-size:12.5px;font-weight:700;color:var(--doux);
+}
+.puce.actif{background:var(--marine);border-color:var(--marine);color:#fff}
 
 /* ── Règles d'entrée d'un associé : vert / rouge, toutes visibles ── */
 .regle{
@@ -318,6 +480,7 @@ textarea{min-height:60px;resize:vertical}
 <div id="bandeau"><span>📴</span><span id="bandeau-txt">Hors ligne</span></div>
 <div id="app"></div>
 <div id="toast"></div>
+<div id="zone-impression"></div>
 
 <script>
 'use strict';
@@ -508,6 +671,7 @@ function tauxUsd() {
 var TOUS_ONGLETS = [
   { id: 'caisse',   ic: '💰', nom: 'Caisse',   droit: 'voir_finance' },
   { id: 'saisie',   ic: '✍️', nom: 'Saisie',   droit: 'saisir_finance' },
+  { id: 'journal',  ic: '📜', nom: 'Journal',  droit: 'voir_finance' },
   { id: 'associes', ic: '👥', nom: 'Associés', droit: 'voir_parts' },
   { id: 'cloture',  ic: '🔒', nom: 'Clôture',  droit: 'cloturer' }
 ];
@@ -588,6 +752,7 @@ function rendreOnglet() {
   switch (Etat.onglet) {
     case 'caisse':   return ongletCaisse();
     case 'saisie':   return ongletSaisie();
+    case 'journal':  return ongletJournal();
     case 'associes': return ongletAssocies();
     case 'cloture':  return ongletCloture();
   }
@@ -1165,6 +1330,719 @@ function validerContribution() {
     b.disabled = false; b.textContent = 'Enregistrer';
     res.innerHTML = bloc(err.message, 'ko', '❌');
   });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET JOURNAL — mouvements et rapport
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Deux écrans sous un seul onglet, et ce n'est pas de l'économie de
+ * place : ils répondent à la même question à deux échelles. Le journal
+ * dit « qu'est-ce qui s'est passé », le rapport dit « qu'est-ce que ça
+ * a donné ». Les deux partagent donc le même sélecteur de période —
+ * on choisit septembre une fois, et on peut passer du détail au total
+ * sans resaisir les dates.
+ */
+var Jrn = {
+  vue: 'mouvements',
+  genre: 'tout',
+  type: 'mensuel',
+  ref: '',
+  debut: '',
+  fin: '',
+  cherche: '',
+  annules: false,
+  depuis: 0,
+  data: null,
+  rapport: null,
+  etats: null
+};
+
+var PERIODES = [
+  { id: 'tout',        nom: 'Tout' },
+  { id: 'journalier',  nom: 'Jour' },
+  { id: 'hebdomadaire', nom: 'Semaine' },
+  { id: 'mensuel',     nom: 'Mois' },
+  { id: 'trimestriel', nom: 'Trimestre' },
+  { id: 'semestriel',  nom: 'Semestre' },
+  { id: 'annuel',      nom: 'Année' },
+  { id: 'libre',       nom: 'Dates…' }
+];
+
+/**
+ * Les paramètres de période envoyés au serveur.
+ *
+ * Le serveur est seul à calculer les bornes : lui demander « le mois
+ * du 15 septembre » plutôt que « du 1er au 30 septembre » évite d'avoir
+ * deux calendriers, un sur le téléphone et un sur le serveur, qui
+ * finiraient par ne plus dire la même chose (fin de mois, février,
+ * semaine à cheval sur deux années).
+ */
+function jrnPeriode() {
+  if (Jrn.type === 'tout') return {};
+  if (Jrn.type === 'libre') {
+    return { type_periode: 'libre', debut: Jrn.debut, fin: Jrn.fin };
+  }
+  return { type_periode: Jrn.type, ref: Jrn.ref || aujourdhui() };
+}
+
+function jrnPeriodePrete() {
+  if (Jrn.type === 'libre') return !!(Jrn.debut && Jrn.fin);
+  return true;
+}
+
+function ongletJournal() {
+  if (!Jrn.ref) {
+    Jrn.ref = aujourdhui();
+    Jrn.debut = premierDuMois();
+    Jrn.fin = aujourdhui();
+  }
+
+  poser(
+    '<div class="segments">' +
+      '<button class="' + (Jrn.vue === 'mouvements' ? 'actif' : '') +
+        '" onclick="jrnVue(\'mouvements\')">Mouvements</button>' +
+      '<button class="' + (Jrn.vue === 'rapport' ? 'actif' : '') +
+        '" onclick="jrnVue(\'rapport\')">Rapport</button>' +
+    '</div>' +
+    '<div id="jrn-periode">' + jrnSelecteur() + '</div>' +
+    '<div id="jrn-corps">' + chargement() + '</div>'
+  );
+
+  jrnCharger();
+}
+
+function jrnVue(v) {
+  Jrn.vue = v; Jrn.depuis = 0;
+  ongletJournal();
+}
+
+/** Le sélecteur de période, commun aux deux écrans. */
+function jrnSelecteur() {
+  var h = '<div class="puces">' + PERIODES.filter(function (p) {
+    // Un rapport sans période n'a pas de sens : on ne propose « Tout »
+    // que pour la liste des mouvements.
+    return !(p.id === 'tout' && Jrn.vue === 'rapport');
+  }).map(function (p) {
+    return '<button class="puce' + (Jrn.type === p.id ? ' actif' : '') +
+      '" onclick="jrnType(\'' + p.id + '\')">' + e(p.nom) + '</button>';
+  }).join('') + '</div>';
+
+  if (Jrn.type === 'libre') {
+    h += '<div class="filtres">' +
+      '<input type="date" id="jrn-d1" value="' + e(Jrn.debut) +
+        '" onchange="jrnDates()" aria-label="Du">' +
+      '<input type="date" id="jrn-d2" value="' + e(Jrn.fin) +
+        '" onchange="jrnDates()" aria-label="Au">' +
+      '</div>';
+  } else if (Jrn.type === 'mensuel') {
+    h += '<div class="filtres">' +
+      '<input type="month" id="jrn-mois" value="' + e(String(Jrn.ref).substring(0, 7)) +
+        '" onchange="jrnMois()" aria-label="Mois">' +
+      '</div>';
+  } else if (Jrn.type !== 'tout') {
+    h += '<div class="filtres">' +
+      '<input type="date" id="jrn-ref" value="' + e(Jrn.ref) +
+        '" onchange="jrnRef()" aria-label="Date de référence">' +
+      '</div>' +
+      '<div class="aide">N\'importe quel jour de la période voulue : ' +
+        'le ' + e(dateCourte(Jrn.ref)) + ' sort ' +
+        (Jrn.type === 'journalier' ? 'cette journée'
+          : Jrn.type === 'hebdomadaire' ? 'sa semaine entière'
+          : Jrn.type === 'trimestriel' ? 'son trimestre entier'
+          : Jrn.type === 'semestriel' ? 'son semestre entier'
+          : 'son année entière') + '.</div>';
+  }
+
+  return h;
+}
+
+function jrnType(t) {
+  Jrn.type = t; Jrn.depuis = 0;
+  ongletJournal();
+}
+function jrnDates() {
+  Jrn.debut = document.getElementById('jrn-d1').value;
+  Jrn.fin = document.getElementById('jrn-d2').value;
+  Jrn.depuis = 0;
+  if (jrnPeriodePrete()) jrnCharger();
+}
+function jrnMois() {
+  var m = document.getElementById('jrn-mois').value;   // AAAA-MM
+  // Le 15 : au milieu du mois, hors de portée des décalages de fuseau.
+  if (m) { Jrn.ref = m + '-15'; Jrn.depuis = 0; jrnCharger(); }
+}
+function jrnRef() {
+  Jrn.ref = document.getElementById('jrn-ref').value;
+  Jrn.depuis = 0;
+  var s = document.getElementById('jrn-periode');
+  if (s) s.innerHTML = jrnSelecteur();
+  jrnCharger();
+}
+
+function jrnCorps(h) {
+  var c = document.getElementById('jrn-corps');
+  if (c) c.innerHTML = h;
+}
+
+function jrnCharger() {
+  if (!jrnPeriodePrete()) {
+    jrnCorps(bloc('Choisis une date de début et une date de fin.', 'info', '📅'));
+    return;
+  }
+  return Jrn.vue === 'rapport' ? jrnChargerRapport() : jrnChargerMouvements();
+}
+
+
+// ── Les mouvements ─────────────────────────────────────────────────
+
+function jrnChargerMouvements() {
+  jrnCorps(chargement('Lecture du journal…'));
+
+  var p = Object.assign({
+    genre: Jrn.genre,
+    cherche: Jrn.cherche,
+    depuis: Jrn.depuis,
+    limite: 40
+  }, jrnPeriode());
+  if (Jrn.annules) p.inclure_annules = 'Oui';
+
+  return api('historique', p).then(function (d) {
+    Jrn.data = d;
+    jrnCorps(jrnVueMouvements(d));
+  }).catch(function (err) {
+    jrnCorps(bloc(err.message, 'ko', '⚠️'));
+  });
+}
+
+var GENRES = [
+  { id: 'tout',    nom: 'Tout' },
+  { id: 'revenu',  nom: 'Revenus' },
+  { id: 'depense', nom: 'Dépenses' },
+  { id: 'apport',  nom: 'Apports' }
+];
+
+function jrnVueMouvements(d) {
+  var t = d.totaux || {};
+
+  var h =
+    '<div class="filtres">' +
+      '<select onchange="jrnGenre(this.value)">' + GENRES.map(function (g) {
+        return '<option value="' + g.id + '"' + (Jrn.genre === g.id ? ' selected' : '') +
+          '>' + e(g.nom) + '</option>';
+      }).join('') + '</select>' +
+      '<input type="search" id="jrn-q" placeholder="Chercher…" value="' + e(Jrn.cherche) +
+        '" onchange="jrnChercher()" autocomplete="off">' +
+    '</div>' +
+
+    '<div class="stats" style="margin-bottom:12px">' +
+      '<div class="stat"><div class="v" style="color:var(--vert)">' +
+        court(t.revenus_gdes) + '</div><div class="l">revenus</div></div>' +
+      '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+        court(t.depenses_gdes) + '</div><div class="l">dépenses</div></div>' +
+      '<div class="stat"><div class="v">' + court(t.profit_gdes) +
+        '</div><div class="l">bénéfice</div></div>' +
+    '</div>';
+
+  // Les lignes qui ne pèsent pas sur le bénéfice sont annoncées, sinon
+  // les totaux au-dessus semblent faux par rapport à la liste en bas.
+  var aside = [];
+  if (t.revenus_neutres_gdes) aside.push(htg(t.revenus_neutres_gdes) + ' d\'avances encaissées');
+  if (t.depenses_neutres_gdes) aside.push(htg(t.depenses_neutres_gdes) + ' d\'achats pour clients');
+  if (t.entrees_stock_gdes) aside.push(htg(t.entrees_stock_gdes) + ' partis en stock');
+  if (t.apports_gdes) aside.push(htg(t.apports_gdes) + ' d\'apports');
+  if (aside.length) {
+    h += bloc('Hors bénéfice : ' + aside.join(', ') + '.', 'info', '↔️');
+  }
+
+  if (!d.lignes.length) {
+    h += vide('📭', Jrn.cherche ? 'Rien ne correspond à cette recherche.'
+                                : 'Aucun mouvement sur cette période.');
+    return h + jrnPiedListe(d);
+  }
+
+  var jourCourant = '';
+  d.lignes.forEach(function (l) {
+    var j = dateCourte(l.date);
+    if (j !== jourCourant) {
+      jourCourant = j;
+      h += '<div class="jour-sep">' + e(j) + '</div>';
+    }
+    h += jrnLigne(l);
+  });
+
+  return h + jrnPiedListe(d);
+}
+
+function jrnPiedListe(d) {
+  var h = '<div class="aide" style="text-align:center;margin-top:12px">' +
+    n0(Math.min(d.depuis + d.lignes.length, d.total)) + ' sur ' + n0(d.total) +
+    ' mouvement' + (d.total > 1 ? 's' : '') + '</div>';
+
+  if (d.reste > 0) {
+    h += '<button class="btn vide" onclick="jrnPlus()">Voir ' +
+      Math.min(d.reste, 40) + ' de plus</button>';
+  }
+  h += '<button class="btn vide" onclick="jrnAnnules()">' +
+    (Jrn.annules ? 'Masquer les écritures annulées' : 'Montrer les écritures annulées') +
+    '</button>';
+  return h;
+}
+
+var ICONES_GENRE = { revenu: '↘', depense: '↗', apport: '👤' };
+var CLASSE_GENRE = { revenu: 'rev', depense: 'dep', apport: 'app' };
+
+function jrnLigne(l) {
+  var annule = l.statut === 'Annule';
+  var signe = l.genre === 'depense' ? '−'
+            : (l.genre === 'apport' && l.sens === -1) ? '−' : '+';
+
+  var marques = '';
+  if (l.neutre && l.genre !== 'apport') marques += '<span class="etiq neutre">neutre</span>';
+  if (l.entree_stock) marques += '<span class="etiq stock">stock</span>';
+  if (annule) marques += '<span class="etiq">annulée</span>';
+
+  return '<button class="mvt ' + CLASSE_GENRE[l.genre] + (annule ? ' annule' : '') +
+    '" onclick="jrnDetail(\'' + e(l.genre) + '\',\'' + e(l.id) + '\')">' +
+    '<span class="pic">' + ICONES_GENRE[l.genre] + '</span>' +
+    '<span class="corps">' +
+      '<span class="t">' + e(l.libelle) + marques + '</span>' +
+      '<span class="s">' + e(l.description || l.reference || l.id) + '</span>' +
+    '</span>' +
+    '<span class="m">' + signe + court(l.montant_gdes) +
+      '<span class="d">' + usd(l.montant_usd) + '</span></span>' +
+    '</button>';
+}
+
+function jrnGenre(g) { Jrn.genre = g; Jrn.depuis = 0; jrnChargerMouvements(); }
+function jrnChercher() {
+  Jrn.cherche = document.getElementById('jrn-q').value;
+  Jrn.depuis = 0; jrnChargerMouvements();
+}
+function jrnPlus() {
+  Jrn.depuis += (Jrn.data && Jrn.data.lignes.length) || 40;
+  jrnChargerMouvements();
+}
+function jrnAnnules() { Jrn.annules = !Jrn.annules; Jrn.depuis = 0; jrnChargerMouvements(); }
+
+/** Le détail d'un mouvement, avec de quoi l'annuler si on en a le droit. */
+function jrnDetail(genre, id) {
+  var l = null;
+  (Jrn.data ? Jrn.data.lignes : []).forEach(function (x) {
+    if (x.genre === genre && x.id === id) l = x;
+  });
+  if (!l) return;
+
+  var peut = Etat.user && Etat.user.droits && Etat.user.droits.saisir_finance;
+  var titres = { revenu: 'Revenu', depense: 'Dépense', apport: 'Mouvement d\'associé' };
+
+  var h = '<div class="chiffre"><div class="v">' + htg(l.montant_gdes) + '</div>' +
+    '<div class="l">' + e(l.libelle) + '</div>' +
+    '<div class="s">' + usd(l.montant_usd) + ' · saisi en ' +
+      e(l.devise_saisie || '—') + ' au taux ' + n0(l.taux_applique) + '</div></div>';
+
+  h += '<div class="carte">' + [
+    ['Référence', l.id],
+    ['Date', dateCourte(l.date)],
+    ['Description', l.description],
+    ['Catégorie', l.categorie],
+    ['Agence', l.agence_id],
+    ['Rattaché à', l.reference],
+    ['Saisi par', l.saisi_par],
+    ['Statut', l.statut],
+    ['Note', l.note]
+  ].filter(function (r) { return r[1]; }).map(function (r) {
+    return '<div class="total"><span class="l">' + e(r[0]) + '</span><b>' + e(r[1]) + '</b></div>';
+  }).join('') + '</div>';
+
+  if (l.neutre && l.genre !== 'apport') {
+    h += bloc('Ce mouvement traverse la caisse sans toucher au bénéfice : ' +
+      'c\'est l\'argent d\'un client qui entre puis ressort.', 'info', '↔️');
+  }
+  if (l.entree_stock) {
+    h += bloc('Cet achat est devenu du stock : il sort de la caisse mais ' +
+      'ne pèse sur le bénéfice qu\'à la vente.', 'info', '📦');
+  }
+
+  if (peut && l.statut !== 'Annule') {
+    h += '<label class="champ"><span>Motif d\'annulation</span>' +
+      '<input type="text" id="jrn-motif" placeholder="Erreur de saisie, doublon…" ' +
+      'autocomplete="off"></label>' +
+      '<button class="btn rouge" id="jrn-btn-annul" onclick="jrnAnnuler(\'' +
+        e(genre) + '\',\'' + e(id) + '\')">Annuler cette écriture</button>' +
+      '<div class="aide">Rien n\'est effacé : la ligne reste au journal, ' +
+        'marquée annulée, avec ton nom et le motif.</div>';
+  }
+
+  modale(titres[genre] || 'Mouvement', h);
+}
+
+function jrnAnnuler(genre, id) {
+  var motif = (document.getElementById('jrn-motif') || {}).value || '';
+  if (!motif.trim()) { toast('Le motif est obligatoire.', 'ko'); return; }
+
+  var b = document.getElementById('jrn-btn-annul');
+  b.disabled = true; b.textContent = 'Annulation…';
+
+  // Le journal parle d'« apport » ; la table s'appelle Contributions.
+  var type = genre === 'apport' ? 'contribution' : genre;
+
+  api('annuler', { type: type, id: id, motif: motif.trim() }).then(function () {
+    toast('Écriture annulée.', 'ok');
+    fermerModale();
+    jrnChargerMouvements();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Annuler cette écriture';
+    toast(err.message, 'ko');
+  });
+}
+
+
+// ── Le rapport ─────────────────────────────────────────────────────
+
+function jrnChargerRapport() {
+  jrnCorps(chargement('Calcul du rapport…'));
+  var p = jrnPeriode();
+
+  return Promise.all([
+    api('rapport', Object.assign({ type_rapport: p.type_periode || 'mensuel' }, p)),
+    api('etats_financiers', p)
+  ]).then(function (r) {
+    Jrn.rapport = r[0]; Jrn.etats = r[1];
+    jrnCorps(jrnVueRapport(r[0], r[1]));
+  }).catch(function (err) {
+    jrnCorps(bloc(err.message, 'ko', '⚠️'));
+  });
+}
+
+function jrnVueRapport(r, f) {
+  // Montant exact, pas abrégé : sur un rapport, « 16 k » ne sert à rien.
+  // Les tuiles en dessous gardent la forme courte, elles ne servent qu'à
+  // donner l'ordre de grandeur d'un coup d'œil.
+  var h = '<div class="chiffre ' + (r.profit_gdes < 0 ? 'negatif' : 'positif') + '">' +
+    '<div class="v" style="font-size:27px">' + htg(r.profit_gdes) + '</div>' +
+    '<div class="l">bénéfice · ' + e(r.libelle_periode) + '</div>' +
+    '<div class="s">' + usd(r.profit_usd) + ' · marge ' + pct(r.marge_pct) + '</div></div>';
+
+  (r.avertissements || []).forEach(function (a) { h += bloc(a, 'attention', '⚠️'); });
+  if (r.controle && r.controle.equilibre) {
+    h += bloc('Caisse et bénéfice se recoupent au centime.', 'ok', '✅');
+  }
+
+  h += '<div class="stats" style="margin-bottom:12px">' +
+    '<div class="stat"><div class="v" style="color:var(--vert)">' +
+      court(r.revenus_gdes) + '</div><div class="l">revenus</div></div>' +
+    '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+      court(r.depenses_gdes) + '</div><div class="l">dépenses</div></div>' +
+    '<div class="stat"><div class="v">' + court(r.variation_tresorerie_gdes) +
+      '</div><div class="l">caisse</div></div>' +
+    '</div>';
+
+  h += jrnTableau('Revenus par source', r.par_source, r.revenus_gdes);
+  h += jrnTableau('Dépenses par catégorie', r.par_categorie, r.depenses_gdes);
+
+  var ag = Object.keys(r.par_agence || {});
+  if (ag.length > 1) {
+    h += '<div class="titre-section">Par agence</div><div class="carte">' +
+      ag.map(function (k) {
+        var a = r.par_agence[k];
+        return '<div class="total"><span class="l">' + e(k) + '</span><b>' +
+          htg(a.marge) + '</b></div>';
+      }).join('') + '</div>';
+  }
+
+  if (r.poids_livre_lb) {
+    h += '<div class="carte"><div class="total"><span class="l">Poids livré</span><b>' +
+      n2(r.poids_livre_lb) + ' lb</b></div>' +
+      '<div class="total"><span class="l">Revenu par livre</span><b>' +
+      htg(r.revenu_par_lb_gdes) + '</b></div></div>';
+  }
+
+  if (f && f.bilan) {
+    h += '<div class="titre-section">Bilan au ' + e(f.periode.fin || r.periode.fin) + '</div>' +
+      '<div class="carte">' +
+      '<div class="total"><span class="l">Total actif</span><b>' + htg(f.bilan.actif.total_gdes) + '</b></div>' +
+      '<div class="total"><span class="l">Total passif</span><b>' + htg(f.bilan.passif.total_gdes) + '</b></div>' +
+      (f.bilan.equilibre
+        ? '<div class="total"><span class="l">Équilibre</span><b style="color:var(--vert)">✓</b></div>'
+        : '<div class="total"><span class="l">Écart</span><b style="color:var(--rouge)">' +
+          htg(f.bilan.ecart_gdes) + '</b></div>') +
+      '</div>';
+    (f.avertissements || []).forEach(function (a) { h += bloc(a, 'attention', '⚠️'); });
+  }
+
+  h += '<button class="btn" onclick="jrnImprimer()">🖨️ Imprimer le rapport</button>';
+  h += '<div class="aide">Format A4, en-tête de l\'entreprise, compte de ' +
+    'résultat et bilan. De quoi classer un dossier par mois.</div>';
+  return h;
+}
+
+function jrnTableau(titre, objet, total) {
+  var cles = Object.keys(objet || {});
+  if (!cles.length) return '';
+  cles.sort(function (a, b) { return objet[b] - objet[a]; });
+
+  return '<div class="titre-section">' + e(titre) + '</div><div class="carte">' +
+    cles.map(function (k) {
+      var part = total > 0 ? Math.round(objet[k] / total * 100) : 0;
+      return '<div class="total"><span class="l">' + e(k) +
+        (part ? ' <span class="etiq">' + part + ' %</span>' : '') +
+        '</span><b>' + htg(objet[k]) + '</b></div>';
+    }).join('') + '</div>';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  IMPRESSION — rapport financier A4
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Le format de page se décide au clic, pas dans la feuille de style.
+ *
+ * `@page` ne peut pas se conditionner par une classe : une règle fixe
+ * dans le CSS imprimerait le rapport financier sur un ticket de 50 mm.
+ * On injecte donc la bonne règle juste avant d'appeler window.print().
+ */
+function imprimer(html, format) {
+  var ancienne = document.getElementById('regle-page');
+  if (ancienne) ancienne.remove();
+
+  var st = document.createElement('style');
+  st.id = 'regle-page';
+  st.textContent = format === 'ticket'
+    ? '@media print{@page{size:50mm auto;margin:2mm}}'
+    : '@media print{@page{size:A4;margin:12mm}}';
+  document.head.appendChild(st);
+
+  document.getElementById('zone-impression').innerHTML = html;
+  setTimeout(function () { window.print(); }, 150);
+}
+
+/**
+ * Ce qui s'imprime sur les documents.
+ *
+ * Rien n'est figé dans le code : l'administrateur change le nom, le
+ * slogan et les coordonnées depuis ⚙️ Réglages. Les valeurs ci-dessous
+ * ne servent que si le paramètre a été effacé du classeur.
+ */
+function marque_(cle, defaut) {
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  var v = p[cle];
+  return (v === undefined || v === null || String(v).trim() === '')
+    ? defaut : String(v);
+}
+
+var MARQUE_DEFAUT = {
+  nom: 'FLASHIPPING',
+  slogan: 'FAST AND SECURE',
+  creole: 'PI RAPID · PI SEKIRIZE · PI BA PRI',
+  coord: '+509 43 31 40 28  ·  +509 47 15 64 24 | contact@flashipping-haiti.com'
+         + ' | www.flashipping-haiti.com'
+};
+
+function coordonnees_() {
+  return marque_('COORDONNEES_DOC', MARQUE_DEFAUT.coord)
+    .split('|').map(function (x) { return x.trim(); })
+    .filter(function (x) { return x; });
+}
+
+function enteteDoc(titre, reference, date) {
+  var ent = marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom);
+  return '<div class="doc-tete">' +
+      '<div><div class="doc-marque">' + e(ent) +
+        ' <span class="doc-eclair">⚡</span></div>' +
+        '<div class="doc-slogan">' +
+          e(marque_('SLOGAN_DOC', MARQUE_DEFAUT.slogan)) + '</div></div>' +
+      '<div class="doc-coord">' + coordonnees_().map(e).join('<br>') + '</div>' +
+    '</div>' +
+    '<div class="doc-titre"><span>' + e(titre) + '</span>' +
+      '<span>' + e(reference) + '</span></div>' +
+    '<div style="text-align:right;font-size:9pt;color:#5F7183;margin-top:-3mm;' +
+      'margin-bottom:4mm">Émis le ' + e(date) + '</div>';
+}
+
+function piedDocFin(mention) {
+  return (mention ? '<div class="doc-note">' + mention + '</div>' : '') +
+    '<div class="doc-sign"><div>Le directeur financier</div>' +
+      '<div>Pour ' + e(marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom)) +
+      '</div></div>' +
+    '<div class="doc-pied"><b>' +
+      e(marque_('MSG_PIED_DOC', MARQUE_DEFAUT.creole)) + '</b><br>' +
+      coordonnees_().map(e).join(' · ') + '</div>';
+}
+
+
+/**
+ * Le rapport sur papier.
+ *
+ * Volontairement plus riche que l'écran : à l'écran on cherche un
+ * chiffre, sur papier on classe un dossier et on le relit dans six
+ * mois. Le document porte donc la période en clair, les détails par
+ * source et par catégorie, le compte de résultat, le bilan, et le
+ * contrôle caisse/bénéfice — c'est le document qu'on ressort quand
+ * quelqu'un demande d'où venait tel montant.
+ */
+function jrnImprimer() {
+  var r = Jrn.rapport, f = Jrn.etats;
+  if (!r) { toast('Rapport non chargé.', 'ko'); return; }
+  imprimer(docRapport(r, f), 'a4');
+}
+
+function docRapport(r, f) {
+  var h = '<div class="doc">' +
+    enteteDoc('RAPPORT FINANCIER', r.libelle_periode,
+              dateCourte(new Date()) + ' · ' + e((Etat.user && Etat.user.nom) || ''));
+
+  // ── Résumé encadré ──
+  h += '<div class="doc-cadre">' +
+    docLigne('Revenus de la période', htg(r.revenus_gdes)) +
+    docLigne('Dépenses de la période', '− ' + htg(r.depenses_gdes)) +
+    (r.entrees_stock_gdes
+      ? docLigne('dont partis en stock (non charge)', htg(r.entrees_stock_gdes), true) : '') +
+    docLigne('Bénéfice', htg(r.profit_gdes) + '  /  ' + usd(r.profit_usd), false, true) +
+    '</div>';
+
+  // ── Mouvements de caisse ──
+  h += '<div class="doc-h2">Mouvements de caisse</div>' +
+    '<table class="doc-t"><tbody>' +
+    docRang('Encaissements (tout compris)', htg(r.encaissements_gdes)) +
+    docRang('Décaissements (tout compris)', '− ' + htg(r.decaissements_gdes)) +
+    (r.apports_nets_gdes ? docRang('Apports nets des associés', htg(r.apports_nets_gdes)) : '') +
+    '</tbody><tfoot>' +
+    docRang('Variation de la caisse', htg(r.variation_tresorerie_gdes)) +
+    '</tfoot></table>';
+
+  if (r.controle) {
+    h += r.controle.equilibre
+      ? '<div class="doc-ok">Contrôle : la variation de caisse s\'explique ' +
+        'entièrement par le bénéfice, les apports et les achats de stock. ' +
+        'Aucun montant sans origine.</div>'
+      : '<div class="doc-alerte"><b>Contrôle en défaut.</b> La caisse a bougé de ' +
+        htg(r.variation_tresorerie_gdes) + ' alors que le bénéfice et les apports ' +
+        'n\'en expliquent que ' + htg(r.controle.explique_gdes) + '. Reste ' +
+        htg(Math.abs(r.controle.inexplique_gdes)) + ' sans origine identifiée.</div>';
+  }
+
+  // ── Détails ──
+  h += '<div class="doc-deux">' +
+    '<div>' + docDetail('Revenus par source', r.par_source, r.revenus_gdes) + '</div>' +
+    '<div>' + docDetail('Dépenses par catégorie', r.par_categorie, r.depenses_gdes) + '</div>' +
+    '</div>';
+
+  var ag = Object.keys(r.par_agence || {});
+  if (ag.length > 1) {
+    h += '<div class="doc-h2">Résultat par agence</div>' +
+      '<table class="doc-t"><thead><tr><th>Agence</th>' +
+      '<th class="num">Revenus</th><th class="num">Dépenses</th>' +
+      '<th class="num">Marge</th></tr></thead><tbody>' +
+      ag.map(function (k) {
+        var a = r.par_agence[k];
+        return '<tr><td>' + e(k) + '</td><td class="num">' + htg(a.revenus) +
+          '</td><td class="num">' + htg(a.depenses) + '</td><td class="num"><b>' +
+          htg(a.marge) + '</b></td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  if (r.poids_livre_lb) {
+    h += '<div class="doc-h2">Activité logistique</div>' +
+      '<table class="doc-t"><tbody>' +
+      docRang('Poids livré', n2(r.poids_livre_lb) + ' lb') +
+      docRang('Revenu moyen par livre', htg(r.revenu_par_lb_gdes)) +
+      docRang('Nombre d\'écritures', n0(r.nb_revenus) + ' revenus · ' +
+              n0(r.nb_depenses) + ' dépenses') +
+      '</tbody></table>';
+  }
+
+  // ── États financiers, sur la page suivante ──
+  if (f && f.resultat && f.bilan) {
+    h += '<div class="doc-saut">' +
+      '<div class="doc-titre"><span>ÉTATS FINANCIERS</span><span>' +
+        e(r.libelle_periode) + '</span></div>';
+
+    h += '<div class="doc-h2">Compte de résultat</div>' +
+      '<table class="doc-t"><thead><tr><th>Poste</th><th class="num">Gourdes</th>' +
+      '</tr></thead><tbody>' +
+      docSousTotal('Produits', f.resultat.detail_produits) +
+      '<tr><td><b>Total des produits</b></td><td class="num"><b>' +
+        htg(f.resultat.produits_gdes) + '</b></td></tr>' +
+      docSousTotal('Charges', f.resultat.detail_charges) +
+      (f.resultat.dotation_amortissement_gdes
+        ? '<tr><td class="creux">Amortissements</td><td class="num creux">' +
+          htg(f.resultat.dotation_amortissement_gdes) + '</td></tr>' : '') +
+      '<tr><td><b>Total des charges</b></td><td class="num"><b>' +
+        htg(f.resultat.charges_gdes +
+            (Number(f.resultat.dotation_amortissement_gdes) || 0)) + '</b></td></tr>' +
+      '</tbody><tfoot><tr><td>Résultat de la période</td><td class="num">' +
+        htg(f.resultat.resultat_net_gdes) + '</td></tr></tfoot></table>';
+
+    h += '<div class="doc-h2">Bilan au ' + e(f.periode.fin || r.periode.fin) + '</div>' +
+      '<div class="doc-deux">' +
+      '<div><table class="doc-t"><thead><tr><th>Actif</th>' +
+        '<th class="num">Gourdes</th></tr></thead><tbody>' +
+        docRang('Trésorerie', htg(f.bilan.actif.tresorerie_gdes)) +
+        docRang('Stock', htg(f.bilan.actif.stock_gdes)) +
+        docRang('Immobilisations nettes', htg(f.bilan.actif.immobilisations_nettes_gdes)) +
+        '</tbody><tfoot>' + docRang('Total', htg(f.bilan.actif.total_gdes)) +
+        '</tfoot></table></div>' +
+      '<div><table class="doc-t"><thead><tr><th>Passif</th>' +
+        '<th class="num">Gourdes</th></tr></thead><tbody>' +
+        docRang('Dettes', htg(f.bilan.passif.dettes_gdes)) +
+        docRang('Capitaux propres', htg(f.bilan.passif.capitaux_propres_gdes)) +
+        '</tbody><tfoot>' + docRang('Total', htg(f.bilan.passif.total_gdes)) +
+        '</tfoot></table></div>' +
+      '</div>';
+
+    h += f.bilan.equilibre
+      ? '<div class="doc-ok">Bilan équilibré.</div>'
+      : '<div class="doc-alerte">Bilan déséquilibré de ' +
+        htg(f.bilan.ecart_gdes) + '.</div>';
+
+    (f.avertissements || []).forEach(function (a) {
+      h += '<div class="doc-alerte">' + e(a) + '</div>';
+    });
+    h += '</div>';
+  }
+
+  h += piedDocFin(marque_('MSG_RAPPORT',
+    'Document interne. Les montants en gourdes font foi ; les montants en ' +
+    'dollars sont donnés au taux de chaque opération.'));
+
+  return h + '</div>';
+}
+
+function docLigne(libelle, valeur, creux, fort) {
+  return '<div class="ligne' + (fort ? ' fort' : '') + '"' +
+    (creux ? ' style="font-size:8.5pt;color:#5F7183"' : '') +
+    '><span>' + e(libelle) + '</span><span>' + e(valeur) + '</span></div>';
+}
+function docRang(libelle, valeur) {
+  return '<tr><td>' + e(libelle) + '</td><td class="num">' + e(valeur) + '</td></tr>';
+}
+function docSousTotal(titre, detail) {
+  var cles = Object.keys(detail || {});
+  if (!cles.length) return '<tr><td class="creux">' + e(titre) +
+    ' — aucun</td><td class="num creux">0</td></tr>';
+  cles.sort(function (a, b) { return detail[b] - detail[a]; });
+  return cles.map(function (k) {
+    return '<tr><td class="creux">' + e(k) + '</td><td class="num creux">' +
+      htg(detail[k]) + '</td></tr>';
+  }).join('');
+}
+
+function docDetail(titre, objet, total) {
+  var cles = Object.keys(objet || {});
+  if (!cles.length) return '';
+  cles.sort(function (a, b) { return objet[b] - objet[a]; });
+
+  return '<div class="doc-h2">' + e(titre) + '</div>' +
+    '<table class="doc-t"><tbody>' + cles.map(function (k) {
+      var part = total > 0 ? Math.round(objet[k] / total * 100) : 0;
+      return '<tr><td>' + e(k) + (part ? ' <span class="creux">' + part +
+        ' %</span>' : '') + '</td><td class="num">' + htg(objet[k]) + '</td></tr>';
+    }).join('') + '</tbody><tfoot>' + docRang('Total', htg(total)) +
+    '</tfoot></table>';
 }
 
 
@@ -1807,6 +2685,8 @@ var TEXTES_EDITABLES = [
   { cle:'MSG_RECU_COMMANDE', nom:'Mention — reçu de commande', lignes:4,
     aide:'L\'encadré au bas du reçu d\'une commande. C\'est là qu\'il faut ' +
          'écrire que le transport n\'est pas compris.' },
+  { cle:'MSG_RAPPORT', nom:'Mention — rapport financier', lignes:3,
+    aide:'L\'encadré au bas du rapport financier imprimé. Document interne : c\'est là qu\'on précise quelle devise fait foi.' },
   { cle:'MSG_DISPONIBLE', nom:'Message WhatsApp « colis disponible »', lignes:4,
     aide:'Les repères {client} {agence} {nb} {poids} {montant} sont remplacés ' +
          'automatiquement. Garde-les tels quels.' }
@@ -1949,7 +2829,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-06.3';
+var VERSION_ATTENDUE = '2026-10-07.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
