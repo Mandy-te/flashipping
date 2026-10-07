@@ -309,22 +309,96 @@ textarea{min-height:68px;resize:vertical}
    La largeur est imposée par @page : une imprimante thermique de
    50 mm ignore les marges du navigateur, pas la taille de page.
    ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   IMPRESSION
+   Deux formats : un document A4 pour le client, un ticket 50 mm
+   pour l'imprimante thermique. La règle @page est injectée au
+   moment de l'impression, parce qu'une feuille de style ne peut
+   pas en porter deux.
+   ═══════════════════════════════════════════════════════════════ */
 #zone-impression{display:none}
 @media print{
-  @page{size:50mm auto;margin:2mm}
-  body{background:#fff}
-  #app,#toast,#bandeau,nav{display:none!important}
+  body{background:#fff;margin:0}
+  /* .voile est frère de #app : sans cette ligne, c'est la fiche
+     affichée à l'écran qui part sur le papier, pas le document. */
+  #app,#toast,#bandeau,nav,.voile{display:none!important}
   #zone-impression{display:block!important}
-  .etiquette{
-    width:46mm;font-family:Arial,Helvetica,sans-serif;color:#000;
-    page-break-after:always;padding:0;
+
+  /* ── Document A4 ── */
+  .doc{
+    font-family:Arial,Helvetica,sans-serif;color:#16222E;font-size:10.5pt;
+    line-height:1.45;
   }
+  .doc-tete{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3px solid #0B2545;padding-bottom:4mm;margin-bottom:5mm;
+  }
+  .doc-marque{font-size:21pt;font-weight:bold;letter-spacing:3px;color:#0B2545;
+    line-height:1}
+  .doc-eclair{color:#F0A818}
+  .doc-slogan{font-size:8pt;font-weight:bold;color:#C62828;letter-spacing:2.5px;
+    margin-top:1mm}
+  .doc-coord{font-size:7.5pt;color:#5F7183;text-align:right;line-height:1.5}
+  .doc-titre{
+    background:#0B2545;color:#fff;padding:2.5mm 4mm;font-size:12pt;
+    font-weight:bold;letter-spacing:1px;display:flex;
+    justify-content:space-between;margin-bottom:5mm;
+  }
+  .doc-cols{display:flex;gap:6mm;margin-bottom:5mm}
+  .doc-col{flex:1}
+  .doc-col h4{
+    font-size:7.5pt;letter-spacing:1.2px;color:#5F7183;margin:0 0 1.5mm;
+    text-transform:uppercase;border-bottom:1px solid #D9E0E6;padding-bottom:1mm;
+  }
+  .doc-col .gros{font-size:11pt;font-weight:bold}
+  .doc-col div{font-size:9pt}
+
+  table.doc-t{width:100%;border-collapse:collapse;margin-bottom:4mm}
+  table.doc-t th{
+    background:#EEF2F6;font-size:8pt;text-transform:uppercase;letter-spacing:.8px;
+    color:#0B2545;padding:2mm;text-align:left;border-bottom:1.5px solid #0B2545;
+  }
+  table.doc-t td{padding:2mm;border-bottom:1px solid #E6ECF1;font-size:9.5pt;
+    vertical-align:top}
+  table.doc-t .num{text-align:right;white-space:nowrap}
+  table.doc-t .ref{font-family:'Courier New',monospace;font-size:8.5pt}
+
+  .doc-tot{margin-left:auto;width:72mm}
+  .doc-tot div{display:flex;justify-content:space-between;padding:1.5mm 0;
+    font-size:10pt}
+  .doc-tot .grand{
+    border-top:2px solid #0B2545;margin-top:1mm;padding-top:2mm;
+    font-size:13pt;font-weight:bold;
+  }
+  .doc-tot .gdes{color:#5F7183;font-size:9.5pt}
+
+  .doc-tampon{
+    display:inline-block;border:2px solid;padding:1.5mm 5mm;font-weight:bold;
+    font-size:11pt;letter-spacing:1.5px;transform:rotate(-3deg);margin-top:3mm;
+  }
+  .doc-tampon.paye{color:#1B7F4B;border-color:#1B7F4B}
+  .doc-tampon.du{color:#C62828;border-color:#C62828}
+
+  .doc-note{
+    background:#F7F9FB;border-left:3px solid #F0A818;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-top:5mm;color:#16222E;
+  }
+  .doc-sign{display:flex;gap:10mm;margin-top:14mm}
+  .doc-sign div{flex:1;border-top:1px solid #16222E;padding-top:1.5mm;
+    font-size:8pt;color:#5F7183}
+  .doc-pied{
+    margin-top:8mm;border-top:1px solid #D9E0E6;padding-top:2.5mm;
+    font-size:7.5pt;color:#5F7183;text-align:center;line-height:1.6;
+  }
+  .doc-pied b{color:#C62828;letter-spacing:1.5px}
+
+  /* ── Ticket 50 mm ── */
+  .etiquette{width:46mm;font-family:Arial,Helvetica,sans-serif;color:#000;
+    page-break-after:always}
   .etiquette:last-child{page-break-after:auto}
-  .et-haut{
-    text-align:center;font-size:8pt;font-weight:bold;
+  .et-haut{text-align:center;font-size:8pt;font-weight:bold;
     border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1.5mm;
-    letter-spacing:.5px;
-  }
+    letter-spacing:.5px}
   .et-code{font-size:21pt;font-weight:bold;text-align:center;line-height:1}
   .et-nom{font-size:10pt;font-weight:bold;text-align:center;margin-top:.8mm}
   .et-ville{font-size:11pt;text-align:center;font-weight:bold;
@@ -336,9 +410,9 @@ textarea{min-height:68px;resize:vertical}
     font-family:monospace;margin-top:.5mm}
   .et-pied{font-size:6.5pt;text-align:center;margin-top:1.5mm;
     border-top:1px solid #000;padding-top:.8mm}
-  .rec-t{font-size:11pt;font-weight:bold;text-align:center}
-  .rec-l{font-size:8pt;display:flex;justify-content:space-between;
-    padding:.5mm 0}
+  .rec-t{font-size:12pt;font-weight:bold;text-align:center}
+  .rec-l{font-size:8pt;display:flex;justify-content:space-between;padding:.5mm 0}
+  .rec-art{font-size:7.5pt;padding:.4mm 0;border-bottom:1px dotted #999}
   .rec-sep{border-top:1px dashed #000;margin:1.5mm 0}
   .rec-tot{font-size:12pt;font-weight:bold;display:flex;
     justify-content:space-between;border-top:1.5px solid #000;
@@ -692,10 +766,109 @@ var CODE128 = (function () {
 //  IMPRESSION
 // ═══════════════════════════════════════════════════════════════════
 
-function imprimer(html) {
+/**
+ * Impression.
+ *
+ * `format` décide de la règle @page, injectée à la volée : une feuille
+ * de style ne peut pas porter deux tailles de page, et le navigateur
+ * d'Android ignore une taille qui ne correspond pas au papier choisi
+ * dans sa boîte de dialogue.
+ *
+ *   'a4'     document pour le client — à enregistrer en PDF, à envoyer
+ *            sur WhatsApp, à classer
+ *   'ticket' bande de 50 mm pour l'imprimante thermique du comptoir
+ */
+function imprimer(html, format) {
+  var ancienne = document.getElementById('regle-page');
+  if (ancienne) ancienne.remove();
+
+  var st = document.createElement('style');
+  st.id = 'regle-page';
+  st.textContent = format === 'ticket'
+    ? '@media print{@page{size:50mm auto;margin:2mm}}'
+    : '@media print{@page{size:A4;margin:12mm}}';
+  document.head.appendChild(st);
+
   document.getElementById('zone-impression').innerHTML = html;
-  setTimeout(function () { window.print(); }, 120);
+  setTimeout(function () { window.print(); }, 150);
 }
+
+/**
+ * Ce qui s'imprime sur les documents.
+ *
+ * Rien n'est figé dans le code : l'administrateur change les mentions,
+ * le slogan et les coordonnées depuis ⚙️ Réglages. Les valeurs
+ * ci-dessous ne servent que si le paramètre a été effacé du classeur.
+ */
+function marque_(cle, defaut) {
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  var v = p[cle];
+  return (v === undefined || v === null || String(v).trim() === '')
+    ? defaut : String(v);
+}
+
+var MARQUE_DEFAUT = {
+  nom: 'FLASHIPPING',
+  slogan: 'FAST AND SECURE',
+  creole: 'PI RAPID · PI SEKIRIZE · PI BA PRI',
+  coord: '+509 43 31 40 28  ·  +509 47 15 64 24 | contact@flashipping-haiti.com'
+         + ' | www.flashipping-haiti.com'
+};
+
+/** Les coordonnées sont une seule chaîne, séparée par des barres. */
+function coordonnees_() {
+  return marque_('COORDONNEES_DOC', MARQUE_DEFAUT.coord)
+    .split('|').map(function (x) { return x.trim(); })
+    .filter(function (x) { return x; });
+}
+
+/** L'en-tête et le pied de page, identiques sur tous les documents. */
+function enteteDoc(titre, reference, date) {
+  var ent = marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom);
+  return '<div class="doc-tete">' +
+      '<div><div class="doc-marque">' + e(ent) +
+        ' <span class="doc-eclair">⚡</span></div>' +
+        '<div class="doc-slogan">' +
+          e(marque_('SLOGAN_DOC', MARQUE_DEFAUT.slogan)) + '</div></div>' +
+      '<div class="doc-coord">' + coordonnees_().map(e).join('<br>') + '</div>' +
+    '</div>' +
+    '<div class="doc-titre"><span>' + e(titre) + '</span>' +
+      '<span>' + e(reference) + '</span></div>' +
+    '<div style="text-align:right;font-size:9pt;color:#5F7183;margin-top:-3mm;' +
+      'margin-bottom:4mm">Émis le ' + e(date) + '</div>';
+}
+
+function piedDoc(mention) {
+  return (mention ? '<div class="doc-note">' + mention + '</div>' : '') +
+    '<div class="doc-sign"><div>Signature du client</div>' +
+      '<div>Pour ' + e(marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom)) +
+      '</div></div>' +
+    '<div class="doc-pied"><b>' +
+      e(marque_('MSG_PIED_DOC', MARQUE_DEFAUT.creole)) + '</b><br>' +
+      coordonnees_().map(e).join(' · ') + '</div>';
+}
+
+function blocClient(client, valeur, titre, dessous) {
+  return '<div class="doc-cols">' +
+    '<div class="doc-col"><h4>Client</h4>' +
+      '<div class="gros">' + e(client.nom_complet || client.nom || '') + '</div>' +
+      (client.code_client ? '<div>Code ' + e(client.code_client) + '</div>' : '') +
+      (client.telephone ? '<div>' + e(client.telephone) + '</div>' : '') +
+      (client.ville ? '<div>' + e(client.ville) + '</div>' : '') +
+    '</div>' +
+    '<div class="doc-col"><h4>' + e(titre || 'Agence') + '</h4>' +
+      '<div class="gros">' + e(valeur || '') + '</div>' +
+      (dessous ? '<div>' + e(dessous) + '</div>' : '') +
+    '</div></div>';
+}
+
+function tampon(paye, texte) {
+  return '<div class="doc-tampon ' + (paye ? 'paye' : 'du') + '">' +
+         e(texte) + '</div>';
+}
+
+/** Une étiquette part toujours sur l'imprimante thermique. */
+function imprimerEtiquette(c) { imprimer(etiquetteColis(c), 'ticket'); }
 
 function etiquetteColis(c) {
   var ent = (Etat.ref && Etat.ref.parametres && Etat.ref.parametres.NOM_ENTREPRISE) || 'FLASHIPPING';
@@ -710,6 +883,64 @@ function etiquetteColis(c) {
     '<div class="et-tk">' + e(c.tracking) + '</div>' +
     (c.contenu ? '<div class="et-pied">' + e(c.contenu) + '</div>' : '') +
   '</div>';
+}
+
+/**
+ * La facture de livraison, en A4.
+ *
+ * C'est le document que le client garde. Il porte donc tout ce qu'on
+ * lui réclamerait s'il revenait : le détail de chaque colis, son poids,
+ * le prix au livre appliqué ce jour-là, le taux de change utilisé, et
+ * ce qui reste dû.
+ */
+function factureA4(f) {
+  var lignes = (f.lignes_detail || []).length
+    ? f.lignes_detail
+    : (f.trackings || []).map(function (t) { return { tracking: t }; });
+
+  var h = '<div class="doc">' +
+    enteteDoc('FACTURE DE LIVRAISON', f.facture_id,
+              new Date(f.date || Date.now()).toLocaleDateString('fr-FR')) +
+    blocClient(f.client, f.ville_agence || '', 'Agence de retrait', 'Haïti') +
+
+    '<table class="doc-t"><thead><tr>' +
+      '<th>Colis</th><th>Contenu</th>' +
+      '<th class="num">Poids</th><th class="num">Prix / lb</th>' +
+      '<th class="num">Montant</th></tr></thead><tbody>';
+
+  lignes.forEach(function (l) {
+    h += '<tr><td class="ref">' + e(l.tracking) + '</td>' +
+      '<td>' + e(l.contenu || '—') + '</td>' +
+      '<td class="num">' + (l.poids_lb !== undefined ? n2(l.poids_lb) + ' lb' : '') + '</td>' +
+      '<td class="num">' + (l.prix_lb_usd !== undefined ? n2(l.prix_lb_usd) + ' $' : '') + '</td>' +
+      '<td class="num">' + (l.montant_usd !== undefined ? usd(l.montant_usd) : '') + '</td></tr>';
+  });
+
+  h += '</tbody></table>' +
+
+    '<div class="doc-tot">' +
+      '<div><span>Sous-total · ' + f.nb_colis + ' colis · ' + n2(f.poids_lb) +
+        ' lb</span><span>' + usd(f.sous_total_usd) + '</span></div>' +
+      (Number(f.remise_usd) > 0
+        ? '<div><span>Remise accordée</span><span>− ' + usd(f.remise_usd) +
+          '</span></div>' : '') +
+      '<div class="grand"><span>TOTAL</span><span>' + usd(f.montant_usd) + '</span></div>' +
+      '<div class="gdes"><span>Au taux de ' + n0(f.taux) + ' HTG/$</span><span>' +
+        htg(f.montant_htg) + '</span></div>' +
+      '<div><span>Montant encaissé</span><span>' + usd(f.montant_paye_usd) + '</span></div>' +
+      (Number(f.reste_du_usd) > 0
+        ? '<div style="color:#C62828;font-weight:bold"><span>Reste à payer</span>' +
+          '<span>' + usd(f.reste_du_usd) + '</span></div>' : '') +
+    '</div>' +
+
+    tampon(Number(f.reste_du_usd) <= 0,
+           Number(f.reste_du_usd) <= 0 ? 'PAYÉ' : 'SOLDE DÛ') +
+
+    piedDoc(e(marque_('MSG_FACTURE_COLIS',
+      'Le transport est facturé au poids, au prix du jour de la réception du ' +
+      'colis. Toute réclamation doit être faite au moment du retrait.'))) +
+  '</div>';
+  return h;
 }
 
 function recuFacture(f) {
@@ -975,6 +1206,7 @@ function connecter() {
     Etat.user = d.utilisateur;
     S.ecrire(CLE_TOKEN, d.token);
     S.ecrireJson(CLE_USER, d.utilisateur);
+    verifierVersion();
     return chargerReferentiels();
   }).then(function () {
     toast('Bienvenue ' + (Etat.user.nom || '') + '.', 'ok');
@@ -1297,12 +1529,12 @@ function carteScan(d) {
   }
 
   h += '<div class="rangee-btn" style="margin-top:9px">' +
-    '<button class="btn vide petit" onclick="imprimer(etiquetteColis(' +
+    '<button class="btn vide petit" onclick="imprimerEtiquette(' +
       e(JSON.stringify({
         tracking: d.tracking, client_nom: c.client_nom, code_client: '',
         ville_destination: c.ville_destination, poids_lb: c.poids_lb,
         montant_usd: c.montant_usd, contenu: c.contenu
-      })).replace(/'/g, '&#39;') + '))">🏷 Étiquette</button>' +
+      })).replace(/'/g, '&#39;') + ')">🏷 Étiquette</button>' +
     '<button class="btn vide petit" onclick="ouvrirDetail(\'' + e(d.tracking) +
       '\')">📄 Détail</button></div>';
 
@@ -1640,8 +1872,8 @@ function validerReception() {
       '<div class="carte"><div class="titre-section" style="margin-top:0">' +
         'Itinéraire prévu</div><div style="font-size:14px;font-weight:650">' +
         (d.route || []).map(e).join(' → ') + '</div>' +
-      '<button class="btn or" style="margin-top:12px" onclick="imprimer(etiquetteColis(' +
-        e(JSON.stringify(pourEtiquette)).replace(/'/g, '&#39;') + '))">' +
+      '<button class="btn or" style="margin-top:12px" onclick="imprimerEtiquette(' +
+        e(JSON.stringify(pourEtiquette)).replace(/'/g, '&#39;') + ')">' +
         '🏷 Imprimer l\'étiquette 50 mm</button>' +
       '<button class="btn vide petit" onclick="ouvrirReception()">' +
         '➕ Réceptionner le suivant</button></div>' + boutonReprise();
@@ -1892,7 +2124,7 @@ function ouvrirDetail(tracking) {
         'Faire avancer → ' + e(s.libelle) + '</button>';
     }
 
-    h += '<button class="btn vide" style="margin-top:9px" onclick="imprimer(etiquetteColis(' +
+    h += '<button class="btn vide" style="margin-top:9px" onclick="imprimerEtiquette(' +
       e(JSON.stringify({
         tracking: c.tracking_number, client_nom: cl.nom_complet || '',
         code_client: cl.code_client || '',
@@ -2042,6 +2274,88 @@ function chercherClients() {
   }, 330);
 }
 
+/**
+ * Les factures d'un client, et leur réimpression.
+ *
+ * Le besoin vient du comptoir : un client revient, il a perdu son
+ * papier, il veut une copie. Sans cet écran il fallait ouvrir le
+ * classeur — ce qu'un agent ne doit pas avoir à faire.
+ */
+function ouvrirFactures(clientId, nom) {
+  modale('Factures de ' + nom, chargement());
+
+  api('facture_lister', { client_id: clientId }).then(function (d) {
+    var liste = d.factures || d;
+    if (!liste.length) {
+      majModale('Factures', vide('📄', 'Aucune facture pour ce client.'));
+      return;
+    }
+    majModale('Factures de ' + nom, liste.map(function (f) {
+      var du = Number(f.reste_du_usd || (f.montant_usd - f.montant_paye_usd));
+      return '<button class="ligne" onclick="ouvrirFacture(\'' +
+        e(f.facture_id) + '\')"><div class="corps">' +
+        '<div class="t1">' + e(f.facture_id) + '</div>' +
+        '<div class="t2">' + dateCourte(f.date) + ' · ' + (f.nb_colis || 0) +
+          ' colis</div></div>' +
+        '<div class="droite"><div style="font-weight:800">' +
+          usd(f.montant_usd) + '</div>' +
+        (du > 0.01
+          ? '<span class="badge impaye">' + usd(du) + ' dû</span>'
+          : '<span class="badge paye">payé</span>') +
+        '</div></button>';
+    }).join(''));
+  }).catch(function (err) {
+    majModale('Factures', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function ouvrirFacture(id) {
+  modale('Facture', chargement());
+  api('facture_detail', { facture_id: id }).then(function (d) {
+    var f = d.facture, cl = d.client || {};
+    // On reconstruit la forme attendue par factureA4 : le même document
+    // qu'à la livraison, réimprimé à l'identique.
+    var pour = {
+      facture_id: f.facture_id, date: f.date,
+      client: cl, ville_agence: d.agence ? d.agence.ville : '',
+      lignes_detail: d.lignes, nb_colis: f.nb_colis, poids_lb: f.poids_total,
+      sous_total_usd: f.montant_usd, remise_usd: 0,
+      montant_usd: f.montant_usd, taux: f.taux, montant_htg: f.montant_htg,
+      montant_paye_usd: f.montant_paye_usd, reste_du_usd: f.reste_du_usd,
+      trackings: (d.lignes || []).map(function (l) { return l.tracking; })
+    };
+
+    majModale('Facture ' + f.facture_id,
+      '<div class="total"><span class="l">Client</span><b>' +
+        e(cl.nom_complet || '') + '</b></div>' +
+      '<div class="total"><span class="l">Date</span><span>' +
+        dateCourte(f.date) + '</span></div>' +
+      '<div class="total"><span class="l">' + f.nb_colis + ' colis · ' +
+        n2(f.poids_total) + ' lb</span><span>' + usd(f.montant_usd) + '</span></div>' +
+      '<div class="total"><span class="l">Au taux ' + n0(f.taux) + '</span><b>' +
+        htg(f.montant_htg) + '</b></div>' +
+      '<div class="total"><span class="l">Encaissé</span><b>' +
+        usd(f.montant_paye_usd) + '</b></div>' +
+      (Number(f.reste_du_usd) > 0.01
+        ? bloc('Reste dû : ' + usd(f.reste_du_usd), 'attention', '💰') : '') +
+
+      '<div class="titre-section">Colis facturés</div>' +
+      (d.lignes || []).map(function (l) {
+        return '<div class="ligne"><div class="corps">' +
+          '<div class="t2 mono" style="color:var(--texte)">' + e(l.tracking) +
+          '</div><div class="t2">' + n2(l.poids_lb) + ' lb' +
+          (l.contenu ? ' · ' + e(l.contenu) : '') + '</div></div>' +
+          '<div class="droite"><b>' + usd(l.montant_usd) + '</b></div></div>';
+      }).join('') +
+
+      '<button class="btn or" style="margin-top:14px" onclick="imprimer(factureA4(' +
+        e(JSON.stringify(pour)).replace(/'/g, '&#39;') + '),\'a4\')">' +
+        '📄 Réimprimer en A4</button>');
+  }).catch(function (err) {
+    majModale('Facture', bloc(err.message, 'ko', '❌'));
+  });
+}
+
 function ouvrirFicheClient(clientId) {
   modale('Fiche client', chargement());
   api('client_fiche', { client_id: clientId }).then(function (d) {
@@ -2067,6 +2381,9 @@ function ouvrirFicheClient(clientId) {
     if (Number(c.solde_du) > 0) {
       h += bloc('Solde dû : ' + usd(c.solde_du), 'attention', '💰');
     }
+
+    h += '<button class="btn vide" onclick="ouvrirFactures(\'' + e(c.client_id) +
+      '\',\'' + e(c.nom_complet).replace(/'/g, '') + '\')">📄 Ses factures</button>';
 
     if (r.nb_disponibles > 0) {
       h += '<button class="btn or" onclick="fermerModale();allerLivrer(\'' +
@@ -2392,8 +2709,12 @@ function afficherFacture(f) {
         : bloc('Aucun encaissement : rien n\'a été écrit en comptabilité. ' +
                'Le montant reste au solde du client.', 'info', 'ℹ️')) +
 
-      '<button class="btn or" style="margin-top:14px" onclick="imprimer(recuFacture(' +
-        e(JSON.stringify(f)).replace(/'/g, '&#39;') + '))">🖨 Imprimer le reçu 50 mm</button>' +
+      '<button class="btn or" style="margin-top:14px" onclick="imprimer(factureA4(' +
+        e(JSON.stringify(f)).replace(/'/g, '&#39;') + '),\'a4\')">' +
+        '📄 Facture A4 — à enregistrer en PDF</button>' +
+      '<button class="btn vide" onclick="imprimer(recuFacture(' +
+        e(JSON.stringify(f)).replace(/'/g, '&#39;') + '),\'ticket\')">' +
+        '🧾 Ticket 50 mm (imprimante thermique)</button>' +
       '<button class="btn vide" onclick="Livr={client:null,prep:null,coches:{}};' +
         'rendreOnglet()">Livraison suivante</button>' +
     '</div>'
@@ -2656,6 +2977,44 @@ function sectionStock(titre, bloc2, icone) {
 //  RÉGLAGES
 // ═══════════════════════════════════════════════════════════════════
 
+/**
+ * Le contrôle de version.
+ *
+ * Un backend non redéployé, ou un fichier .gs oublié au copier-coller,
+ * donne des symptômes incompréhensibles : une action qui répond
+ * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
+ * vérification transforme tout ça en une phrase claire.
+ */
+var VERSION_ATTENDUE = '2026-10-06.3';
+
+function verifierVersion() {
+  return api('diag').then(function (d) {
+    var dep = String(d.version_code || '');
+    Etat.versionBackend = dep || '(ancienne)';
+    Etat.versionOk = (dep === VERSION_ATTENDUE);
+    return Etat.versionOk;
+  }).catch(function () { return null; });
+}
+
+function blocVersion() {
+  if (Etat.versionOk === undefined) {
+    // Réponse pas encore arrivée : on la demande et on repeint à son retour.
+    verifierVersion().then(function (r) {
+      if (r !== null && document.getElementById('voile')) ouvrirReglages();
+    });
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Vérification de la version…</div>';
+  }
+  if (Etat.versionOk) {
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Code déployé ' + e(Etat.versionBackend) + ' — à jour</div>';
+  }
+  return bloc('Le code déployé dans Apps Script (' + Etat.versionBackend + ') ne ' +
+    'correspond pas à cette application (' + VERSION_ATTENDUE + '). Il manque un ' +
+    'fichier .gs, ou le déploiement n\'a pas été refait en « Nouvelle version ». ' +
+    'Certaines fonctions ne marcheront pas.', 'attention', '⚠️');
+}
+
 function ouvrirReglages() {
   var u = Etat.user || {};
   var nb = Queue.nb();
@@ -2695,12 +3054,14 @@ function ouvrirReglages() {
   h += '<button class="btn vide" onclick="fermerModale();allerA(\'stock\')">' +
       '🏬 Inventaire de l\'agence</button>' +
     (Etat.user && Etat.user.role === 'admin'
-      ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>'
+      ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>' +
+    '<button class="btn vide" onclick="ouvrirTextes()">📝 Textes et mentions</button>'
       : '') +
     '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
     '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>' +
+    blocVersion() +
     '<div style="text-align:center;color:var(--doux);font-size:11.5px;margin-top:16px">' +
       'Flashipping Logistique · ' + (Etat.ref && Etat.ref.parametres
         ? 'taux ' + n0(Etat.ref.parametres.TAUX_ACHAT_USD) + ' / ' +
@@ -2814,6 +3175,86 @@ function rendreParametres(valeurs, tarifs) {
 
   h += '<div id="pm-res"></div>';
   majModale('Paramètres', h);
+}
+
+/**
+ * Les textes imprimés sur les documents et envoyés aux clients.
+ *
+ * Ils étaient figés dans le code : changer une mention de facture
+ * demandait de republier l'application. Ce sont maintenant des
+ * paramètres comme les autres, modifiables par l'administrateur.
+ */
+var TEXTES_EDITABLES = [
+  { cle:'NOM_ENTREPRISE', nom:'Nom imprimé en en-tête', lignes:1,
+    aide:'Apparaît en gros sur tous les documents.' },
+  { cle:'SLOGAN_DOC', nom:'Slogan sous le nom', lignes:1,
+    aide:'En rouge, juste sous le nom. Par défaut : FAST AND SECURE.' },
+  { cle:'COORDONNEES_DOC', nom:'Coordonnées', lignes:2,
+    aide:'Téléphones, courriel, site. Sépare chaque bloc par une barre | — ' +
+         'ils s\'affichent sur des lignes différentes en haut du document.' },
+  { cle:'MSG_PIED_DOC', nom:'Slogan en pied de page', lignes:1,
+    aide:'La ligne rouge tout en bas de chaque document.' },
+  { cle:'MSG_FACTURE_COLIS', nom:'Mention — facture de livraison', lignes:4,
+    aide:'L\'encadré au bas de la facture d\'un colis livré.' },
+  { cle:'MSG_RECU_COMMANDE', nom:'Mention — reçu de commande', lignes:4,
+    aide:'L\'encadré au bas du reçu d\'une commande. C\'est là qu\'il faut ' +
+         'écrire que le transport n\'est pas compris.' },
+  { cle:'MSG_DISPONIBLE', nom:'Message WhatsApp « colis disponible »', lignes:4,
+    aide:'Les repères {client} {agence} {nb} {poids} {montant} sont remplacés ' +
+         'automatiquement. Garde-les tels quels.' }
+];
+
+function ouvrirTextes() {
+  modale('Textes et mentions', chargement());
+
+  api('admin_parametres').then(function (liste) {
+    var v = {};
+    liste.forEach(function (x) { v[x.cle] = x.valeur; });
+
+    var h = bloc('Ces textes s\'impriment sur les documents remis aux clients. ' +
+                 'Une modification s\'applique aux documents imprimés ensuite ; ' +
+                 'une facture déjà remise ne change pas.', 'info', '📝');
+
+    TEXTES_EDITABLES.forEach(function (t) {
+      var val = v[t.cle];
+      if (val === undefined) val = '';
+      h += '<div class="carte serree" style="margin-bottom:10px">' +
+        '<div style="font-weight:700;font-size:14.5px">' + e(t.nom) + '</div>' +
+        '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;' +
+          'line-height:1.35">' + e(t.aide) + '</div>' +
+        (t.lignes > 1
+          ? '<textarea id="tx-' + e(t.cle) + '" style="min-height:' +
+            (t.lignes * 22) + 'px">' + e(val) + '</textarea>'
+          : '<input type="text" id="tx-' + e(t.cle) + '" value="' + e(val) + '">') +
+        '<button class="btn petit" style="margin-top:9px" onclick="enregistrerTexte(\'' +
+          e(t.cle) + '\')">Enregistrer</button>' +
+      '</div>';
+    });
+
+    h += '<div id="tx-res"></div>';
+    majModale('Textes et mentions', h);
+  }).catch(function (err) {
+    majModale('Textes et mentions', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function enregistrerTexte(cle) {
+  var champ = document.getElementById('tx-' + cle);
+  var val = champ.value.trim();
+  if (!val) { toast('Le texte ne peut pas être vide.', 'ko'); return; }
+
+  api('admin_parametres', { cle: cle, valeur: val }).then(function () {
+    toast('Enregistré.', 'ok');
+    champ.style.borderColor = 'var(--vert)';
+    // Les documents lisent les référentiels : il faut les recharger
+    // pour que la prochaine impression porte le nouveau texte.
+    return chargerReferentiels();
+  }).catch(function (err) {
+    champ.style.borderColor = 'var(--rouge)';
+    var z = document.getElementById('tx-res');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+    toast(err.message, 'ko');
+  });
 }
 
 function enregistrerParametre(cle, fraction) {
@@ -2998,6 +3439,7 @@ if ('serviceWorker' in navigator) {
     document.getElementById('app').innerHTML =
       '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
       '</span></h1></header><main>' + chargement() + '</main>';
+    verifierVersion();
     chargerReferentiels().then(dessiner).catch(function (err) {
       if (/Session|Jeton/i.test(err.message)) { deconnecter(); return; }
       toast(err.message, 'ko');
