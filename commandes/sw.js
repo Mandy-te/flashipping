@@ -13,7 +13,7 @@
       franchement et l'application met l'écriture en file d'attente.
    ═══════════════════════════════════════════════════════════════════ */
 
-var VERSION = 'fls-cmd-v3';
+var VERSION = 'fls-cmd-v6';
 var COQUILLE = [
   './',
   './index.html',
