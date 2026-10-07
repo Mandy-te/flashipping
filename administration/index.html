@@ -944,8 +944,16 @@ function changerUrl() {
  */
 var Cli = { q: '', resultats: null, dossier: null, depuis: 0, liste: null };
 
+function peutCreerClient() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  return !!d.creer_client;
+}
+
 function ongletClients() {
   poser(
+    (peutCreerClient()
+      ? '<button class="btn" onclick="ouvrirNouveauClient()">➕ Nouveau client</button>'
+      : '') +
     '<div class="filtres">' +
       '<input type="search" id="cli-q" placeholder="Nom, téléphone ou tracking…" ' +
         'value="' + e(Cli.q) + '" autocomplete="off" ' +
@@ -1266,6 +1274,72 @@ function ouvrirEditionClient() {
     '<label class="champ"><span>Note</span><textarea id="ec-note">' +
       e(c.note) + '</textarea></label>' +
     '<button class="btn" id="ec-btn" onclick="enregistrerClient()">Enregistrer</button>');
+}
+
+/**
+ * Créer un client depuis le service client.
+ *
+ * Le même appel que la Logistique : un agent qui enregistre un client
+ * au guichet et le service client qui l'enregistre au téléphone
+ * écrivent la même fiche, avec le même contrôle de doublon. Deux
+ * chemins vers une seule porte, pas deux portes.
+ */
+function ouvrirNouveauClient() {
+  modale('Nouveau client',
+    bloc('Le code client (deux lettres et deux chiffres) est attribué ' +
+         'automatiquement. Un homonyme est refusé : on ne crée pas deux ' +
+         'fiches pour la même personne.', 'info', '🏷️') +
+    champ('ncl-nom', 'Nom', '') +
+    champ('ncl-prenom', 'Prénom', '') +
+    champ('ncl-tel', 'Téléphone', '', 'tel') +
+    champ('ncl-wa', 'WhatsApp (si différent)', '', 'tel') +
+    champ('ncl-email', 'Courriel', '', 'email') +
+    champ('ncl-ville', 'Ville', '') +
+    '<label class="champ"><span>Agence de retrait</span><select id="ncl-agence">' +
+      ((Etat.ref && Etat.ref.agences) || [])
+        .filter(function (a) { return String(a.type).trim() !== 'entrepot'; })
+        .map(function (a) {
+          return '<option value="' + e(a.agence_id) + '">' + e(a.ville) +
+            ' (' + e(a.agence_id) + ')</option>';
+        }).join('') + '</select>' +
+      '<span class="aide">Là où ce client viendra chercher ses colis. ' +
+      'C\'est la destination proposée par défaut à la réception.</span></label>' +
+    '<label class="champ"><span>Taux fidèle (%)</span>' +
+      '<input type="number" id="ncl-taux" step="0.5" inputmode="decimal" ' +
+      'placeholder="vide = taux général"></label>' +
+    '<label class="champ"><span>Note</span><textarea id="ncl-note"></textarea></label>' +
+    '<button class="btn" id="ncl-btn" onclick="creerClient()">Créer le client</button>');
+}
+
+function creerClient() {
+  var v = function (x) { return (document.getElementById(x) || {}).value || ''; };
+  if (!v('ncl-nom').trim() && !v('ncl-prenom').trim()) {
+    toast('Un nom ou un prénom, au minimum.', 'ko'); return;
+  }
+
+  var taux = v('ncl-taux').trim();
+  var b = document.getElementById('ncl-btn');
+  b.disabled = true; b.textContent = 'Création…';
+
+  var p = {
+    nom: v('ncl-nom').trim(), prenom: v('ncl-prenom').trim(),
+    telephone: v('ncl-tel').trim(), whatsapp: v('ncl-wa').trim(),
+    email: v('ncl-email').trim(), ville: v('ncl-ville').trim(),
+    agence_id: v('ncl-agence'), note: v('ncl-note')
+  };
+  if (taux !== '') p.taux_commission_defaut = Number(taux) / 100;
+
+  api('client_creer', p).then(function (d) {
+    toast(d.nom_complet + ' — code ' + d.code_client, 'ok');
+    fermerModale();
+    // On ouvre sa fiche : c'est presque toujours pour y enchaîner.
+    Cli.q = ''; Cli.depuis = 0;
+    ongletClients();
+    setTimeout(function () { ouvrirDossier(d.client_id); }, 150);
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Créer le client';
+    toast(err.message, 'ko');
+  });
 }
 
 function champ(id, libelle, valeur, type) {
@@ -2037,7 +2111,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-07.7';
+var VERSION_ATTENDUE = '2026-10-07.8';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
