@@ -497,12 +497,31 @@ function tauxUsd() {
 //  SQUELETTE
 // ═══════════════════════════════════════════════════════════════════
 
-var ONGLETS = [
-  { id: 'caisse',   ic: '💰', nom: 'Caisse' },
-  { id: 'saisie',   ic: '✍️', nom: 'Saisie' },
-  { id: 'associes', ic: '👥', nom: 'Associés' },
-  { id: 'cloture',  ic: '🔒', nom: 'Clôture' }
+/**
+ * Les onglets dépendent du rôle.
+ *
+ * Un comptable tient la caisse ; il ne voit ni la table des parts ni la
+ * clôture. Ce n'est pas seulement un masquage d'écran : le serveur
+ * refuse les mêmes actions. L'interface ne fait qu'éviter de proposer
+ * une porte fermée.
+ */
+var TOUS_ONGLETS = [
+  { id: 'caisse',   ic: '💰', nom: 'Caisse',   droit: 'voir_finance' },
+  { id: 'saisie',   ic: '✍️', nom: 'Saisie',   droit: 'saisir_finance' },
+  { id: 'associes', ic: '👥', nom: 'Associés', droit: 'voir_parts' },
+  { id: 'cloture',  ic: '🔒', nom: 'Clôture',  droit: 'cloturer' }
 ];
+
+var ONGLETS = TOUS_ONGLETS;
+
+function majOnglets() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  ONGLETS = TOUS_ONGLETS.filter(function (o) { return d[o.droit]; });
+  if (!ONGLETS.length) ONGLETS = [TOUS_ONGLETS[0]];
+  if (!ONGLETS.some(function (o) { return o.id === Etat.onglet; })) {
+    Etat.onglet = ONGLETS[0].id;
+  }
+}
 
 var Nav = { modaleOuverte: false };
 
@@ -521,6 +540,8 @@ function dessiner() {
       '<button class="btn vide" onclick="deconnecter()">Se déconnecter</button></main>';
     return;
   }
+
+  majOnglets();
 
   var u = Etat.user;
   app.innerHTML =
@@ -647,15 +668,19 @@ function chargerUtilisateurs() {
     var z = document.getElementById('liste-users');
     if (!z) return;
     // Seuls les admins peuvent entrer ici : autant ne pas proposer les autres.
-    var admins = liste.filter(function (u) { return u.role === 'admin'; });
+    var admins = liste.filter(function (u) {
+      return u.role === 'admin' || u.role === 'comptable';
+    });
     if (!admins.length) {
-      z.innerHTML = bloc('Aucun compte administrateur actif.', 'attention', '⚠️');
+      z.innerHTML = bloc('Aucun compte administrateur ou comptable actif.',
+                         'attention', '⚠️');
       return;
     }
     z.innerHTML =
       '<label class="champ"><span>Qui es-tu ?</span><select id="in-user">' +
       admins.map(function (u) {
-        return '<option value="' + e(u.user_id) + '">' + e(u.nom) + '</option>';
+        return '<option value="' + e(u.user_id) + '">' + e(u.nom) + ' — ' +
+               e(u.role) + '</option>';
       }).join('') + '</select></label>' +
       '<label class="champ"><span>Code à 6 chiffres</span>' +
       '<input type="password" id="in-code" inputmode="numeric" maxlength="6" ' +
@@ -685,6 +710,7 @@ function connecter() {
   api('login', { user_id: uid, code: code }).then(function (d) {
     Etat.token = d.token; Etat.user = d.utilisateur;
     S.ecrire(CLE_TOKEN, d.token); S.ecrireJson(CLE_USER, d.utilisateur);
+    verifierVersion();
     return chargerReferentiels();
   }).then(function () {
     toast('Bienvenue ' + (Etat.user.nom || '') + '.', 'ok');
@@ -754,6 +780,19 @@ function ongletCaisse() {
     if (d.depuis_cloture) {
       h += bloc('Ces chiffres repartent de la clôture du ' +
                 dateCourte(d.depuis_cloture) + '.', 'info', '🔒');
+    }
+
+    // Le serveur retire la répartition et les associés quand le rôle
+    // n'y a pas droit : on ne dessine donc rien plutôt que des zéros.
+    if (d.parts_masquees) {
+      h += bloc(d.note_acces || 'La répartition entre associés est réservée ' +
+                'à l\'administrateur.', 'info', '🔒');
+      h += '<div class="rangee-btn" style="margin-top:14px">' +
+        '<button class="btn vide petit" onclick="allerA(\'saisie\')">✍️ Saisir</button>' +
+        '<button class="btn vide petit" onclick="ouvrirEtats()">📊 États financiers</button>' +
+        '</div>';
+      poser(h);
+      return;
     }
 
     // ── La clé de répartition, expliquée à l'écran ──
@@ -1746,6 +1785,86 @@ function rendreParametres(valeurs, tarifs) {
   majModale('Paramètres', h);
 }
 
+/**
+ * Les textes imprimés sur les documents et envoyés aux clients.
+ *
+ * Ils étaient figés dans le code : changer une mention de facture
+ * demandait de republier l'application. Ce sont maintenant des
+ * paramètres comme les autres, modifiables par l'administrateur.
+ */
+var TEXTES_EDITABLES = [
+  { cle:'NOM_ENTREPRISE', nom:'Nom imprimé en en-tête', lignes:1,
+    aide:'Apparaît en gros sur tous les documents.' },
+  { cle:'SLOGAN_DOC', nom:'Slogan sous le nom', lignes:1,
+    aide:'En rouge, juste sous le nom. Par défaut : FAST AND SECURE.' },
+  { cle:'COORDONNEES_DOC', nom:'Coordonnées', lignes:2,
+    aide:'Téléphones, courriel, site. Sépare chaque bloc par une barre | — ' +
+         'ils s\'affichent sur des lignes différentes en haut du document.' },
+  { cle:'MSG_PIED_DOC', nom:'Slogan en pied de page', lignes:1,
+    aide:'La ligne rouge tout en bas de chaque document.' },
+  { cle:'MSG_FACTURE_COLIS', nom:'Mention — facture de livraison', lignes:4,
+    aide:'L\'encadré au bas de la facture d\'un colis livré.' },
+  { cle:'MSG_RECU_COMMANDE', nom:'Mention — reçu de commande', lignes:4,
+    aide:'L\'encadré au bas du reçu d\'une commande. C\'est là qu\'il faut ' +
+         'écrire que le transport n\'est pas compris.' },
+  { cle:'MSG_DISPONIBLE', nom:'Message WhatsApp « colis disponible »', lignes:4,
+    aide:'Les repères {client} {agence} {nb} {poids} {montant} sont remplacés ' +
+         'automatiquement. Garde-les tels quels.' }
+];
+
+function ouvrirTextes() {
+  modale('Textes et mentions', chargement());
+
+  api('admin_parametres').then(function (liste) {
+    var v = {};
+    liste.forEach(function (x) { v[x.cle] = x.valeur; });
+
+    var h = bloc('Ces textes s\'impriment sur les documents remis aux clients. ' +
+                 'Une modification s\'applique aux documents imprimés ensuite ; ' +
+                 'une facture déjà remise ne change pas.', 'info', '📝');
+
+    TEXTES_EDITABLES.forEach(function (t) {
+      var val = v[t.cle];
+      if (val === undefined) val = '';
+      h += '<div class="carte serree" style="margin-bottom:10px">' +
+        '<div style="font-weight:700;font-size:14.5px">' + e(t.nom) + '</div>' +
+        '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;' +
+          'line-height:1.35">' + e(t.aide) + '</div>' +
+        (t.lignes > 1
+          ? '<textarea id="tx-' + e(t.cle) + '" style="min-height:' +
+            (t.lignes * 22) + 'px">' + e(val) + '</textarea>'
+          : '<input type="text" id="tx-' + e(t.cle) + '" value="' + e(val) + '">') +
+        '<button class="btn petit" style="margin-top:9px" onclick="enregistrerTexte(\'' +
+          e(t.cle) + '\')">Enregistrer</button>' +
+      '</div>';
+    });
+
+    h += '<div id="tx-res"></div>';
+    majModale('Textes et mentions', h);
+  }).catch(function (err) {
+    majModale('Textes et mentions', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function enregistrerTexte(cle) {
+  var champ = document.getElementById('tx-' + cle);
+  var val = champ.value.trim();
+  if (!val) { toast('Le texte ne peut pas être vide.', 'ko'); return; }
+
+  api('admin_parametres', { cle: cle, valeur: val }).then(function () {
+    toast('Enregistré.', 'ok');
+    champ.style.borderColor = 'var(--vert)';
+    // Les documents lisent les référentiels : il faut les recharger
+    // pour que la prochaine impression porte le nouveau texte.
+    return chargerReferentiels();
+  }).catch(function (err) {
+    champ.style.borderColor = 'var(--rouge)';
+    var z = document.getElementById('tx-res');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+    toast(err.message, 'ko');
+  });
+}
+
 function enregistrerParametre(cle, fraction) {
   var champ = document.getElementById('pm-' + cle);
   var saisi = champ.value;
@@ -1822,6 +1941,44 @@ function validerCode() {
   }).catch(function (err) { res.innerHTML = bloc(err.message, 'ko', '❌'); });
 }
 
+/**
+ * Le contrôle de version.
+ *
+ * Un backend non redéployé, ou un fichier .gs oublié au copier-coller,
+ * donne des symptômes incompréhensibles : une action qui répond
+ * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
+ * vérification transforme tout ça en une phrase claire.
+ */
+var VERSION_ATTENDUE = '2026-10-06.3';
+
+function verifierVersion() {
+  return api('diag').then(function (d) {
+    var dep = String(d.version_code || '');
+    Etat.versionBackend = dep || '(ancienne)';
+    Etat.versionOk = (dep === VERSION_ATTENDUE);
+    return Etat.versionOk;
+  }).catch(function () { return null; });
+}
+
+function blocVersion() {
+  if (Etat.versionOk === undefined) {
+    // Réponse pas encore arrivée : on la demande et on repeint à son retour.
+    verifierVersion().then(function (r) {
+      if (r !== null && document.getElementById('voile')) ouvrirReglages();
+    });
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Vérification de la version…</div>';
+  }
+  if (Etat.versionOk) {
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Code déployé ' + e(Etat.versionBackend) + ' — à jour</div>';
+  }
+  return bloc('Le code déployé dans Apps Script (' + Etat.versionBackend + ') ne ' +
+    'correspond pas à cette application (' + VERSION_ATTENDUE + '). Il manque un ' +
+    'fichier .gs, ou le déploiement n\'a pas été refait en « Nouvelle version ». ' +
+    'Certaines fonctions ne marcheront pas.', 'attention', '⚠️');
+}
+
 function ouvrirReglages() {
   var u = Etat.user || {};
   var p = (Etat.ref && Etat.ref.parametres) || {};
@@ -1831,7 +1988,8 @@ function ouvrirReglages() {
       '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
         e(u.user_id) + ' · ' + e(u.role) + '</div></div>' +
 
-    '<div class="carte"><div class="titre-section" style="margin-top:0">' +
+    (u.droits && u.droits.voir_parts
+    ? '<div class="carte"><div class="titre-section" style="margin-top:0">' +
       'Gouvernance en vigueur</div>' +
       '<div class="total"><span class="l">Clé de répartition</span><b>' +
         e(p.MODE_REPARTITION || 'mixte') + '</b></div>' +
@@ -1843,16 +2001,22 @@ function ouvrirReglages() {
         n0(p.MAX_ASSOCIES) + '</b></div>' +
       '<div class="total"><span class="l">Capital appelé</span><b>' +
         htg(p.CAPITAL_CIBLE_GDES) + '</b></div>' +
-    '</div>' +
+    '</div>'
+    : '') +
 
-    '<button class="btn vide" onclick="ouvrirParametres()">' +
-      '⚙️ Paramètres et tarifs</button>' +
-    '<button class="btn vide" onclick="ouvrirGouvernance()">' +
-      '⚖️ Règles d\'entrée des associés</button>' +
+    (u.droits && u.droits.gerer_parametres
+      ? '<button class="btn vide" onclick="ouvrirParametres()">' +
+        '⚙️ Paramètres et tarifs</button>' +
+        '<button class="btn vide" onclick="ouvrirTextes()">' +
+        '📝 Textes et mentions</button>' +
+        '<button class="btn vide" onclick="ouvrirGouvernance()">' +
+        '⚖️ Règles d\'entrée des associés</button>'
+      : '') +
     '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
-    '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>');
+    '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>' +
+    blocVersion());
 }
 
 /**
@@ -2025,6 +2189,7 @@ if ('serviceWorker' in navigator) {
     document.getElementById('app').innerHTML =
       '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
       '</span></h1></header><main>' + chargement() + '</main>';
+    verifierVersion();
     chargerReferentiels().then(dessiner).catch(function (err) {
       if (/Session|Jeton/i.test(err.message)) { deconnecter(); return; }
       toast(err.message, 'ko'); dessiner();
