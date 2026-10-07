@@ -254,24 +254,116 @@ textarea{min-height:60px;resize:vertical}
 #toast div.ok{background:var(--vert)}
 
 /* ── Impression 50 mm : reçu de commande ── */
+/* ═══════════════════════════════════════════════════════════════
+   IMPRESSION
+   Deux formats : un document A4 pour le client, un ticket 50 mm
+   pour l'imprimante thermique. La règle @page est injectée au
+   moment de l'impression, parce qu'une feuille de style ne peut
+   pas en porter deux.
+   ═══════════════════════════════════════════════════════════════ */
 #zone-impression{display:none}
 @media print{
-  @page{size:50mm auto;margin:2mm}
-  body{background:#fff}
-  #app,#toast,#bandeau,nav{display:none!important}
+  body{background:#fff;margin:0}
+  /* .voile est frère de #app : sans cette ligne, c'est la fiche
+     affichée à l'écran qui part sur le papier, pas le document. */
+  #app,#toast,#bandeau,nav,.voile{display:none!important}
   #zone-impression{display:block!important}
-  .etiquette{width:46mm;font-family:Arial,Helvetica,sans-serif;color:#000}
+
+  /* ── Document A4 ── */
+  .doc{
+    font-family:Arial,Helvetica,sans-serif;color:#16222E;font-size:10.5pt;
+    line-height:1.45;
+  }
+  .doc-tete{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3px solid #0B2545;padding-bottom:4mm;margin-bottom:5mm;
+  }
+  .doc-marque{font-size:21pt;font-weight:bold;letter-spacing:3px;color:#0B2545;
+    line-height:1}
+  .doc-eclair{color:#F0A818}
+  .doc-slogan{font-size:8pt;font-weight:bold;color:#C62828;letter-spacing:2.5px;
+    margin-top:1mm}
+  .doc-coord{font-size:7.5pt;color:#5F7183;text-align:right;line-height:1.5}
+  .doc-titre{
+    background:#0B2545;color:#fff;padding:2.5mm 4mm;font-size:12pt;
+    font-weight:bold;letter-spacing:1px;display:flex;
+    justify-content:space-between;margin-bottom:5mm;
+  }
+  .doc-cols{display:flex;gap:6mm;margin-bottom:5mm}
+  .doc-col{flex:1}
+  .doc-col h4{
+    font-size:7.5pt;letter-spacing:1.2px;color:#5F7183;margin:0 0 1.5mm;
+    text-transform:uppercase;border-bottom:1px solid #D9E0E6;padding-bottom:1mm;
+  }
+  .doc-col .gros{font-size:11pt;font-weight:bold}
+  .doc-col div{font-size:9pt}
+
+  table.doc-t{width:100%;border-collapse:collapse;margin-bottom:4mm}
+  table.doc-t th{
+    background:#EEF2F6;font-size:8pt;text-transform:uppercase;letter-spacing:.8px;
+    color:#0B2545;padding:2mm;text-align:left;border-bottom:1.5px solid #0B2545;
+  }
+  table.doc-t td{padding:2mm;border-bottom:1px solid #E6ECF1;font-size:9.5pt;
+    vertical-align:top}
+  table.doc-t .num{text-align:right;white-space:nowrap}
+  table.doc-t .ref{font-family:'Courier New',monospace;font-size:8.5pt}
+
+  .doc-tot{margin-left:auto;width:72mm}
+  .doc-tot div{display:flex;justify-content:space-between;padding:1.5mm 0;
+    font-size:10pt}
+  .doc-tot .grand{
+    border-top:2px solid #0B2545;margin-top:1mm;padding-top:2mm;
+    font-size:13pt;font-weight:bold;
+  }
+  .doc-tot .gdes{color:#5F7183;font-size:9.5pt}
+
+  .doc-tampon{
+    display:inline-block;border:2px solid;padding:1.5mm 5mm;font-weight:bold;
+    font-size:11pt;letter-spacing:1.5px;transform:rotate(-3deg);margin-top:3mm;
+  }
+  .doc-tampon.paye{color:#1B7F4B;border-color:#1B7F4B}
+  .doc-tampon.du{color:#C62828;border-color:#C62828}
+
+  .doc-note{
+    background:#F7F9FB;border-left:3px solid #F0A818;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-top:5mm;color:#16222E;
+  }
+  .doc-sign{display:flex;gap:10mm;margin-top:14mm}
+  .doc-sign div{flex:1;border-top:1px solid #16222E;padding-top:1.5mm;
+    font-size:8pt;color:#5F7183}
+  .doc-pied{
+    margin-top:8mm;border-top:1px solid #D9E0E6;padding-top:2.5mm;
+    font-size:7.5pt;color:#5F7183;text-align:center;line-height:1.6;
+  }
+  .doc-pied b{color:#C62828;letter-spacing:1.5px}
+
+  /* ── Ticket 50 mm ── */
+  .etiquette{width:46mm;font-family:Arial,Helvetica,sans-serif;color:#000;
+    page-break-after:always}
+  .etiquette:last-child{page-break-after:auto}
   .et-haut{text-align:center;font-size:8pt;font-weight:bold;
     border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1.5mm;
     letter-spacing:.5px}
+  .et-code{font-size:21pt;font-weight:bold;text-align:center;line-height:1}
+  .et-nom{font-size:10pt;font-weight:bold;text-align:center;margin-top:.8mm}
+  .et-ville{font-size:11pt;text-align:center;font-weight:bold;
+    border:1.5px solid #000;padding:.8mm;margin:1.5mm 0}
+  .et-info{font-size:7.5pt;display:flex;justify-content:space-between;
+    margin-bottom:1mm}
+  .et-bar{width:100%;height:14mm;display:block}
+  .et-tk{font-size:7pt;text-align:center;word-break:break-all;
+    font-family:monospace;margin-top:.5mm}
+  .et-pied{font-size:6.5pt;text-align:center;margin-top:1.5mm;
+    border-top:1px solid #000;padding-top:.8mm}
   .rec-t{font-size:12pt;font-weight:bold;text-align:center}
   .rec-l{font-size:8pt;display:flex;justify-content:space-between;padding:.5mm 0}
   .rec-art{font-size:7.5pt;padding:.4mm 0;border-bottom:1px dotted #999}
   .rec-sep{border-top:1px dashed #000;margin:1.5mm 0}
-  .rec-tot{font-size:12pt;font-weight:bold;display:flex;justify-content:space-between;
-    border-top:1.5px solid #000;padding-top:1mm;margin-top:1mm}
-  .et-pied{font-size:6.5pt;text-align:center;margin-top:1.5mm;
-    border-top:1px solid #000;padding-top:.8mm}
+  .rec-tot{font-size:12pt;font-weight:bold;display:flex;
+    justify-content:space-between;border-top:1.5px solid #000;
+    padding-top:1mm;margin-top:1mm}
+  .rec-tk{font-size:6.5pt;font-family:monospace;word-break:break-all;
+    line-height:1.3}
 }
 </style>
 </head>
@@ -451,9 +543,161 @@ function tauxUsd() {
 //  IMPRESSION — reçu de commande
 // ═══════════════════════════════════════════════════════════════════
 
-function imprimer(html) {
+/**
+ * Impression.
+ *
+ * `format` décide de la règle @page, injectée à la volée : une feuille
+ * de style ne peut pas porter deux tailles de page, et le navigateur
+ * d'Android ignore une taille qui ne correspond pas au papier choisi
+ * dans sa boîte de dialogue.
+ *
+ *   'a4'     document pour le client — à enregistrer en PDF, à envoyer
+ *            sur WhatsApp, à classer
+ *   'ticket' bande de 50 mm pour l'imprimante thermique du comptoir
+ */
+function imprimer(html, format) {
+  var ancienne = document.getElementById('regle-page');
+  if (ancienne) ancienne.remove();
+
+  var st = document.createElement('style');
+  st.id = 'regle-page';
+  st.textContent = format === 'ticket'
+    ? '@media print{@page{size:50mm auto;margin:2mm}}'
+    : '@media print{@page{size:A4;margin:12mm}}';
+  document.head.appendChild(st);
+
   document.getElementById('zone-impression').innerHTML = html;
-  setTimeout(function () { window.print(); }, 120);
+  setTimeout(function () { window.print(); }, 150);
+}
+
+/**
+ * Ce qui s'imprime sur les documents.
+ *
+ * Rien n'est figé dans le code : l'administrateur change les mentions,
+ * le slogan et les coordonnées depuis ⚙️ Réglages. Les valeurs
+ * ci-dessous ne servent que si le paramètre a été effacé du classeur.
+ */
+function marque_(cle, defaut) {
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  var v = p[cle];
+  return (v === undefined || v === null || String(v).trim() === '')
+    ? defaut : String(v);
+}
+
+var MARQUE_DEFAUT = {
+  nom: 'FLASHIPPING',
+  slogan: 'FAST AND SECURE',
+  creole: 'PI RAPID · PI SEKIRIZE · PI BA PRI',
+  coord: '+509 43 31 40 28  ·  +509 47 15 64 24 | contact@flashipping-haiti.com'
+         + ' | www.flashipping-haiti.com'
+};
+
+/** Les coordonnées sont une seule chaîne, séparée par des barres. */
+function coordonnees_() {
+  return marque_('COORDONNEES_DOC', MARQUE_DEFAUT.coord)
+    .split('|').map(function (x) { return x.trim(); })
+    .filter(function (x) { return x; });
+}
+
+/** L'en-tête et le pied de page, identiques sur tous les documents. */
+function enteteDoc(titre, reference, date) {
+  var ent = marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom);
+  return '<div class="doc-tete">' +
+      '<div><div class="doc-marque">' + e(ent) +
+        ' <span class="doc-eclair">⚡</span></div>' +
+        '<div class="doc-slogan">' +
+          e(marque_('SLOGAN_DOC', MARQUE_DEFAUT.slogan)) + '</div></div>' +
+      '<div class="doc-coord">' + coordonnees_().map(e).join('<br>') + '</div>' +
+    '</div>' +
+    '<div class="doc-titre"><span>' + e(titre) + '</span>' +
+      '<span>' + e(reference) + '</span></div>' +
+    '<div style="text-align:right;font-size:9pt;color:#5F7183;margin-top:-3mm;' +
+      'margin-bottom:4mm">Émis le ' + e(date) + '</div>';
+}
+
+function piedDoc(mention) {
+  return (mention ? '<div class="doc-note">' + mention + '</div>' : '') +
+    '<div class="doc-sign"><div>Signature du client</div>' +
+      '<div>Pour ' + e(marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom)) +
+      '</div></div>' +
+    '<div class="doc-pied"><b>' +
+      e(marque_('MSG_PIED_DOC', MARQUE_DEFAUT.creole)) + '</b><br>' +
+      coordonnees_().map(e).join(' · ') + '</div>';
+}
+
+function blocClient(client, valeur, titre, dessous) {
+  return '<div class="doc-cols">' +
+    '<div class="doc-col"><h4>Client</h4>' +
+      '<div class="gros">' + e(client.nom_complet || client.nom || '') + '</div>' +
+      (client.code_client ? '<div>Code ' + e(client.code_client) + '</div>' : '') +
+      (client.telephone ? '<div>' + e(client.telephone) + '</div>' : '') +
+      (client.ville ? '<div>' + e(client.ville) + '</div>' : '') +
+    '</div>' +
+    '<div class="doc-col"><h4>' + e(titre || 'Agence') + '</h4>' +
+      '<div class="gros">' + e(valeur || '') + '</div>' +
+      (dessous ? '<div>' + e(dessous) + '</div>' : '') +
+    '</div></div>';
+}
+
+function tampon(paye, texte) {
+  return '<div class="doc-tampon ' + (paye ? 'paye' : 'du') + '">' +
+         e(texte) + '</div>';
+}
+
+/**
+ * Le reçu de commande, en A4.
+ *
+ * Le client paie ici le panier et les frais, pas le transport. Le
+ * document doit donc le dire noir sur blanc : c'est la source de
+ * malentendu la plus probable de ce service, et une ligne sur un papier
+ * vaut mieux qu'une explication au comptoir trois semaines plus tard.
+ */
+function commandeA4(d) {
+  var c = d.commande, cl = d.client || {};
+  var taux = tauxUsd();
+  var paye = Number(c.montant_paye_usd) >= Number(c.total_client_usd) - 0.01;
+
+  var h = '<div class="doc">' +
+    enteteDoc('REÇU DE COMMANDE', c.commande_id, dateCourte(c.date)) +
+    blocClient(cl, c.plateforme, 'Plateforme d\'achat',
+               'Commande passée par Flashipping') +
+
+    '<table class="doc-t"><thead><tr>' +
+      '<th>Article</th><th>Variante</th>' +
+      '<th class="num">Qté</th><th class="num">Prix unitaire</th>' +
+      '<th class="num">Total</th></tr></thead><tbody>';
+
+  (d.lignes || []).forEach(function (l) {
+    h += '<tr><td>' + e(l.designation || '—') + '</td>' +
+      '<td>' + e(l.variante || '') + '</td>' +
+      '<td class="num">' + l.quantite + '</td>' +
+      '<td class="num">' + usd(l.prix_unitaire_usd) + '</td>' +
+      '<td class="num">' + usd(l.total_usd) + '</td></tr>';
+  });
+
+  h += '</tbody></table>' +
+
+    '<div class="doc-tot">' +
+      '<div><span>Panier validé</span><span>' + usd(c.montant_panier_usd) + '</span></div>' +
+      '<div><span>Frais de service · ' + pct(c.taux_commission) + '</span><span>' +
+        usd(c.commission_usd) + '</span></div>' +
+      '<div class="grand"><span>TOTAL PAYÉ</span><span>' +
+        usd(c.total_client_usd) + '</span></div>' +
+      '<div class="gdes"><span>Au taux de ' + n0(taux) + ' HTG/$</span><span>' +
+        htg(c.total_client_usd * taux) + '</span></div>' +
+    '</div>' +
+
+    tampon(paye, paye ? 'PAYÉ' : 'EN ATTENTE DE PAIEMENT') +
+
+    (c.tracking_marchand
+      ? '<div style="margin-top:4mm;font-size:9pt"><b>Suivi marchand :</b> ' +
+        '<span class="ref">' + e(c.tracking_marchand) + '</span></div>' : '') +
+
+    piedDoc(e(marque_('MSG_RECU_COMMANDE',
+      'Le transport n\'est pas compris dans ce montant. Il sera facturé à la ' +
+      'livraison, au poids réel du colis. Conservez ce reçu.'))) +
+  '</div>';
+  return h;
 }
 
 function recuCommande(d) {
@@ -507,6 +751,24 @@ function dessiner() {
   var app = document.getElementById('app');
   if (!Etat.url)   { app.innerHTML = ecranReglage(); return; }
   if (!Etat.token) { app.innerHTML = ecranConnexion(); chargerUtilisateurs(); return; }
+
+  /**
+   * Un agent de succursale n'a rien à faire ici : les commandes
+   * engagent de l'argent et se saisissent au bureau. Autant le dire à
+   * l'ouverture plutôt que de lui laisser découvrir des refus écran
+   * par écran.
+   */
+  if (!Etat.user || !Etat.user.droits || !Etat.user.droits.saisir_commande) {
+    app.innerHTML =
+      '<header class="entete"><h1>Commandes<span class="sous">' +
+      e(Etat.user ? Etat.user.nom : '') + '</span></h1>' +
+      '<button class="btn-entete" onclick="deconnecter()">⏻</button></header>' +
+      '<main>' + bloc('Les commandes client sont réservées aux ' +
+        'administrateurs et aux responsables. Ton compte n\'y a pas accès — ' +
+        'tu peux utiliser l\'application Logistique.', 'attention', '🔒') +
+      '<button class="btn vide" onclick="deconnecter()">Se déconnecter</button></main>';
+    return;
+  }
 
   var u = Etat.user || {};
   app.innerHTML =
@@ -635,9 +897,18 @@ function chargerUtilisateurs() {
     if (!liste.length) {
       z.innerHTML = bloc('Aucun compte actif.', 'attention', '⚠️'); return;
     }
+    // Seuls les rôles qui peuvent saisir une commande sont proposés.
+    var autorises = liste.filter(function (u) {
+      return u.role === 'admin' || u.role === 'responsable';
+    });
+    if (!autorises.length) {
+      z.innerHTML = bloc('Aucun compte autorisé à saisir des commandes.',
+                         'attention', '🔒');
+      return;
+    }
     z.innerHTML =
       '<label class="champ"><span>Qui es-tu ?</span><select id="in-user">' +
-      liste.map(function (u) {
+      autorises.map(function (u) {
         return '<option value="' + e(u.user_id) + '">' + e(u.nom) + ' — ' +
                e(u.role) + '</option>';
       }).join('') + '</select></label>' +
@@ -669,6 +940,7 @@ function connecter() {
   api('login', { user_id: uid, code: code }).then(function (d) {
     Etat.token = d.token; Etat.user = d.utilisateur;
     S.ecrire(CLE_TOKEN, d.token); S.ecrireJson(CLE_USER, d.utilisateur);
+    verifierVersion();
     return chargerReferentiels();
   }).then(function () {
     toast('Bienvenue ' + (Etat.user.nom || '') + '.', 'ok');
@@ -1263,8 +1535,12 @@ function htmlCommande(d) {
     h += bloc('Commande terminée : colis livré et facturé.', 'ok', '✅');
   }
 
-  h += '<button class="btn vide" style="margin-top:12px" onclick="imprimer(recuCommande(' +
-    e(JSON.stringify(d)).replace(/'/g, '&#39;') + '))">🖨 Imprimer le reçu 50 mm</button>';
+  h += '<button class="btn" style="margin-top:12px" onclick="imprimer(commandeA4(' +
+      e(JSON.stringify(d)).replace(/'/g, '&#39;') + '),\'a4\')">' +
+      '📄 Reçu A4 — à enregistrer en PDF</button>' +
+    '<button class="btn vide" onclick="imprimer(recuCommande(' +
+      e(JSON.stringify(d)).replace(/'/g, '&#39;') + '),\'ticket\')">' +
+      '🧾 Ticket 50 mm (imprimante thermique)</button>';
 
   if (admin && (c.statut === 'devis' || c.statut === 'payee')) {
     h += '<button class="btn rouge" onclick="ouvrirAnnulation(\'' +
@@ -1941,6 +2217,44 @@ function simulerGroupage() {
 //  RÉGLAGES ET MODALE
 // ═══════════════════════════════════════════════════════════════════
 
+/**
+ * Le contrôle de version.
+ *
+ * Un backend non redéployé, ou un fichier .gs oublié au copier-coller,
+ * donne des symptômes incompréhensibles : une action qui répond
+ * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
+ * vérification transforme tout ça en une phrase claire.
+ */
+var VERSION_ATTENDUE = '2026-10-06.3';
+
+function verifierVersion() {
+  return api('diag').then(function (d) {
+    var dep = String(d.version_code || '');
+    Etat.versionBackend = dep || '(ancienne)';
+    Etat.versionOk = (dep === VERSION_ATTENDUE);
+    return Etat.versionOk;
+  }).catch(function () { return null; });
+}
+
+function blocVersion() {
+  if (Etat.versionOk === undefined) {
+    // Réponse pas encore arrivée : on la demande et on repeint à son retour.
+    verifierVersion().then(function (r) {
+      if (r !== null && document.getElementById('voile')) ouvrirReglages();
+    });
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Vérification de la version…</div>';
+  }
+  if (Etat.versionOk) {
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Code déployé ' + e(Etat.versionBackend) + ' — à jour</div>';
+  }
+  return bloc('Le code déployé dans Apps Script (' + Etat.versionBackend + ') ne ' +
+    'correspond pas à cette application (' + VERSION_ATTENDUE + '). Il manque un ' +
+    'fichier .gs, ou le déploiement n\'a pas été refait en « Nouvelle version ». ' +
+    'Certaines fonctions ne marcheront pas.', 'attention', '⚠️');
+}
+
 function ouvrirReglages() {
   var u = Etat.user || {};
   var p = (Etat.ref && Etat.ref.parametres) || {};
@@ -1971,12 +2285,14 @@ function ouvrirReglages() {
     '</div>' +
 
     (Etat.user && Etat.user.role === 'admin'
-      ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>'
+      ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>' +
+    '<button class="btn vide" onclick="ouvrirTextes()">📝 Textes et mentions</button>'
       : '') +
     '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
-    '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>');
+    '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>' +
+    blocVersion());
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2084,6 +2400,86 @@ function rendreParametres(valeurs, tarifs) {
 
   h += '<div id="pm-res"></div>';
   majModale('Paramètres', h);
+}
+
+/**
+ * Les textes imprimés sur les documents et envoyés aux clients.
+ *
+ * Ils étaient figés dans le code : changer une mention de facture
+ * demandait de republier l'application. Ce sont maintenant des
+ * paramètres comme les autres, modifiables par l'administrateur.
+ */
+var TEXTES_EDITABLES = [
+  { cle:'NOM_ENTREPRISE', nom:'Nom imprimé en en-tête', lignes:1,
+    aide:'Apparaît en gros sur tous les documents.' },
+  { cle:'SLOGAN_DOC', nom:'Slogan sous le nom', lignes:1,
+    aide:'En rouge, juste sous le nom. Par défaut : FAST AND SECURE.' },
+  { cle:'COORDONNEES_DOC', nom:'Coordonnées', lignes:2,
+    aide:'Téléphones, courriel, site. Sépare chaque bloc par une barre | — ' +
+         'ils s\'affichent sur des lignes différentes en haut du document.' },
+  { cle:'MSG_PIED_DOC', nom:'Slogan en pied de page', lignes:1,
+    aide:'La ligne rouge tout en bas de chaque document.' },
+  { cle:'MSG_FACTURE_COLIS', nom:'Mention — facture de livraison', lignes:4,
+    aide:'L\'encadré au bas de la facture d\'un colis livré.' },
+  { cle:'MSG_RECU_COMMANDE', nom:'Mention — reçu de commande', lignes:4,
+    aide:'L\'encadré au bas du reçu d\'une commande. C\'est là qu\'il faut ' +
+         'écrire que le transport n\'est pas compris.' },
+  { cle:'MSG_DISPONIBLE', nom:'Message WhatsApp « colis disponible »', lignes:4,
+    aide:'Les repères {client} {agence} {nb} {poids} {montant} sont remplacés ' +
+         'automatiquement. Garde-les tels quels.' }
+];
+
+function ouvrirTextes() {
+  modale('Textes et mentions', chargement());
+
+  api('admin_parametres').then(function (liste) {
+    var v = {};
+    liste.forEach(function (x) { v[x.cle] = x.valeur; });
+
+    var h = bloc('Ces textes s\'impriment sur les documents remis aux clients. ' +
+                 'Une modification s\'applique aux documents imprimés ensuite ; ' +
+                 'une facture déjà remise ne change pas.', 'info', '📝');
+
+    TEXTES_EDITABLES.forEach(function (t) {
+      var val = v[t.cle];
+      if (val === undefined) val = '';
+      h += '<div class="carte serree" style="margin-bottom:10px">' +
+        '<div style="font-weight:700;font-size:14.5px">' + e(t.nom) + '</div>' +
+        '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;' +
+          'line-height:1.35">' + e(t.aide) + '</div>' +
+        (t.lignes > 1
+          ? '<textarea id="tx-' + e(t.cle) + '" style="min-height:' +
+            (t.lignes * 22) + 'px">' + e(val) + '</textarea>'
+          : '<input type="text" id="tx-' + e(t.cle) + '" value="' + e(val) + '">') +
+        '<button class="btn petit" style="margin-top:9px" onclick="enregistrerTexte(\'' +
+          e(t.cle) + '\')">Enregistrer</button>' +
+      '</div>';
+    });
+
+    h += '<div id="tx-res"></div>';
+    majModale('Textes et mentions', h);
+  }).catch(function (err) {
+    majModale('Textes et mentions', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function enregistrerTexte(cle) {
+  var champ = document.getElementById('tx-' + cle);
+  var val = champ.value.trim();
+  if (!val) { toast('Le texte ne peut pas être vide.', 'ko'); return; }
+
+  api('admin_parametres', { cle: cle, valeur: val }).then(function () {
+    toast('Enregistré.', 'ok');
+    champ.style.borderColor = 'var(--vert)';
+    // Les documents lisent les référentiels : il faut les recharger
+    // pour que la prochaine impression porte le nouveau texte.
+    return chargerReferentiels();
+  }).catch(function (err) {
+    champ.style.borderColor = 'var(--rouge)';
+    var z = document.getElementById('tx-res');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+    toast(err.message, 'ko');
+  });
 }
 
 function enregistrerParametre(cle, fraction) {
@@ -2224,6 +2620,7 @@ if ('serviceWorker' in navigator) {
     document.getElementById('app').innerHTML =
       '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
       '</span></h1></header><main>' + chargement() + '</main>';
+    verifierVersion();
     chargerReferentiels().then(dessiner).catch(function (err) {
       if (/Session|Jeton/i.test(err.message)) { deconnecter(); return; }
       toast(err.message, 'ko'); dessiner();
