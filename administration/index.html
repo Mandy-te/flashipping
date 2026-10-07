@@ -1549,7 +1549,14 @@ function ongletAgences() {
   poser(chargement('Réseau…'));
 
   api('admin_reseau').then(function (d) {
-    var liste = d.agences || d;
+    /* Le serveur renvoie l'arbre du réseau ET la liste à plat. C'est
+       la liste qu'on veut ici : elle contient les agences fermées et
+       l'entrepôt, que l'arbre met à part. */
+    var liste = (d && d.agences) || [];
+    if (!liste.length) {
+      poser(bloc('Aucune agence trouvée. Vérifie le déploiement.', 'attention', '🏢'));
+      return;
+    }
     var h = '<button class="btn" onclick="ouvrirNouvelleAgence()">' +
       '➕ Ajouter une agence</button>';
 
@@ -1564,7 +1571,9 @@ function ongletAgences() {
           '<span class="corps">' +
             '<span class="t">' + e(a.ville || a.nom) +
               (String(a.actif) === 'OUI' ? '' : '<span class="etiq">fermée</span>') +
-              (a.telephone ? '' : '<span class="etiq">sans téléphone</span>') + '</span>' +
+              // L'entrepôt de Miami n'a pas de guichet : personne n'y appelle.
+              (a.telephone || t.id === 'entrepot'
+                ? '' : '<span class="etiq">sans téléphone</span>') + '</span>' +
             '<span class="s">' + e(a.agence_id) + ' · facture ' +
               e(a.prefixe_facture || '—') +
               (a.parent_id ? ' · sous ' + e(a.parent_id) : '') + '</span>' +
@@ -2028,7 +2037,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-07.6';
+var VERSION_ATTENDUE = '2026-10-07.7';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
