@@ -443,6 +443,11 @@ textarea{min-height:68px;resize:vertical}
    genoux. Le backend est un Apps Script déployé en /exec.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* Le nom de cette application. Il part à chaque connexion : le
+   serveur refuse lui-même un rôle qui n'a rien à faire ici, au
+   lieu de délivrer un jeton qui ouvrirait les autres apps. */
+var APP = 'logistique';
+
 var CLE_URL   = 'fls_api_url';
 var CLE_TOKEN = 'fls_token';
 var CLE_USER  = 'fls_user';
@@ -978,13 +983,25 @@ function recuFacture(f) {
 //  SQUELETTE DE L'APPLICATION
 // ═══════════════════════════════════════════════════════════════════
 
-var ONGLETS = [
+/* Le Tri n'apparaît que pour qui peut nommer un colis anonyme : un
+   agent qui le verrait n'y trouverait que des refus. */
+var TOUS_ONGLETS = [
   { id: 'scan',       ic: '🔍', nom: 'Scan' },
   { id: 'colis',      ic: '📦', nom: 'Colis' },
   { id: 'clients',    ic: '👤', nom: 'Clients' },
   { id: 'livraison',  ic: '🧾', nom: 'Livrer' },
-  { id: 'tri',        ic: '🏷', nom: 'Tri' }
+  { id: 'tri',        ic: '🏷', nom: 'Tri', droit: 'attribuer_colis' }
 ];
+
+var ONGLETS = TOUS_ONGLETS;
+
+function majOnglets() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  ONGLETS = TOUS_ONGLETS.filter(function (o) { return !o.droit || d[o.droit]; });
+  if (!ONGLETS.some(function (o) { return o.id === Etat.onglet; })) {
+    Etat.onglet = ONGLETS[0].id;
+  }
+}
 
 function dessiner() {
   var app = document.getElementById('app');
@@ -992,13 +1009,16 @@ function dessiner() {
   if (!Etat.url)   { app.innerHTML = ecranReglage(); return; }
   if (!Etat.token) { app.innerHTML = ecranConnexion(); chargerUtilisateurs(); return; }
 
+  majOnglets();
+
   var u = Etat.user || {};
   app.innerHTML =
     '<header class="entete">' +
       '<span class="pastille' + (navigator.onLine ? '' : ' hors') + '"></span>' +
       '<h1>' + e(titreOnglet()) +
         '<span class="sous">' + e(u.nom || '') + ' · ' +
-        e(villeAgence(u.agence_id) || u.agence_id || '') + ' · ' + e(u.role || '') +
+        e(villeAgence(u.agence_id) || u.agence_id || '') + ' · ' +
+        e(u.role_libelle || u.role || '') +
         '</span></h1>' +
       '<button class="btn-entete" onclick="ouvrirReglages()">⚙️</button>' +
     '</header>' +
@@ -1152,7 +1172,7 @@ function ecranConnexion() {
 }
 
 function chargerUtilisateurs() {
-  api('utilisateurs_publics').then(function (liste) {
+  api('utilisateurs_publics', { app: APP }).then(function (liste) {
     var z = document.getElementById('liste-users');
     if (!z) return;
     if (!liste.length) {
@@ -1164,7 +1184,7 @@ function chargerUtilisateurs() {
       '<label class="champ"><span>Qui es-tu ?</span><select id="in-user">' +
       liste.map(function (u) {
         return '<option value="' + e(u.user_id) + '">' + e(u.nom) + ' — ' +
-               e(u.role) + ' (' + e(u.agence_id) + ')</option>';
+               e(u.role_libelle || u.role) + ' (' + e(u.agence_id) + ')</option>';
       }).join('') + '</select></label>' +
       '<label class="champ"><span>Code à 6 chiffres</span>' +
       '<input type="password" id="in-code" inputmode="numeric" maxlength="6" ' +
@@ -1201,7 +1221,7 @@ function connecter() {
   b.textContent = 'Connexion…';
   res.innerHTML = '';
 
-  api('login', { user_id: uid, code: code }).then(function (d) {
+  api('login', { user_id: uid, code: code, app: APP }).then(function (d) {
     Etat.token = d.token;
     Etat.user = d.utilisateur;
     S.ecrire(CLE_TOKEN, d.token);
@@ -2985,7 +3005,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-07.2';
+var VERSION_ATTENDUE = '2026-10-07.6';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
@@ -3023,7 +3043,7 @@ function ouvrirReglages() {
     '<div class="carte serree" style="margin-bottom:12px">' +
       '<div style="font-weight:800;font-size:16px">' + e(u.nom) + '</div>' +
       '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
-        e(u.user_id) + ' · ' + e(u.role) + ' · ' +
+        e(u.user_id) + ' · ' + e(u.role_libelle || u.role) + ' · ' +
         e(villeAgence(u.agence_id)) + '</div></div>';
 
   if (nb) {
@@ -3053,9 +3073,11 @@ function ouvrirReglages() {
 
   h += '<button class="btn vide" onclick="fermerModale();allerA(\'stock\')">' +
       '🏬 Inventaire de l\'agence</button>' +
-    (Etat.user && Etat.user.role === 'admin'
-      ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>' +
-    '<button class="btn vide" onclick="ouvrirTextes()">📝 Textes et mentions</button>'
+    (peutReglages()
+      ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>'
+      : '') +
+    (peutTextes()
+      ? '<button class="btn vide" onclick="ouvrirTextes()">📝 Textes et mentions</button>'
       : '') +
     '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
@@ -3103,24 +3125,43 @@ var PARAMS_EDITABLES = [
     aide:'Le compte se bloque ensuite ; un admin le débloque.' }
 ];
 
+/* Qui voit quoi dans les réglages.
+
+   La direction logistique règle son métier — prix au poids, délais,
+   paliers de dépôt. Le taux de change, le capital et les textes
+   imprimés restent au super administrateur : ce ne sont pas des
+   réglages d'exploitation, ce sont des décisions d'entreprise. */
+function peutReglages() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  return !!(d.gerer_parametres || d.gerer_parametres_metier);
+}
+function peutTextes() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  return !!d.gerer_parametres;
+}
+
 function ouvrirParametres() {
-  if (!Etat.user || Etat.user.role !== 'admin') {
-    toast('Réservé à l\'administrateur.', 'ko');
+  if (!peutReglages()) {
+    toast('Réservé à la direction.', 'ko');
     return;
   }
   modale('Paramètres', chargement());
 
   Promise.all([api('admin_parametres'), api('admin_tarifs_depot')])
     .then(function (r) {
-      var valeurs = {};
-      r[0].forEach(function (x) { valeurs[x.cle] = x.valeur; });
-      rendreParametres(valeurs, r[1].tarifs);
+      var valeurs = {}, modifiables = {};
+      r[0].forEach(function (x) {
+        valeurs[x.cle] = x.valeur;
+        modifiables[x.cle] = x.modifiable !== false;
+      });
+      rendreParametres(valeurs, r[1].tarifs, modifiables);
     }).catch(function (err) {
       majModale('Paramètres', bloc(err.message, 'ko', '❌'));
     });
 }
 
-function rendreParametres(valeurs, tarifs) {
+function rendreParametres(valeurs, tarifs, modifiables) {
+  modifiables = modifiables || {};
   var h = bloc('Une modification ne touche jamais une opération déjà ' +
                'enregistrée. Un colis garde le prix du jour de sa réception, ' +
                'une facture son taux, une commande ses frais. Seules les ' +
@@ -3130,19 +3171,26 @@ function rendreParametres(valeurs, tarifs) {
     var brut = valeurs[p.cle];
     if (brut === undefined) return;
     var affiche = p.fraction ? (Number(brut) * 100) : brut;
+    var ouvert = modifiables[p.cle] !== false;
 
-    h += '<div class="carte serree" style="margin-bottom:10px">' +
-      '<div style="font-weight:700;font-size:14.5px">' + e(p.nom) + '</div>' +
+    h += '<div class="carte serree" style="margin-bottom:10px' +
+        (ouvert ? '' : ';opacity:.62') + '">' +
+      '<div style="font-weight:700;font-size:14.5px">' + e(p.nom) +
+        (ouvert ? '' : ' 🔒') + '</div>' +
       '<div style="font-size:12px;color:var(--doux);margin:3px 0 9px;' +
-        'line-height:1.35">' + e(p.aide) + '</div>' +
+        'line-height:1.35">' + e(p.aide) +
+        (ouvert ? '' : '<br><b>Réservé au super administrateur.</b>') + '</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
         '<input type="number" id="pm-' + e(p.cle) + '" value="' + e(affiche) + '" ' +
-          'step="' + p.pas + '" inputmode="decimal" style="flex:1">' +
+          'step="' + p.pas + '" inputmode="decimal" style="flex:1"' +
+          (ouvert ? '' : ' disabled') + '>' +
         (p.unite ? '<span style="font-weight:700;color:var(--doux);' +
           'min-width:34px">' + e(p.unite) + '</span>' : '') +
-        '<button class="btn petit" style="width:auto;padding:11px 15px" ' +
-          'onclick="enregistrerParametre(\'' + e(p.cle) + '\',' +
-          (p.fraction ? 'true' : 'false') + ')">OK</button>' +
+        (ouvert
+          ? '<button class="btn petit" style="width:auto;padding:11px 15px" ' +
+            'onclick="enregistrerParametre(\'' + e(p.cle) + '\',' +
+            (p.fraction ? 'true' : 'false') + ')">OK</button>'
+          : '') +
       '</div></div>';
   });
 
