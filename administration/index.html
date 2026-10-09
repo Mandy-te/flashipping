@@ -680,6 +680,13 @@ function tauxUsd() {
  */
 var TOUS_ONGLETS = [
   { id: 'clients',  ic: '🧑', nom: 'Clients',  droit: 'dossier_client' },
+  /* Approuver un rattachement ouvre à un compte web l'historique
+     complet d'un client. On le range sur modifier_client — le
+     fondateur et le service client — et pas sur dossier_client, qui
+     est un droit de consultation partagé plus largement. Voir un
+     dossier et décider à qui il appartient ne sont pas le même
+     geste. */
+  { id: 'rattach',  ic: '🔗', nom: 'Rattachements', droit: 'modifier_client' },
   { id: 'comptes',  ic: '👤', nom: 'Comptes',  droit: 'gerer_utilisateurs' },
   { id: 'agences',  ic: '🏢', nom: 'Agences',  droit: 'gerer_agences' },
   { id: 'journal',  ic: '📋', nom: 'Journal',  droit: 'gerer_utilisateurs' }
@@ -769,6 +776,7 @@ function poser(h) { var c = document.getElementById('contenu'); if (c) c.innerHT
 function rendreOnglet() {
   switch (Etat.onglet) {
     case 'clients': return ongletClients();
+    case 'rattach': return ongletRattachements();
     case 'comptes': return ongletComptes();
     case 'agences': return ongletAgences();
     case 'journal': return ongletJournalAdmin();
@@ -2186,6 +2194,185 @@ function appsDuRole() {
 // ═══════════════════════════════════════════════════════════════════
 //  MODALE ET DÉMARRAGE
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+//  RATTACHEMENTS — qui a le droit de voir quel historique
+// ═══════════════════════════════════════════════════════════════════
+
+var Ratt = { liste: [] };
+
+/**
+ * La file des anciens clients qui veulent retrouver leur historique
+ * depuis le site.
+ *
+ * Le site ne relie plus personne tout seul. Il l'a fait un temps, sur
+ * présentation d'un numéro de suivi, et c'était une erreur : ce
+ * numéro est imprimé sur l'étiquette, il circule sur WhatsApp, il est
+ * lu par qui réceptionne le colis. Qui l'avait en main pouvait ouvrir
+ * l'historique de son propriétaire.
+ *
+ * L'écran ne décide rien non plus. Il met côte à côte ce que la
+ * personne a déclaré et ce que porte le dossier qu'elle revendique,
+ * et laisse juger quelqu'un qui connaît ses clients.
+ */
+function ongletRattachements() {
+  poser(chargement('Demandes…'));
+
+  api('admin_rattachements').then(function (d) {
+    var liste = (d && d.demandes) || [];
+    Ratt.liste = liste;
+
+    if (!liste.length) {
+      poser(vide('🔗', 'Aucune demande en attente.'));
+      return;
+    }
+
+    var h = '<div class="titre-section">En attente (' + liste.length + ')</div>';
+
+    liste.forEach(function (r) {
+      var c = r.concordance || {};
+      var accords = (c.telephone ? 1 : 0) + (c.nom ? 1 : 0) + (c.email ? 1 : 0);
+
+      /* La pastille résume avant la lecture : vert quand le téléphone
+         ET le nom concordent, orange quand l'un des deux manque,
+         rouge quand le numéro fourni ne mène nulle part. */
+      var teinte = !r.vise ? '#FDE8E8' : (accords >= 2 ? '#E6F4EA' : '#FEF3E2');
+      var icone  = !r.vise ? '⛔' : (accords >= 2 ? '✅' : '⚠️');
+
+      var etiquettes = '';
+      if (!r.vise) {
+        etiquettes = '<span class="etiq">numéro inconnu</span>';
+      } else {
+        if (c.telephone) etiquettes += '<span class="etiq">téléphone ✓</span>';
+        if (c.nom)       etiquettes += '<span class="etiq">nom ✓</span>';
+        if (!c.telephone && !c.nom) etiquettes += '<span class="etiq">rien ne concorde</span>';
+      }
+
+      h += '<button class="mvt" onclick="ouvrirRattachement(\'' +
+        e(r.demande_id) + '\')">' +
+        '<span class="pic" style="background:' + teinte + '">' + icone + '</span>' +
+        '<span class="corps">' +
+          '<span class="t">' + e(r.declare.nom || r.declare.email) +
+            etiquettes + '</span>' +
+          '<span class="s">' + e(r.demande_id) + ' · ' + dateCourte(r.date) +
+            (r.vise ? ' · revendique ' + e(r.vise.code_client) +
+                      ' (' + r.vise.nb_colis + ' colis)' : '') +
+          '</span>' +
+        '</span>' +
+        '<span class="m" style="font-size:19px;color:var(--doux)">›</span>' +
+        '</button>';
+    });
+
+    poser(h);
+  }).catch(function (err) { poser(bloc(err.message, 'ko', '⚠️')); });
+}
+
+
+function ouvrirRattachement(id) {
+  var r = null;
+  (Ratt.liste || []).forEach(function (x) {
+    if (String(x.demande_id) === id) r = x;
+  });
+  if (!r) return;
+
+  function ligne(etiquette, declare, dossier, concorde) {
+    var marque = concorde === true ? ' ✅' : (concorde === false ? ' ⚠️' : '');
+    return '<div style="display:flex;gap:10px;padding:7px 0;' +
+      'border-bottom:1px solid var(--bord)">' +
+      '<div style="flex:0 0 86px;color:var(--doux);font-size:13px">' +
+        e(etiquette) + '</div>' +
+      '<div style="flex:1;font-size:14px">' + e(declare || '—') + '</div>' +
+      '<div style="flex:1;font-size:14px;color:var(--doux)">' +
+        e(dossier || '—') + marque + '</div></div>';
+  }
+
+  var c = r.concordance || {};
+  var h = '';
+
+  if (!r.vise) {
+    h += bloc('Le numéro de suivi fourni ne mène à aucun dossier. ' +
+              'Rien à approuver ici — refuse la demande, ou relie le ' +
+              'compte à la main depuis la fiche client si tu sais qui ' +
+              'c\'est.', 'attention', '⛔');
+  }
+
+  h += '<div style="display:flex;gap:10px;padding:4px 0 6px;' +
+       'font-size:12px;font-weight:600;color:var(--doux)">' +
+       '<div style="flex:0 0 86px"></div>' +
+       '<div style="flex:1">DÉCLARÉ AU SITE</div>' +
+       '<div style="flex:1">DOSSIER REVENDIQUÉ</div></div>';
+
+  h += ligne('Nom', r.declare.nom, r.vise ? r.vise.nom : '', r.vise ? c.nom : null);
+  h += ligne('Téléphone', r.declare.telephone, r.vise ? r.vise.telephone : '',
+             r.vise ? c.telephone : null);
+  h += ligne('Courriel', r.declare.email, r.vise ? r.vise.email : '',
+             r.vise ? c.email : null);
+  if (r.vise) {
+    h += ligne('Ville', '', r.vise.ville, null);
+    h += ligne('Historique', '', r.vise.nb_colis + ' colis', null);
+  }
+
+  h += '<div class="titre-section">Le colis présenté comme preuve</div>';
+  h += '<div style="font-size:14px;line-height:1.6">' +
+       '<b>' + e(r.preuve.tracking) + '</b>' +
+       (r.preuve.existe
+         ? '<br>' + e(r.preuve.contenu || 'contenu non renseigné') +
+           '<br><span style="color:var(--doux)">dernier mouvement ' +
+           dateCourte(r.preuve.date) + '</span>'
+         : '<br><span style="color:var(--doux)">introuvable dans la base</span>') +
+       '</div>';
+
+  /* Le rappel n'est pas décoratif. L'écran peut donner trois coches
+     vertes sans que la personne soit la bonne : un voisin connaît le
+     nom, le téléphone se trouve, le numéro de suivi était sur le
+     carton. La seule vérification qui vaut est humaine. */
+  h += '<div style="margin-top:14px;padding:10px 12px;border-radius:10px;' +
+       'background:#FFF8E1;font-size:13px;line-height:1.5">' +
+       'Les coches disent que les informations concordent, pas que la ' +
+       'personne est la bonne. En cas de doute, appelle le numéro du ' +
+       '<b>dossier</b> — pas celui qui vient d\'être déclaré.</div>';
+
+  h += '<label class="champ" style="margin-top:12px"><span>Motif ' +
+       '(obligatoire pour un refus)</span>' +
+       '<input type="text" id="ratt-motif" placeholder="Confirmé par téléphone"></label>';
+
+  h += '<div style="display:flex;gap:8px;margin-top:10px">' +
+    (r.vise
+      ? '<button class="btn vert" style="flex:1" onclick="deciderRattachement(\'' +
+        e(r.demande_id) + '\',\'approuver\')">Approuver</button>'
+      : '') +
+    '<button class="btn rouge" style="flex:1" onclick="deciderRattachement(\'' +
+      e(r.demande_id) + '\',\'refuser\')">Refuser</button>' +
+    '</div>';
+
+  modale(r.declare.nom || r.declare.email, h);
+}
+
+
+function deciderRattachement(id, decision) {
+  var champ = document.getElementById('ratt-motif');
+  var motif = champ ? champ.value.trim() : '';
+
+  if (decision === 'refuser' && !motif) {
+    toast('Dis pourquoi tu refuses — le client te le demandera.', 'ko');
+    return;
+  }
+
+  api('admin_rattachement_traiter',
+      { demande_id: id, decision: decision, motif: motif })
+  .then(function (d) {
+    fermerModale();
+    if (d.statut === 'approuvee') {
+      toast('Relié à ' + (d.code_client || d.client_id) +
+            (d.colis_deplaces ? ' · ' + d.colis_deplaces + ' colis repris' : ''));
+    } else {
+      toast('Demande refusée.');
+    }
+    ongletRattachements();
+  })
+  .catch(function (err) { toast(err.message, 'ko'); });
+}
+
 
 function modale(titre, html) {
   var dejaOuverte = Nav.modaleOuverte;
