@@ -1431,10 +1431,69 @@ function envoyerRafale() {
   });
 }
 
+/**
+ * Le colis dont on attend l'écran de scan, et le nombre d'essais déjà
+ * faits pour y arriver. Voir lancerScan ci-dessous.
+ */
+var ScanEnAttente = null;
+var ScanEssais = 0;
+
+/**
+ * Reprend un scan demandé depuis un autre onglet.
+ *
+ * Il faut parfois deux passages, et c'est voulu. Fermer la fiche colis
+ * appelle history.back(), dont le popstate arrive APRÈS le clic : il
+ * remet l'onglet d'origine et redessine, effaçant l'écran de scan
+ * qu'on venait d'ouvrir. Au deuxième essai, plus rien n'est en
+ * attente et la navigation tient.
+ *
+ * Le compteur borne la reprise. Sans lui, un onglet qui refuserait de
+ * s'afficher ferait tourner cette fonction indéfiniment — et une
+ * boucle invisible sur un téléphone de guichet vide la batterie sans
+ * que personne comprenne pourquoi.
+ */
+function reprendreScanEnAttente() {
+  if (!ScanEnAttente) return;
+
+  if (!document.getElementById('res-scan')) {
+    if (++ScanEssais > 10) {
+      ScanEnAttente = null;
+      toast('Impossible d\'ouvrir l\'écran de scan.', 'ko');
+      return;
+    }
+    if (Etat.onglet !== 'scan') allerA('scan');
+    setTimeout(reprendreScanEnAttente, 60);
+    return;
+  }
+
+  var t = ScanEnAttente;
+  ScanEnAttente = null;
+  lancerScan(t);
+}
+
 function lancerScan(valeur) {
   var champ = document.getElementById('in-tk');
   var t = (valeur || (champ ? champ.value : '') || '').trim().toUpperCase();
   if (!t) return;
+
+  /**
+   * Appelé depuis un autre onglet — le bouton « Faire avancer » de la
+   * fiche colis le fait.
+   *
+   * Le conteneur res-scan n'existe que sur l'onglet Scan. Sans cette
+   * garde, la ligne suivante lisait null.innerHTML, levait une
+   * exception qu'aucun gestionnaire n'attrapait, et le bouton ne
+   * faisait visiblement rien. Une panne muette : l'agent clique,
+   * l'écran ne bouge pas, et rien n'indique où regarder.
+   */
+  if (!document.getElementById('res-scan')) {
+    ScanEnAttente = t;
+    ScanEssais = 0;
+    if (Etat.onglet !== 'scan') allerA('scan');
+    setTimeout(reprendreScanEnAttente, 60);
+    return;
+  }
+
   if (champ) champ.value = '';
 
   if (ModeRafale) {
@@ -1542,7 +1601,7 @@ function carteScan(d) {
     }
   } else if (s.a_identifier) {
     h += bloc(s.message, 'attention', '🏷') +
-      '<button class="btn or" onclick="fermerModale();allerA(\'tri\')">' +
+      '<button class="btn or" onclick="fermerModalePuis(function(){allerA(\'tri\')})">' +
       '👤 Aller attribuer ce colis</button>';
   } else {
     h += bloc(s.message || 'Aucune étape suivante.', 'attention', '⏸');
@@ -2140,7 +2199,7 @@ function ouvrirDetail(tracking) {
     var s = d.suivant || {};
     if (s.possible && s.action !== 'livraison') {
       h += '<button class="btn vert" style="margin-top:12px" ' +
-        'onclick="fermerModale();lancerScan(\'' + e(c.tracking_number) + '\')">' +
+        'onclick="fermerModalePuis(function(){lancerScan(\'' + e(c.tracking_number) + '\')})">' +
         'Faire avancer → ' + e(s.libelle) + '</button>';
     }
 
@@ -2406,8 +2465,8 @@ function ouvrirFicheClient(clientId) {
       '\',\'' + e(c.nom_complet).replace(/'/g, '') + '\')">📄 Ses factures</button>';
 
     if (r.nb_disponibles > 0) {
-      h += '<button class="btn or" onclick="fermerModale();allerLivrer(\'' +
-        e(c.client_id) + '\')">🧾 Livrer ' + r.nb_disponibles + ' colis</button>' +
+      h += '<button class="btn or" onclick="fermerModalePuis(function(){allerLivrer(\'' +
+        e(c.client_id) + '\')})">🧾 Livrer ' + r.nb_disponibles + ' colis</button>' +
         '<button class="btn vide" onclick="envoyerWhatsapp(\'' + e(c.client_id) +
         '\')">💬 Prévenir sur WhatsApp</button>';
     }
@@ -3005,7 +3064,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-07.6';
+var VERSION_ATTENDUE = '2026-10-07.8';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
@@ -3071,7 +3130,7 @@ function ouvrirReglages() {
         'ouvrirReglages()">Effacer cette liste</button></div>';
   }
 
-  h += '<button class="btn vide" onclick="fermerModale();allerA(\'stock\')">' +
+  h += '<button class="btn vide" onclick="fermerModalePuis(function(){allerA(\'stock\')})">' +
       '🏬 Inventaire de l\'agence</button>' +
     (peutReglages()
       ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>'
@@ -3435,6 +3494,47 @@ function fermerModaleDom() {
  * pour que l'entrée empilée soit consommée. Sans ça, un Retour après
  * une fermeture au doigt reviendrait sur une modale déjà fermée.
  */
+/**
+ * Ferme la fiche, PUIS fait autre chose.
+ *
+ * Le piège : fermerModale() appelle history.back(), dont le popstate
+ * n'arrive pas au moment du clic mais à la tâche suivante. Tout ce
+ * qu'on enchaîne derrière — changer d'onglet, ouvrir l'écran de
+ * livraison — est donc défait une fraction de seconde plus tard par
+ * un gestionnaire qui remet l'onglet d'avant et redessine.
+ *
+ * Le symptôme est le pire qui soit : le bouton ne fait visiblement
+ * rien. Pas d'erreur, pas de message, rien à montrer au support.
+ *
+ * On attend donc que le retour ait eu lieu avant d'agir. Le minuteur
+ * de secours couvre le cas où le popstate n'arrive jamais — certains
+ * navigateurs ne le déclenchent pas quand il n'y a rien derrière dans
+ * l'historique, et un bouton muet pour cette raison serait le même
+ * défaut déplacé d'un cran.
+ */
+function fermerModalePuis(suite) {
+  if (typeof suite !== 'function') suite = function () {};
+
+  if (!Nav.modaleOuverte) { fermerModaleDom(); suite(); return; }
+
+  Nav.modaleOuverte = false;
+  fermerModaleDom();
+
+  var fait = false;
+  function reprendre() {
+    if (fait) return;
+    fait = true;
+    window.removeEventListener('popstate', surRetour);
+    suite();
+  }
+  function surRetour() { setTimeout(reprendre, 0); }
+
+  window.addEventListener('popstate', surRetour);
+  try { history.back(); } catch (e) { reprendre(); return; }
+  setTimeout(reprendre, 250);
+}
+
+
 function fermerModale() {
   if (Nav.modaleOuverte) {
     Nav.modaleOuverte = false;
