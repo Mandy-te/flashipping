@@ -2388,6 +2388,195 @@ function ouvrirFactures(clientId, nom) {
   });
 }
 
+/**
+ * Le reçu d'un VERSEMENT, qui n'est pas le reçu de la facture.
+ *
+ * La distinction a l'air subtile et elle ne l'est pas. Le reçu de
+ * facture dit ce que le client doit ; celui-ci dit ce qu'il vient de
+ * donner, à cette date, à cet agent. Un client qui vient solder une
+ * ancienne dette repart avec la preuve de SON versement — pas avec
+ * une facture réimprimée dont les totaux ont changé, qui ne prouve
+ * rien de la transaction du jour.
+ *
+ * Le numéro du reçu est celui de l'écriture comptable créée par le
+ * serveur. Un reçu sans numéro propre est un bout de papier ; relié
+ * au revenu, il se retrouve dans les livres le jour où quelqu'un
+ * conteste.
+ */
+function recuPaiement(v) {
+  var ent = marque_('NOM_ENTREPRISE', 'FLASHIPPING');
+  var reste = Number(v.reste_du_usd) || 0;
+  var numero = v.revenu_id || v.facture_id;
+
+  var h = '<div class="etiquette">' +
+    '<div class="et-haut">' + e(ent) + '</div>' +
+    '<div class="rec-t">REÇU DE PAIEMENT</div>' +
+    '<div class="rec-l"><span>Reçu n°</span><b>' + e(numero) + '</b></div>' +
+    '<div class="rec-sep"></div>' +
+
+    '<div class="rec-l"><span>Client</span><b>' + e(v.client_nom || '') + '</b></div>' +
+    '<div class="rec-l"><span>Date</span><span>' +
+      new Date().toLocaleString('fr-FR') + '</span></div>' +
+    '<div class="rec-l"><span>Facture</span><span>' + e(v.facture_id) + '</span></div>' +
+    '<div class="rec-sep"></div>' +
+
+    '<div class="rec-tot"><span>REÇU</span><span>' + usd(v.versement_usd) + '</span></div>' +
+    (Number(v.taux) > 0
+      ? '<div class="rec-l"><span>Au taux ' + n0(v.taux) + '</span><b>' +
+        htg(Number(v.versement_usd) * Number(v.taux)) + '</b></div>'
+      : '') +
+    '<div class="rec-l"><span>Mode</span><span>' + e(v.methode || 'cash') + '</span></div>' +
+    '<div class="rec-sep"></div>' +
+
+    '<div class="rec-l"><span>Total facture</span><span>' + usd(v.montant_usd) + '</span></div>' +
+    '<div class="rec-l"><span>Payé à ce jour</span><span>' +
+      usd(v.montant_paye_usd) + '</span></div>';
+
+  /* Le reste dû est la raison d'être de ce document pour un paiement
+     partiel. Il ne doit pas se lire comme une ligne parmi d'autres :
+     le client doit repartir en sachant combien il doit encore. */
+  h += reste > 0.009
+    ? '<div class="rec-tot" style="border-top:1px dashed #000">' +
+      '<span>RESTE DÛ</span><span>' + usd(reste) + '</span></div>' +
+      (Number(v.taux) > 0
+        ? '<div class="rec-l"><span>soit</span><b>' +
+          htg(reste * Number(v.taux)) + '</b></div>' : '')
+    : '<div class="rec-tot" style="border-top:1px dashed #000">' +
+      '<span>FACTURE SOLDÉE</span><span>✓</span></div>';
+
+  if (Number(v.solde_client_usd) > 0.009 && reste <= 0.009) {
+    /* Facture soldée mais le client doit encore sur d'AUTRES factures.
+       Le taire laisserait croire qu'il ne doit plus rien. */
+    h += '<div class="rec-l"><span>Autres factures dues</span><b>' +
+      usd(v.solde_client_usd) + '</b></div>';
+  }
+
+  h += '<div class="rec-sep"></div>' +
+    '<div class="rec-l"><span>Agent</span><span>' +
+      e((Etat.user && Etat.user.user_id) || '') + '</span></div>' +
+    '<div class="et-pied">Merci de votre confiance</div>' +
+    CODE128.svg(String(numero), 10) +
+    '</div>';
+  return h;
+}
+
+
+/* La facture ouverte, pour que l'écran d'encaissement sache de quoi
+   il parle sans la redemander au serveur. */
+var Fact = { courante: null };
+
+/**
+ * L'encaissement.
+ *
+ * Le montant est pré-rempli avec le reste dû : dans l'immense
+ * majorité des cas le client solde, et l'agent n'a qu'à valider. Le
+ * champ reste modifiable pour les paiements partiels, que le serveur
+ * accepte et plafonne au reste.
+ */
+function ouvrirPaiement(factureId) {
+  var f = Fact.courante;
+  if (!f || String(f.facture_id) !== String(factureId)) return;
+
+  var reste = Number(f.reste_du_usd) || 0;
+  if (reste <= 0.009) { toast('Facture déjà soldée.'); return; }
+
+  var modes = ['cash', 'moncash', 'natcash', 'virement', 'carte', 'autre'];
+
+  modale('Encaisser — ' + f.facture_id,
+    '<div class="total"><span class="l">Client</span><b>' +
+      e(f.client_nom || '') + '</b></div>' +
+    '<div class="total"><span class="l">Total facture</span><span>' +
+      usd(f.montant_usd) + '</span></div>' +
+    '<div class="total"><span class="l">Déjà payé</span><span>' +
+      usd(f.montant_paye_usd) + '</span></div>' +
+    '<div class="total gros"><span class="l">Reste dû</span><span>' +
+      usd(reste) + '</span></div>' +
+    (Number(f.taux) > 0
+      ? '<div class="total"><span class="l">soit au taux ' + n0(f.taux) +
+        '</span><b>' + htg(reste * Number(f.taux)) + '</b></div>' : '') +
+
+    '<label class="champ" style="margin-top:12px"><span>Montant reçu ($ US)</span>' +
+      '<input type="number" id="pay-montant" inputmode="decimal" step="0.01" ' +
+      'min="0.01" max="' + reste.toFixed(2) + '" value="' + reste.toFixed(2) +
+      '"></label>' +
+
+    '<label class="champ"><span>Mode de paiement</span><select id="pay-mode">' +
+      modes.map(function (m) {
+        return '<option value="' + m + '">' + m + '</option>';
+      }).join('') +
+    '</select></label>' +
+
+    '<div id="pay-apercu" style="font-size:13px;color:var(--doux);margin:6px 2px"></div>' +
+
+    '<button class="btn vert" id="pay-ok" onclick="enregistrerPaiement()">' +
+      '💵 Encaisser et imprimer le reçu</button>');
+
+  var champ = document.getElementById('pay-montant');
+  function apercu() {
+    var v = Number(champ.value) || 0;
+    var r = Math.round((reste - v) * 100) / 100;
+    document.getElementById('pay-apercu').innerHTML = r > 0.009
+      ? 'Paiement partiel — il restera <b>' + usd(r) + '</b> à payer.'
+      : (v > 0 ? 'La facture sera soldée.' : '');
+  }
+  champ.addEventListener('input', apercu);
+  apercu();
+  champ.focus();
+  champ.select();
+}
+
+
+function enregistrerPaiement() {
+  var f = Fact.courante;
+  if (!f) return;
+
+  var montant = Number(document.getElementById('pay-montant').value) || 0;
+  var mode = document.getElementById('pay-mode').value;
+  var reste = Number(f.reste_du_usd) || 0;
+
+  if (montant <= 0) { toast('Entre un montant.', 'ko'); return; }
+  if (montant > reste + 0.009) {
+    toast('Plus que le reste dû (' + usd(reste) + ').', 'ko');
+    return;
+  }
+
+  /* Le bouton se désarme pendant l'appel. Sur une connexion lente, un
+     agent pressé appuie deux fois — et encaisse deux fois. */
+  var btn = document.getElementById('pay-ok');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
+
+  api('facture_payer', { facture_id: f.facture_id,
+                         montant_usd: montant, methode: mode })
+  .then(function (d) {
+    fermerModaleDom();
+    Nav.modaleOuverte = false;
+
+    imprimer(recuPaiement({
+      facture_id: d.facture_id,
+      revenu_id: d.revenu_id,
+      client_nom: f.client_nom,
+      versement_usd: montant,
+      methode: mode,
+      taux: f.taux,
+      montant_usd: d.montant_usd,
+      montant_paye_usd: d.montant_paye_usd,
+      reste_du_usd: d.reste_du_usd,
+      solde_client_usd: d.solde_client_usd
+    }), 'ticket');
+
+    toast(Number(d.reste_du_usd) > 0.009
+      ? 'Encaissé ' + usd(montant) + ' · reste ' + usd(d.reste_du_usd)
+      : 'Facture soldée.');
+
+    if (d.avertissement) toast(d.avertissement, 'ko');
+  })
+  .catch(function (err) {
+    if (btn) { btn.disabled = false; btn.textContent = '💵 Encaisser et imprimer le reçu'; }
+    toast(err.message, 'ko');
+  });
+}
+
+
 function ouvrirFacture(id) {
   modale('Facture', chargement());
   api('facture_detail', { facture_id: id }).then(function (d) {
@@ -2403,6 +2592,19 @@ function ouvrirFacture(id) {
       montant_paye_usd: f.montant_paye_usd, reste_du_usd: f.reste_du_usd,
       trackings: (d.lignes || []).map(function (l) { return l.tracking; })
     };
+
+    /* Gardée pour l'écran d'encaissement, qui ne doit pas redemander
+       au serveur ce qu'on vient de lui demander. */
+    Fact.courante = {
+      facture_id: String(f.facture_id),
+      client_nom: String(cl.nom_complet || ''),
+      montant_usd: Number(f.montant_usd) || 0,
+      montant_paye_usd: Number(f.montant_paye_usd) || 0,
+      reste_du_usd: Number(f.reste_du_usd) || 0,
+      taux: Number(f.taux) || 0
+    };
+
+    var peutEncaisser = !!(Etat.user && Etat.user.droits && Etat.user.droits.facturer);
 
     majModale('Facture ' + f.facture_id,
       '<div class="total"><span class="l">Client</span><b>' +
@@ -2427,7 +2629,15 @@ function ouvrirFacture(id) {
           '<div class="droite"><b>' + usd(l.montant_usd) + '</b></div></div>';
       }).join('') +
 
-      '<button class="btn or" style="margin-top:14px" onclick="imprimer(factureA4(' +
+      /* L'encaissement passe avant la réimpression : quand un client
+         est au comptoir avec son argent, c'est le geste du moment. */
+      (Number(f.reste_du_usd) > 0.009 && peutEncaisser
+        ? '<button class="btn vert" style="margin-top:14px" ' +
+          'onclick="ouvrirPaiement(\'' + e(f.facture_id) + '\')">' +
+          '💵 Encaisser ' + usd(f.reste_du_usd) + '</button>'
+        : '') +
+
+      '<button class="btn vide" style="margin-top:9px" onclick="imprimer(factureA4(' +
         e(JSON.stringify(pour)).replace(/'/g, '&#39;') + '),\'a4\')">' +
         '📄 Réimprimer en A4</button>');
   }).catch(function (err) {
@@ -2457,8 +2667,19 @@ function ouvrirFicheClient(clientId) {
           '<div class="l">$ à payer</div></div>' +
       '</div>';
 
+    /* Le solde dû mène à ses factures d'un seul geste. C'est le
+       parcours du client qui arrive au comptoir avec son argent :
+       sans ce raccourci, l'agent lit « solde dû », cherche le bouton
+       des factures plus bas, et le client attend. */
     if (Number(c.solde_du) > 0) {
-      h += bloc('Solde dû : ' + usd(c.solde_du), 'attention', '💰');
+      h += '<button class="mvt" style="width:100%;text-align:left" ' +
+        'onclick="ouvrirFactures(\'' + e(c.client_id) + '\',\'' +
+        e(String(c.nom_complet).replace(/'/g, '')) + '\')">' +
+        '<span class="pic" style="background:#FDECEA">💰</span>' +
+        '<span class="corps"><span class="t">Solde dû : ' + usd(c.solde_du) +
+        '</span><span class="s">Voir ses factures et encaisser</span></span>' +
+        '<span class="m" style="font-size:19px;color:var(--doux)">›</span>' +
+        '</button>';
     }
 
     h += '<button class="btn vide" onclick="ouvrirFactures(\'' + e(c.client_id) +
