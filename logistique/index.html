@@ -687,6 +687,27 @@ function puceStatut(code, libelle) {
   return '<span class="etat" style="background:' + couleurStatut(code) + '">' +
          e(libelle || libelleStatut(code)) + '</span>';
 }
+/**
+ * La date du jour au format que comprend <input type="date">.
+ *
+ * Construite sur l'heure locale, jamais avec toISOString() : celui-ci
+ * convertit en UTC, et à partir de 20 h en Haïti il renvoie déjà
+ * demain. Un champ « max » calculé comme ça laisserait choisir une date
+ * future que le serveur refuserait ensuite — on aurait proposé ce qu'on
+ * s'apprête à rejeter.
+ */
+function isoAujourdhui() {
+  var d = new Date();
+  var m = String(d.getMonth() + 1);
+  var j = String(d.getDate());
+  return d.getFullYear() + '-' + (m.length < 2 ? '0' + m : m) +
+         '-' + (j.length < 2 ? '0' + j : j);
+}
+
+function peutAntidater() {
+  return !!(Etat.user && Etat.user.droits && Etat.user.droits.antidater);
+}
+
 function villeAgence(id) {
   var a = (Etat.ref && Etat.ref.agences || []).filter(function (x) { return x.agence_id === id; })[0];
   return a ? a.ville : id;
@@ -1816,6 +1837,19 @@ function ouvrirReception(tracking) {
         'sa destination est le Cap.</span>' +
       '</label>' +
 
+    /* La date ne s'affiche que pour qui a le droit de l'écrire. Un champ
+       grisé pose quand même la question et invite à demander le droit ;
+       un champ absent ne pose rien. */
+    (peutAntidater()
+      ? '<label class="champ"><span>Date de réception ' +
+          '<span style="font-weight:400">— vide = aujourd\'hui</span></span>' +
+          '<input type="date" id="r-date" max="' + isoAujourdhui() + '">' +
+          '<span style="font-size:12px;color:var(--doux);font-weight:400;' +
+            'display:block;margin-top:5px">Pour un colis arrivé il y a quelques ' +
+            'jours et saisi seulement maintenant. C\'est cette date que le client ' +
+            'lit et sur laquelle se comptent les délais.</span></label>'
+      : '') +
+
     '<div id="r-res"></div>' +
     '<button class="btn vert" id="r-btn" onclick="validerReception()">Enregistrer</button>'
   );
@@ -1919,6 +1953,9 @@ function validerReception() {
   if (dest) p.agence_destination = dest;
   if (entree) p.agence_entree = entree;
 
+  var champDate = document.getElementById('r-date');
+  if (champDate && champDate.value) p.date_reception = champDate.value;
+
   var peutPrix = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
   var prixSaisi = document.getElementById('r-prix').value;
   var prixDef = String((Etat.ref && Etat.ref.parametres && Etat.ref.parametres.PRIX_LB_USD) || 5);
@@ -1948,6 +1985,9 @@ function validerReception() {
                'devra l\'attribuer avant qu\'il puisse être livré.',
                'attention', '🏷')
         : '') +
+      /* Dire la date retenue plutôt que de la taire : c'est le seul
+         moment où une erreur de saisie se repère sans effort. */
+      (d.antidate ? bloc(d.antidate_message, 'info', '📅') : '') +
       '<div class="carte"><div class="titre-section" style="margin-top:0">' +
         'Itinéraire prévu</div><div style="font-size:14px;font-weight:650">' +
         (d.route || []).map(e).join(' → ') + '</div>' +
@@ -2217,6 +2257,33 @@ function ouvrirDetail(tracking) {
                            prix_lb_usd: c.prix_lb_usd })).replace(/'/g, '&#39;') +
         ')">💲 Corriger poids et prix</button>';
     }
+    /* Changer la destination existait côté serveur depuis le début et
+       n'avait aucun bouton : le droit était déclaré, l'action écrite, et
+       personne ne pouvait l'atteindre. */
+    if (Etat.user && Etat.user.droits && Etat.user.droits.modifier_colis) {
+      h += '<button class="btn vide" onclick="ouvrirDestinationColis(' +
+        e(JSON.stringify({ tracking: c.tracking_number,
+                           destination: c.agence_destination,
+                           facture_id: c.facture_id || '' })).replace(/'/g, '&#39;') +
+        ')">📍 Changer la destination</button>';
+    }
+    if (peutAntidater()) {
+      h += '<button class="btn vide" onclick="ouvrirDateColis(' +
+        e(JSON.stringify({
+          tracking: c.tracking_number,
+          statut: c.statut,
+          rang_statut: c.rang_statut,
+          dates: {
+            date_recu_usa:           c.date_recu_usa || '',
+            date_transit_haiti:      c.date_transit_haiti || '',
+            date_arrive_haiti:       c.date_arrive_haiti || '',
+            date_transit_succursale: c.date_transit_succursale || '',
+            date_disponible:         c.date_disponible || '',
+            date_livraison:          c.date_livraison || ''
+          }
+        })).replace(/'/g, '&#39;') +
+        ')">📅 Corriger une date</button>';
+    }
     if (peutCorriger) {
       h += '<button class="btn rouge" onclick="ouvrirCorrection(\'' +
         e(c.tracking_number) + '\',\'' + e(c.statut) + '\')">' +
@@ -2252,6 +2319,175 @@ function majMontantPrix() {
   var p = Number(document.getElementById('p-poids').value) || 0;
   var pr = Number(document.getElementById('p-prix').value) || 0;
   document.getElementById('p-montant').textContent = usd(p * pr);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  DESTINATION — direction seulement
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * À la réception à Miami, la destination est souvent une supposition :
+ * le transitaire ne la donne pas, et sans client connu on dépose le
+ * colis sur l'agence de tri. Elle doit donc rester modifiable tant que
+ * le colis n'est ni facturé ni livré.
+ */
+function ouvrirDestinationColis(c) {
+  var agences = (Etat.ref && Etat.ref.agences || []).filter(function (a) {
+    /* Un entrepôt est une origine, jamais un point de retrait : aucun
+       client ne vient chercher son colis à Miami. Le serveur le refuse
+       déjà ; autant ne pas le proposer. */
+    return a.agence_id !== 'AG00' && String(a.type).trim() !== 'entrepot';
+  });
+
+  modale('Destination',
+    bloc('La destination décide quelle agence facture, qui peut remettre le ' +
+         'colis, et par quels camions il passe.', 'info', 'ℹ️') +
+    (c.facture_id
+      ? bloc('Ce colis est facturé (' + e(c.facture_id) + '). Le numéro de facture ' +
+             'porte le préfixe de l\'agence : il faut annuler la facture avant de ' +
+             'rerouter.', 'attention', '⚠️')
+      : '') +
+    '<label class="champ"><span>Nouvelle destination</span><select id="d-dest">' +
+      agences.map(function (a) {
+        return '<option value="' + e(a.agence_id) + '"' +
+               (a.agence_id === c.destination ? ' selected' : '') + '>' +
+               e(a.ville) + ' (' + e(a.agence_id) + ')</option>';
+      }).join('') + '</select></label>' +
+    '<div id="d-res"></div>' +
+    '<button class="btn vert" style="margin-top:12px" id="d-btn" ' +
+      'onclick="validerDestinationColis(\'' + e(c.tracking) + '\')">Enregistrer</button>');
+}
+
+function validerDestinationColis(tracking) {
+  var dest = document.getElementById('d-dest').value;
+  var res = document.getElementById('d-res');
+  var b = document.getElementById('d-btn');
+  if (!dest) { res.innerHTML = bloc('Choisis une destination.', 'ko', '⚠️'); return; }
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('colis_destination', { trackings: JSON.stringify([tracking]),
+                             agence_destination: dest })
+    .then(function (d) {
+      /* Le serveur répond en lot : un colis demandé peut revenir
+         « refusé » sans que l'appel échoue. Sans cette lecture, un refus
+         s'afficherait comme un succès. */
+      if (d.nb_refuses) {
+        b.disabled = false; b.textContent = 'Enregistrer';
+        res.innerHTML = bloc(d.refuses[0].erreur, 'ko', '❌');
+        return;
+      }
+      if (!d.nb_changes) {
+        b.disabled = false; b.textContent = 'Enregistrer';
+        res.innerHTML = bloc('Le colis est déjà destiné à ' + d.ville_destination + '.',
+                             'info', 'ℹ️');
+        return;
+      }
+      fermerModale();
+      bip();
+      toast('Destination : ' + d.ville_destination +
+            (d.changes[0] && d.changes[0].repasse_en_transit
+              ? ' — repassé en transit, il doit être réexpédié.' : '.'), 'ok');
+    })
+    .catch(function (err) {
+      b.disabled = false; b.textContent = 'Enregistrer';
+      res.innerHTML = bloc(err.message, 'ko', '❌');
+    });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  DATE D'UNE ÉTAPE — direction seulement
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Corriger la date d'une étape déjà franchie.
+ *
+ * Seules les étapes réellement atteintes sont proposées : dater une
+ * étape que le colis n'a pas passée écrirait qu'il y est passé.
+ */
+function ouvrirDateColis(c) {
+  var rang = Number(c.rang_statut || 0);
+  var etapes = (Etat.ref && Etat.ref.statuts || []).filter(function (s) {
+    var r = Number(s.rang);
+    return r >= 1 && r <= 6 && r <= rang;
+  });
+
+  if (!etapes.length) {
+    modale('Date', bloc('Aucune étape datée pour ce colis.', 'info', 'ℹ️'));
+    return;
+  }
+
+  modale('Corriger une date',
+    bloc('Pour un colis enregistré en retard. La correction elle-même reste ' +
+         'horodatée à maintenant dans l\'historique : on déplace la date du ' +
+         'colis, pas celle de la correction.', 'info', 'ℹ️') +
+    '<label class="champ"><span>Étape</span><select id="dt-etape" ' +
+      'onchange="majDateEtape()">' +
+      etapes.map(function (s) {
+        return '<option value="' + e(s.code) + '"' +
+               (s.code === c.statut ? ' selected' : '') + '>' +
+               e(s.libelle) + '</option>';
+      }).join('') + '</select></label>' +
+    '<label class="champ"><span>Date</span>' +
+      '<input type="date" id="dt-date" max="' + isoAujourdhui() + '"></label>' +
+    '<div id="dt-actuelle" style="font-size:12px;color:var(--doux);margin:-6px 0 12px"></div>' +
+    '<div id="dt-res"></div>' +
+    '<button class="btn vert" style="margin-top:12px" id="dt-btn" ' +
+      'onclick="validerDateColis(\'' + e(c.tracking) + '\')">Enregistrer</button>');
+
+  Dates = { colis: c.dates || {} };
+  majDateEtape();
+}
+
+var Dates = { colis: {} };
+
+var COLONNE_DATE = {
+  'recu_usa': 'date_recu_usa',
+  'transit_haiti': 'date_transit_haiti',
+  'arrive_haiti': 'date_arrive_haiti',
+  'transit_succursale': 'date_transit_succursale',
+  'disponible': 'date_disponible',
+  'livre': 'date_livraison'
+};
+
+function majDateEtape() {
+  var code = document.getElementById('dt-etape').value;
+  var brut = Dates.colis[COLONNE_DATE[code]];
+  var z = document.getElementById('dt-actuelle');
+  var champ = document.getElementById('dt-date');
+
+  if (brut) {
+    var iso = String(brut).slice(0, 10);
+    champ.value = iso;
+    z.textContent = 'Actuellement : ' + dateCourte(brut);
+  } else {
+    champ.value = '';
+    z.textContent = 'Aucune date enregistrée pour cette étape.';
+  }
+}
+
+function validerDateColis(tracking) {
+  var res = document.getElementById('dt-res');
+  var b = document.getElementById('dt-btn');
+  var d = document.getElementById('dt-date').value;
+  if (!d) { res.innerHTML = bloc('Choisis une date.', 'ko', '⚠️'); return; }
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('colis_dater', { tracking: tracking,
+                       statut: document.getElementById('dt-etape').value,
+                       date: d })
+    .then(function (r) {
+      fermerModale();
+      bip();
+      toast(r.message, 'ok');
+    })
+    .catch(function (err) {
+      b.disabled = false; b.textContent = 'Enregistrer';
+      res.innerHTML = bloc(err.message, 'ko', '❌');
+    });
 }
 
 function validerPrix(tracking) {
