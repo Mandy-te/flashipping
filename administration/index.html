@@ -2289,11 +2289,26 @@ function ouvrirRattachement(id) {
   var c = r.concordance || {};
   var h = '';
 
-  if (!r.vise) {
-    h += bloc('Le numéro de suivi fourni ne mène à aucun dossier. ' +
-              'Rien à approuver ici — refuse la demande, ou relie le ' +
-              'compte à la main depuis la fiche client si tu sais qui ' +
-              'c\'est.', 'attention', '⛔');
+  /* Trois situations très différentes se cachaient derrière un seul
+     message. Les séparer, c'est la moitié du correctif : le cas le plus
+     fréquent — un colis arrivé sans nom — n'est pas une impasse, c'est
+     une attribution. */
+  var anonyme = !r.vise && r.preuve && r.preuve.existe && r.preuve.anonyme;
+
+  if (anonyme) {
+    h += bloc('Ce colis est arrivé sans nom de destinataire : il n\'appartient ' +
+              'encore à personne. Il n\'y a donc pas d\'historique à rattacher — ' +
+              'mais si cette personne est bien la destinataire, tu peux lui ' +
+              'donner le colis ci-dessous.', 'info', '📦');
+  } else if (!r.vise && r.preuve && r.preuve.existe) {
+    h += bloc('Le colis existe mais appartient déjà à un autre dossier que ' +
+              'celui-ci. Rien à approuver ici — vérifie avec la personne avant ' +
+              'de refuser.', 'attention', '⛔');
+  } else if (!r.vise) {
+    h += bloc('Aucun colis ne porte ce numéro de suivi. Faute de frappe, ou ' +
+              'colis pas encore scanné à Miami. Refuse la demande, ou relie le ' +
+              'compte à la main depuis la fiche client si tu sais qui c\'est.',
+              'attention', '⛔');
   }
 
   h += '<div style="display:flex;gap:10px;padding:4px 0 6px;' +
@@ -2336,6 +2351,13 @@ function ouvrirRattachement(id) {
        '(obligatoire pour un refus)</span>' +
        '<input type="text" id="ratt-motif" placeholder="Confirmé par téléphone"></label>';
 
+  if (anonyme && !r.preuve.deja_livre) {
+    h += '<button class="btn vert" style="margin-top:10px" ' +
+      'onclick="deciderRattachement(\'' + e(r.demande_id) + '\',\'attribuer\')">' +
+      '📦 Donner ce colis à ' + e((r.declare.nom || '').split(' ')[0] || 'ce compte') +
+      '</button>';
+  }
+
   h += '<div style="display:flex;gap:8px;margin-top:10px">' +
     (r.vise
       ? '<button class="btn vert" style="flex:1" onclick="deciderRattachement(\'' +
@@ -2362,7 +2384,9 @@ function deciderRattachement(id, decision) {
       { demande_id: id, decision: decision, motif: motif })
   .then(function (d) {
     fermerModale();
-    if (d.statut === 'approuvee') {
+    if (d.mode === 'attribution') {
+      toast(d.message || 'Colis attribué.');
+    } else if (d.statut === 'approuvee') {
       toast('Relié à ' + (d.code_client || d.client_id) +
             (d.colis_deplaces ? ' · ' + d.colis_deplaces + ' colis repris' : ''));
     } else {
