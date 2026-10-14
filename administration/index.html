@@ -962,6 +962,7 @@ function ongletClients() {
     (peutCreerClient()
       ? '<button class="btn" onclick="ouvrirNouveauClient()">➕ Nouveau client</button>'
       : '') +
+    '<div id="cli-doublons"></div>' +
     '<div class="filtres">' +
       '<input type="search" id="cli-q" placeholder="Nom, téléphone ou tracking…" ' +
         'value="' + e(Cli.q) + '" autocomplete="off" ' +
@@ -972,6 +973,120 @@ function ongletClients() {
     '<div id="cli-corps">' + chargement() + '</div>'
   );
   if (Cli.q) rendreResultats(); else listerClients();
+  chercherDoublons();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  DOUBLONS — deux fiches pour une personne
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Un bandeau, pas un onglet.
+ *
+ * Les doublons ne sont pas un sujet permanent : ils apparaissent, on
+ * les règle, ils disparaissent. Un sixième onglet resterait vide la
+ * plupart du temps et finirait par ne plus être ouvert — donc par ne
+ * plus être regardé le jour où il compte. Le bandeau, lui, ne
+ * s'affiche que s'il y a quelque chose à faire.
+ */
+function chercherDoublons() {
+  api('admin_doublons', {}).then(function (d) {
+    var z = document.getElementById('cli-doublons');
+    if (!z) return;
+    Doublons.groupes = d.groupes || [];
+    if (!d.nb) { z.innerHTML = ''; return; }
+
+    z.innerHTML = '<div class="msg attention" style="margin-bottom:12px">' +
+      '<span class="ic">👥</span><span>' + d.nb +
+      (d.nb > 1 ? ' groupes de fiches se ressemblent' : ' groupe de fiches se ressemble') +
+      '. <a href="#" onclick="ouvrirDoublons();return false"><b>Regarder</b></a></span></div>';
+  }).catch(function () { /* un bandeau absent ne casse pas l'écran */ });
+}
+
+var Doublons = { groupes: [] };
+
+function ouvrirDoublons() {
+  var h = bloc('Deux fiches pour une même personne, c\'est un historique ' +
+               'coupé en deux : ses colis d\'un côté, ses factures de l\'autre. ' +
+               'Fusionner les réunit.', 'info', 'ℹ️');
+
+  Doublons.groupes.forEach(function (g, i) {
+    h += '<div class="titre-section">Groupe ' + (i + 1) + ' — ' + e(g.motif) + '</div>';
+    g.fiches.forEach(function (f) {
+      h += '<div class="ligne serree"><div class="corps">' +
+        '<div class="t1">' + e(f.nom_complet) + ' <span style="color:var(--doux)">' +
+          e(f.code_client) + '</span></div>' +
+        '<div class="t2">' + e(f.telephone || 'sans téléphone') +
+          ' · ' + f.nb_colis + ' colis · ' + f.nb_factures + ' facture(s)' +
+          ' · ' + f.nb_comptes + ' compte(s) web' +
+          (f.total_references ? '' : ' · jamais servi') +
+        '</div>' +
+        (f.note ? '<div class="t2" style="font-style:italic">' + e(f.note) + '</div>' : '') +
+        '</div></div>';
+    });
+
+    if (g.fiches.length === 2 && estFondateur()) {
+      var a = g.fiches[0], b = g.fiches[1];
+      /* On propose de garder celle qui porte le plus d'histoire : c'est
+         elle qui a le plus à perdre à être absorbée, et la fusion ne se
+         défait pas. */
+      var garder = a.total_references >= b.total_references ? a : b;
+      var absorber = garder === a ? b : a;
+
+      h += '<button class="btn" style="margin-top:8px" onclick="confirmerFusion(' +
+        e(JSON.stringify({ garder: garder, absorber: absorber })).replace(/'/g, '&#39;') +
+        ')">🔗 Garder ' + e(garder.code_client) + ', y fusionner ' +
+        e(absorber.code_client) + '</button>';
+      h += '<button class="btn vide petit" onclick="confirmerFusion(' +
+        e(JSON.stringify({ garder: absorber, absorber: garder })).replace(/'/g, '&#39;') +
+        ')">Inverser : garder ' + e(absorber.code_client) + '</button>';
+    } else if (g.fiches.length > 2) {
+      h += bloc('Plus de deux fiches : fusionne-les deux par deux.', 'attention', '⚠️');
+    }
+  });
+
+  modale('Fiches qui se ressemblent', h);
+}
+
+function confirmerFusion(c) {
+  modale('Fusionner',
+    bloc('Tout ce que porte ' + e(c.absorber.code_client) + ' passe sur ' +
+         e(c.garder.code_client) + ' : colis, factures, commandes, compte web, ' +
+         'solde dû. La fiche absorbée est désactivée, jamais effacée — mais ' +
+         'la fusion ne se défait pas.', 'attention', '⚠️') +
+    '<div class="total"><span class="l">On garde</span><span>' +
+      e(c.garder.code_client) + ' · ' + e(c.garder.nom_complet) + '</span></div>' +
+    '<div class="total"><span class="l">On absorbe</span><span>' +
+      e(c.absorber.code_client) + ' · ' + e(c.absorber.nom_complet) + '</span></div>' +
+    '<div class="total"><span class="l">Colis déplacés</span><span>' +
+      c.absorber.nb_colis + '</span></div>' +
+    '<div id="fus-res"></div>' +
+    '<button class="btn vert" style="margin-top:12px" id="fus-btn" ' +
+      'onclick="lancerFusion(\'' + e(c.garder.client_id) + '\',\'' +
+      e(c.absorber.client_id) + '\')">Fusionner</button>');
+}
+
+function lancerFusion(garder, absorber) {
+  var b = document.getElementById('fus-btn');
+  var res = document.getElementById('fus-res');
+  b.disabled = true; b.textContent = 'Fusion…';
+
+  api('admin_client_fusionner', { garder: garder, absorber: absorber })
+    .then(function (d) {
+      fermerModale();
+      toast(d.message, 'ok');
+      Cli.depuis = 0;
+      ongletClients();
+    })
+    .catch(function (err) {
+      b.disabled = false; b.textContent = 'Fusionner';
+      res.innerHTML = bloc(err.message, 'ko', '❌');
+    });
+}
+
+function estFondateur() {
+  return !!(Etat.user && Etat.user.droits && Etat.user.droits.administrer);
 }
 
 function listerClients() {
@@ -1145,11 +1260,139 @@ function rendreDossier(d) {
     });
   }
 
+  /* Le compte du site, à côté du dossier qu'il ouvre. On le montre même
+     quand il n'y en a pas : savoir qu'un client n'a pas de compte est
+     une information, pas un vide. */
+  if (!c.systeme) {
+    var cw = d.compte_web;
+    h += '<div class="titre-section">Compte sur le site</div>';
+    if (!cw) {
+      h += '<div class="aide">Aucun compte. Ce client ne suit pas ses colis ' +
+           'en ligne.</div>';
+    } else {
+      h += '<div class="carte serree" style="margin-bottom:10px">' +
+        '<div style="font-weight:700">' + e(cw.identifiant) +
+          (cw.statut !== 'actif'
+            ? ' <span class="etiq">' + e(cw.statut) + '</span>' : '') + '</div>' +
+        '<div style="font-size:12.5px;color:var(--doux);margin-top:3px">' +
+          e(cw.compte_id) +
+          (cw.derniere_connexion
+            ? ' · dernière connexion ' + e(dateCourte(cw.derniere_connexion))
+            : ' · jamais connecté') + '</div>' +
+        '</div>';
+
+      if (d.peut_bloquer_compte) {
+        h += cw.statut === 'bloque'
+          ? '<button class="btn vide" onclick="ouvrirStatutCompteWeb(' +
+            e(JSON.stringify({ compte_id: cw.compte_id, identifiant: cw.identifiant,
+                               vers: 'actif' })).replace(/'/g, '&#39;') +
+            ')">🔓 Rouvrir l\'accès</button>'
+          : '<button class="btn rouge vide" onclick="ouvrirStatutCompteWeb(' +
+            e(JSON.stringify({ compte_id: cw.compte_id, identifiant: cw.identifiant,
+                               vers: 'bloque' })).replace(/'/g, '&#39;') +
+            ')">🔒 Bloquer l\'accès au site</button>';
+      }
+    }
+  }
+
   if (d.peut_modifier && !c.systeme) {
     h += '<button class="btn" onclick="ouvrirEditionClient()">✏️ Modifier la fiche</button>';
   }
 
+  /* La suppression n'est proposée qu'au fondateur, et le serveur la
+     refuse de toute façon dès qu'un colis, une facture ou un compte web
+     pointe sur la fiche. On laisse le bouton visible pour que le refus
+     explique pourquoi : un bouton caché laisse croire que l'opération
+     n'existe pas, et on la cherche ailleurs — dans le classeur. */
+  if (estFondateur() && !c.systeme) {
+    h += '<button class="btn rouge vide" onclick="confirmerSuppressionClient(' +
+      e(JSON.stringify({ client_id: c.client_id, code: c.code_client,
+                         nom: c.nom_complet })).replace(/'/g, '&#39;') +
+      ')">🗑 Supprimer cette fiche</button>';
+  }
+
   return h;
+}
+
+function ouvrirStatutCompteWeb(c) {
+  var bloquer = c.vers === 'bloque';
+  modale(bloquer ? 'Bloquer l\'accès' : 'Rouvrir l\'accès',
+    bloc(bloquer
+      ? 'La personne ne pourra plus se connecter, immédiatement, même si ' +
+        'elle a une session ouverte. Ses colis, ses factures et son dossier ' +
+        'ne bougent pas : on lui retire l\'accès, pas son histoire. ' +
+        'Ça se défait.'
+      : 'La personne pourra se reconnecter avec son mot de passe habituel.',
+      bloquer ? 'attention' : 'info', bloquer ? '🔒' : '🔓') +
+    '<div class="total"><span class="l">Compte</span><span>' +
+      e(c.identifiant) + '</span></div>' +
+    (bloquer
+      ? '<label class="champ" style="margin-top:10px"><span>Motif ' +
+        '(obligatoire)</span><input type="text" id="cw-motif" ' +
+        'placeholder="Impayés répétés, usurpation…"></label>'
+      : '') +
+    '<div id="cw-res"></div>' +
+    '<button class="btn ' + (bloquer ? 'rouge' : 'vert') + '" style="margin-top:12px" ' +
+      'id="cw-btn" onclick="lancerStatutCompteWeb(\'' + e(c.compte_id) + '\',\'' +
+      e(c.vers) + '\')">' + (bloquer ? 'Bloquer' : 'Rouvrir') + '</button>');
+}
+
+function lancerStatutCompteWeb(id, vers) {
+  var champ = document.getElementById('cw-motif');
+  var motif = champ ? champ.value.trim() : '';
+  var res = document.getElementById('cw-res');
+  var b = document.getElementById('cw-btn');
+
+  if (vers === 'bloque' && !motif) {
+    res.innerHTML = bloc('Dis pourquoi — le journal devra répondre à ta ' +
+                         'place dans six mois.', 'ko', '⚠️');
+    return;
+  }
+
+  b.disabled = true; b.textContent = '…';
+
+  api('admin_compte_web_statut', { compte_id: id, statut: vers, motif: motif })
+    .then(function (d) {
+      fermerModale();
+      toast(d.message, 'ok');
+      if (Cli.dossier && Cli.dossier.client) ouvrirDossier(Cli.dossier.client.client_id);
+    })
+    .catch(function (err) {
+      b.disabled = false; b.textContent = vers === 'bloque' ? 'Bloquer' : 'Rouvrir';
+      res.innerHTML = bloc(err.message, 'ko', '❌');
+    });
+}
+
+function confirmerSuppressionClient(c) {
+  modale('Supprimer la fiche',
+    bloc('La suppression n\'est possible que si cette fiche n\'a jamais servi : ' +
+         'aucun colis, aucune facture, aucune commande, aucun compte web. ' +
+         'Sinon c\'est une fusion qu\'il faut faire, pas un effacement — ' +
+         'supprimer laisserait les colis pointer sur une fiche disparue.',
+         'attention', '⚠️') +
+    '<div class="total"><span class="l">Fiche</span><span>' +
+      e(c.code || c.client_id) + ' · ' + e(c.nom || '') + '</span></div>' +
+    '<div id="sup-res"></div>' +
+    '<button class="btn rouge" style="margin-top:12px" id="sup-btn" ' +
+      'onclick="lancerSuppressionClient(\'' + e(c.client_id) + '\')">Supprimer</button>');
+}
+
+function lancerSuppressionClient(id) {
+  var b = document.getElementById('sup-btn');
+  var res = document.getElementById('sup-res');
+  b.disabled = true; b.textContent = 'Suppression…';
+
+  api('admin_client_supprimer', { client_id: id })
+    .then(function (d) {
+      fermerModale();
+      toast(d.message, 'ok');
+      Cli.dossier = null; Cli.depuis = 0;
+      ongletClients();
+    })
+    .catch(function (err) {
+      b.disabled = false; b.textContent = 'Supprimer';
+      res.innerHTML = bloc(err.message, 'ko', '❌');
+    });
 }
 
 /** Une carte de colis qui répond sans qu'on ait à cliquer. */
