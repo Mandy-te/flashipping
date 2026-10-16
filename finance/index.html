@@ -621,9 +621,23 @@ function court(v) {
   return s + n0(n);
 }
 
+/**
+ * « 2026-09-30 » tout seul se lit en UTC, et minuit UTC tombe la veille
+ * au soir aux Turques-et-Caïques comme en Haïti. Affichée telle quelle,
+ * une clôture du 30 septembre s'écrivait « 29/09/2026 » — et chaque
+ * date de colis, de dépense ou de journal reculait d'un jour avec elle.
+ *
+ * Le serveur évite déjà ce piège dans versDate_ ; il fallait l'éviter
+ * ici aussi. Les formes qui portent une heure viennent de Sheets avec
+ * leur fuseau : elles gardent le comportement normal.
+ */
+function jourLocal_(d) {
+  var j = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(d).trim());
+  return j ? new Date(Number(j[1]), Number(j[2]) - 1, Number(j[3])) : new Date(d);
+}
 function dateCourte(d) {
   if (!d) return '';
-  var x = new Date(d);
+  var x = jourLocal_(d);
   if (isNaN(x)) return String(d).substring(0, 10);
   return ('0' + x.getDate()).slice(-2) + '/' + ('0' + (x.getMonth() + 1)).slice(-2) +
          '/' + x.getFullYear();
@@ -1056,6 +1070,9 @@ function ouvrirEtats() {
           htg(b.passif.dettes_gdes) + '</span></div>' +
         '<div class="total"><span class="l">Capitaux propres</span><span>' +
           htg(b.passif.capitaux_propres_gdes) + '</span></div>' +
+        (b.passif.ecart_heritage_gdes
+          ? '<div class="ligne"><span class="l">Correction exercice antérieur</span>' +
+            '<span>' + htg(b.passif.ecart_heritage_gdes) + '</span></div>' : '') +
         '<div class="total gros"><span class="l">Total passif</span><span>' +
           htg(b.passif.total_gdes) + '</span></div>' +
         (b.equilibre
@@ -1999,6 +2016,10 @@ function docRapport(r, f) {
         '</tfoot></table></div>' +
       '</div>';
 
+    if (f.bilan.passif.ecart_heritage_gdes) {
+      h += '<div class="doc-ligne"><span>Correction exercice antérieur</span>' +
+           '<span>' + htg(f.bilan.passif.ecart_heritage_gdes) + '</span></div>';
+    }
     h += f.bilan.equilibre
       ? '<div class="doc-ok">Bilan équilibré.</div>'
       : '<div class="doc-alerte">Bilan déséquilibré de ' +
@@ -2117,7 +2138,8 @@ function ongletAssocies() {
 
       h += '<button class="btn" style="margin-top:12px" onclick="ouvrirNouvelAssocie()">' +
         '➕ Faire entrer un associé</button>' +
-        '<button class="btn vide" onclick="ouvrirAppelFonds()">💰 Appel de fonds</button>';
+        '<button class="btn vide" onclick="ouvrirAppelFonds()">💰 Appel de fonds</button>' +
+        '<button class="btn vide" onclick="ouvrirEquilibrage()">⚖️ Équilibrage du capital</button>';
 
       poser(h);
     }).catch(function (err) { poser(bloc(err.message, 'ko', '❌')); });
@@ -2406,6 +2428,135 @@ function validerEntreeAssocie() {
   });
 }
 
+
+
+// ── Équilibrage du capital entre associés ─────────────────────────
+//
+// Un associé détient une part statutaire mais n'a pas forcément
+// financé à sa hauteur. L'écart ne se règle pas avec l'entreprise —
+// sa caisse est pleine — mais avec les associés qui ont payé à sa
+// place. Cet écran dit qui doit quoi à qui, et enregistre le
+// rattrapage, entier ou partiel.
+
+function ouvrirEquilibrage() {
+  modale('Équilibrage du capital', chargement());
+
+  api('equilibrage').then(function (d) {
+    var peutSaisir = Etat.user && Etat.user.droits && Etat.user.droits.saisir_finance;
+    var h = bloc(d.note, d.equilibre ? 'ok' : 'attention', d.equilibre ? '✅' : '⚖️');
+
+    h += '<div class="stats" style="margin:14px 0">' +
+      '<div class="stat"><div class="v">' + court(d.base_gdes) +
+        '</div><div class="l">comptes courants</div></div>' +
+      '<div class="stat"><div class="v" style="color:' +
+        (d.equilibre ? 'var(--vert)' : 'var(--orange)') + '">' +
+        court(d.total_a_rattraper_gdes) + '</div>' +
+        '<div class="l">à rattraper</div></div>' +
+      '</div>';
+
+    h += (d.lignes || []).map(function (l) {
+      var retard = l.ecart_gdes < -0.01;
+      var avance = l.ecart_gdes > 0.01;
+      var couleur = retard ? 'var(--rouge)' : (avance ? 'var(--vert)' : 'var(--doux)');
+
+      var c = '<div class="carte serree" style="margin-bottom:9px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+          '<b>' + e(l.nom) + '</b>' +
+          '<span style="font-weight:800;color:' + couleur + '">' +
+            (l.ecart_gdes > 0 ? '+' : '') + htg(l.ecart_gdes) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--doux);margin-top:4px">' +
+          'finance ' + n2(l.part_financement_pct) + ' % · détient ' +
+          n2(l.part_statutaire_pct) + ' % · ' + htg(l.compte_courant_gdes) +
+          ' sur ' + htg(l.cible_gdes) + '</div>';
+
+      if (l.doit_a.length) {
+        c += '<div style="margin-top:8px;font-size:13px">' +
+          '<div style="color:var(--doux);margin-bottom:4px">Doit à :</div>' +
+          l.doit_a.map(function (x) {
+            return '<div style="display:flex;justify-content:space-between;' +
+              'padding:3px 0"><span>' + e(x.nom) + '</span><b>' +
+              htg(x.montant_gdes) + '</b></div>';
+          }).join('') + '</div>';
+
+        if (peutSaisir) {
+          c += '<button class="btn" style="margin-top:10px" onclick="ouvrirVersement(\'' +
+            l.associe_id + '\',\'' + e(l.nom).replace(/'/g, "\\'") + '\',' +
+            (-l.ecart_gdes) + ')">💸 Enregistrer un versement</button>';
+        }
+      } else if (l.recoit_de.length) {
+        c += '<div style="margin-top:8px;font-size:13px">' +
+          '<div style="color:var(--doux);margin-bottom:4px">Doit recevoir de :</div>' +
+          l.recoit_de.map(function (x) {
+            return '<div style="display:flex;justify-content:space-between;' +
+              'padding:3px 0"><span>' + e(x.nom) + '</span><b>' +
+              htg(x.montant_gdes) + '</b></div>';
+          }).join('') + '</div>';
+      }
+
+      return c + '</div>';
+    }).join('');
+
+    h += '<div style="font-size:12px;color:var(--doux);margin-top:10px">' +
+      'Ces montants circulent entre associés. La caisse de l\'entreprise ' +
+      'ne bouge pas : ni revenu, ni dépense.</div>';
+
+    majModale('Équilibrage du capital', h);
+  }).catch(function (err) {
+    majModale('Équilibrage du capital', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function ouvrirVersement(id, nom, du) {
+  majModale('Versement de ' + nom,
+    '<div class="champ"><label>Montant versé</label>' +
+      '<input id="eqMontant" type="number" step="0.01" inputmode="decimal" ' +
+        'value="' + Number(du).toFixed(2) + '"></div>' +
+    '<div class="champ"><label>Devise</label>' +
+      '<select id="eqDevise"><option>Gourdes</option><option>USD</option></select></div>' +
+    '<div class="champ"><label>Date</label>' +
+      '<input id="eqDate" type="date" value="' + aujourdhui() + '"></div>' +
+    '<div class="champ"><label>Mode de paiement</label>' +
+      '<select id="eqMode"><option>Especes</option><option>Natcash</option>' +
+        '<option>MonCash</option><option>Virement</option></select></div>' +
+    '<div class="champ"><label>Remarque (facultatif)</label>' +
+      '<input id="eqNote" type="text" placeholder="contexte, accord…"></div>' +
+    bloc('Un versement partiel est accepté : il sera réparti entre les ' +
+         'associés qui ont avancé, au prorata de ce que chacun a avancé. ' +
+         'Dû au total : ' + htg(du) + '.', 'info', 'ℹ️') +
+    '<button class="btn" onclick="lancerVersement(\'' + id + '\')">' +
+      '✅ Enregistrer</button>' +
+    '<button class="btn vide" onclick="ouvrirEquilibrage()">Annuler</button>');
+}
+
+function lancerVersement(id) {
+  var montant = Number(document.getElementById('eqMontant').value);
+  if (!montant || montant <= 0) { toast('Montant requis.', 'ko'); return; }
+
+  majModale('Versement', chargement('Écriture des deux côtés…'));
+
+  api('equilibrage_verser', {
+    associe_id: id,
+    montant_saisi: montant,
+    devise_saisie: document.getElementById('eqDevise').value,
+    date: document.getElementById('eqDate').value,
+    mode_paiement: document.getElementById('eqMode').value,
+    note: document.getElementById('eqNote').value
+  }).then(function (r) {
+    var h = bloc(r.message, r.solde ? 'ok' : 'attention', r.solde ? '✅' : '⏳');
+    h += '<div style="margin-top:12px">' + r.repartition.map(function (x) {
+      return '<div style="display:flex;justify-content:space-between;padding:4px 0">' +
+        '<span>' + e(x.nom) + '</span><b>' + htg(x.montant_gdes) + '</b></div>';
+    }).join('') + '</div>';
+    h += '<div style="font-size:12px;color:var(--doux);margin-top:8px">' +
+      r.nb_lignes + ' écritures, référence ' + e(r.reference) + '.</div>';
+    h += '<button class="btn" style="margin-top:12px" onclick="ouvrirEquilibrage()">' +
+      'Revoir l\'équilibrage</button>';
+    majModale('Versement enregistré', h);
+  }).catch(function (err) {
+    majModale('Versement', bloc(err.message, 'ko', '❌') +
+      '<button class="btn vide" onclick="ouvrirEquilibrage()">Retour</button>');
+  });
+}
 
 // ── Appel de fonds ────────────────────────────────────────────────
 
@@ -2860,7 +3011,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-07.6';
+var VERSION_ATTENDUE = '2026-10-07.8';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
