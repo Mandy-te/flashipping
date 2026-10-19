@@ -241,6 +241,26 @@ textarea{min-height:68px;resize:vertical}
   border:2.5px solid var(--or);border-radius:9px;
   box-shadow:0 0 0 2000px rgba(0,0,0,.28);
 }
+/* Torche et zoom, posés sur l'image : le pouce les atteint sans
+   quitter le colis des yeux. */
+.outils-cam{
+  position:absolute;right:10px;bottom:10px;
+  display:flex;flex-direction:column;gap:8px;
+}
+/* Cases à cocher des frais : cible large, le doigt d'un agent qui
+   tient un colis de l'autre main ne vise pas une case de 14 px. */
+.case{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 2px;font-size:15px;cursor:pointer;
+}
+.case input{width:20px;height:20px;flex:none}
+.pastille{
+  width:44px;height:44px;border-radius:50%;border:none;
+  background:rgba(0,0,0,.55);color:#fff;font-size:20px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;backdrop-filter:blur(3px);
+}
+.pastille.on{background:var(--or);color:#13243f}
 .saisie-scan{
   display:flex;gap:8px;
 }
@@ -655,9 +675,22 @@ function n0(v) { return Math.round(Number(v) || 0).toLocaleString('fr-FR'); }
 function usd(v) { return n2(v) + ' $'; }
 function htg(v) { return n0(v) + ' HTG'; }
 
+/**
+ * « 2026-09-30 » tout seul se lit en UTC, et minuit UTC tombe la veille
+ * au soir aux Turques-et-Caïques comme en Haïti. Affichée telle quelle,
+ * chaque date de colis, de dépense ou de journal reculait d'un jour.
+ *
+ * Le serveur évite déjà ce piège dans versDate_ ; il fallait l'éviter
+ * ici aussi. Les formes qui portent une heure viennent de Sheets avec
+ * leur fuseau : elles gardent le comportement normal.
+ */
+function jourLocal_(d) {
+  var j = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(d).trim());
+  return j ? new Date(Number(j[1]), Number(j[2]) - 1, Number(j[3])) : new Date(d);
+}
 function dateCourte(d) {
   if (!d) return '';
-  var x = new Date(d);
+  var x = jourLocal_(d);
   if (isNaN(x)) return String(d).substring(0, 16);
   var auj = new Date();
   var memeJour = x.toDateString() === auj.toDateString();
@@ -1298,7 +1331,9 @@ function changerUrl() {
 // ═══════════════════════════════════════════════════════════════════
 
 var Cam = { flux: null, detecteur: null, boucle: null, dernier: '', quand: 0,
-            pause: false };
+            pause: false, enCours: false,
+            torche: false, torcheDispo: false,
+            zoom: 1, zoomDispo: false, zoomMin: 1, zoomMax: 1 };
 var ModeRafale = false;
 var Rafale = [];
 
@@ -1320,6 +1355,19 @@ function ongletScan() {
   poser(
     '<div class="cadre-scan" id="zone-cam" style="display:none">' +
       '<video id="flux" playsinline muted></video><div class="viseur"></div>' +
+      /* Torche et zoom ne s'affichent que si l'appareil les expose :
+         un bouton qui ne fait rien use la confiance de l'agent. */
+      (Cam.flux && (Cam.torcheDispo || Cam.zoomDispo)
+        ? '<div class="outils-cam">' +
+            (Cam.torcheDispo
+              ? '<button class="pastille' + (Cam.torche ? ' on' : '') +
+                '" onclick="basculerTorche()">🔦</button>' : '') +
+            (Cam.zoomDispo
+              ? '<button class="pastille' +
+                (Cam.zoom > Cam.zoomMin ? ' on' : '') +
+                '" onclick="basculerZoom()">🔍</button>' : '') +
+          '</div>'
+        : '') +
     '</div>' +
     '<div class="carte serree">' +
       '<div class="saisie-scan">' +
@@ -1690,15 +1738,97 @@ function demarrerCamera() {
     toast('Caméra indisponible sur cet appareil.', 'ko');
     return;
   }
+  /* Pourquoi 1920 et pas 1280.
+     Un code 128 d'étiquette Amazon fait une trentaine de barres sur
+     deux centimètres. En 720p, chaque barre tombe sur un pixel et
+     demi : au moindre flou elles fusionnent et le code devient
+     illisible. L'appareil photo du téléphone, lui, travaille en pleine
+     résolution — d'où un code qu'il voit et que l'app ne voit pas. */
   navigator.mediaDevices.getUserMedia({
     video: { facingMode: { ideal: 'environment' },
-             width: { ideal: 1280 }, height: { ideal: 720 } }
+             width:  { ideal: 1920, min: 1280 },
+             height: { ideal: 1080, min: 720 },
+             /* LA correction principale. Sans mise au point continue,
+                la caméra reste fixée sur l'infini et le code à vingt
+                centimètres ne sera JAMAIS net. C'est ce seul réglage
+                qui sépare « code-barres invisible » d'une lecture
+                immédiate. Non normalisé, donc passé en advanced pour
+                qu'un navigateur qui l'ignore n'échoue pas. */
+             advanced: [{ focusMode: 'continuous' }] }
   }).then(function (flux) {
     Cam.flux = flux;
+    reglerCapacites_(flux);
     rendreOnglet();
   }).catch(function () {
     toast('Accès à la caméra refusé.', 'ko');
   });
+}
+
+/**
+ * Ce que l'appareil sait faire, une fois le flux ouvert.
+ *
+ * Les capacités ne sont connues qu'après coup, jamais avant. On
+ * applique la mise au point continue une seconde fois ici : sur
+ * plusieurs Android, la contrainte passée à getUserMedia est acceptée
+ * sans effet, alors qu'appliquée sur la piste elle fonctionne.
+ */
+function reglerCapacites_(flux) {
+  var piste = flux.getVideoTracks()[0];
+  if (!piste || !piste.getCapabilities) return;
+
+  var cap = {};
+  try { cap = piste.getCapabilities() || {}; } catch (e) { return; }
+
+  Cam.torcheDispo = !!cap.torch;
+  Cam.zoomDispo = !!(cap.zoom && cap.zoom.max > cap.zoom.min);
+  Cam.zoomMin = Cam.zoomDispo ? cap.zoom.min : 1;
+  Cam.zoomMax = Cam.zoomDispo ? cap.zoom.max : 1;
+
+  var reglages = [];
+  if (cap.focusMode && cap.focusMode.indexOf('continuous') !== -1) {
+    reglages.push({ focusMode: 'continuous' });
+  }
+  if (reglages.length) {
+    piste.applyConstraints({ advanced: reglages }).catch(function () {});
+  }
+}
+
+/** La torche : décisive dans un dépôt mal éclairé ou un carton sombre. */
+function basculerTorche() {
+  if (!Cam.flux || !Cam.torcheDispo) {
+    toast('Cet appareil n\'expose pas sa torche.', 'ko');
+    return;
+  }
+  var piste = Cam.flux.getVideoTracks()[0];
+  Cam.torche = !Cam.torche;
+  piste.applyConstraints({ advanced: [{ torch: Cam.torche }] })
+    .then(function () { rendreOnglet(); })
+    .catch(function () {
+      Cam.torche = false;
+      toast('Torche indisponible pendant la lecture.', 'ko');
+    });
+}
+
+/**
+ * Le zoom rapproche sans bouger le téléphone.
+ *
+ * Un code imprimé petit occupe plus de pixels zoomé qu'approché : en
+ * s'approchant on passe sous la distance minimale de mise au point et
+ * tout redevient flou. Deux crans suffisent en pratique.
+ */
+function basculerZoom() {
+  if (!Cam.flux || !Cam.zoomDispo) {
+    toast('Cet appareil n\'expose pas son zoom.', 'ko');
+    return;
+  }
+  var piste = Cam.flux.getVideoTracks()[0];
+  var cible = Cam.zoom && Cam.zoom > Cam.zoomMin
+    ? Cam.zoomMin
+    : Math.min(Cam.zoomMin * 2, Cam.zoomMax);
+
+  piste.applyConstraints({ advanced: [{ zoom: cible }] })
+    .then(function () { Cam.zoom = cible; rendreOnglet(); })
+    .catch(function () { toast('Zoom refusé par l\'appareil.', 'ko'); });
 }
 
 function brancherFlux() {
@@ -1718,19 +1848,36 @@ function brancherFlux() {
     } catch (e) { return; }
   }
 
-  // 300 ms suffisent : au-delà le téléphone chauffe pour rien
+  /* 120 ms au lieu de 300 : la lecture paraissait lente parce qu'on
+     ne regardait l'image que trois fois par seconde. Le garde
+     `Cam.enCours` empêche les appels de s'empiler quand une détection
+     dure plus longtemps que l'intervalle — c'est ce qui faisait
+     chauffer le téléphone et ralentissait tout le reste. */
   Cam.boucle = setInterval(function () {
-    if (!Cam.flux || Cam.pause || v.readyState < 2) return;
+    if (!Cam.flux || Cam.pause || Cam.enCours || v.readyState < 2) return;
+
+    Cam.enCours = true;
     Cam.detecteur.detect(v).then(function (codes) {
+      Cam.enCours = false;
       if (!codes || !codes.length) return;
-      var val = String(codes[0].rawValue || '').trim().toUpperCase();
+
+      /* On garde le code le plus long : sur une étiquette Amazon, le
+         petit code de tri cohabite avec le vrai numéro de suivi, et
+         rien ne garantit l'ordre de détection. */
+      var val = '';
+      codes.forEach(function (c) {
+        var x = String(c.rawValue || '').trim().toUpperCase();
+        if (x.length > val.length) val = x;
+      });
       if (!val) return;
+
       // Anti-rebond : un code reste dans le viseur plusieurs images
       if (val === Cam.dernier && Date.now() - Cam.quand < 2800) return;
       Cam.dernier = val; Cam.quand = Date.now();
+      if (navigator.vibrate) navigator.vibrate(40);
       lancerScan(val);
-    }).catch(function () {});
-  }, 300);
+    }).catch(function () { Cam.enCours = false; });
+  }, 120);
 }
 
 /**
@@ -1762,12 +1909,20 @@ function boutonReprise() {
 
 function arreterCamera() {
   Cam.pause = false;
+  Cam.enCours = false;
   if (Cam.boucle) { clearInterval(Cam.boucle); Cam.boucle = null; }
   if (Cam.flux) {
     Cam.flux.getTracks().forEach(function (t) { t.stop(); });
     Cam.flux = null;
   }
   Cam.dernier = '';
+
+  /* Les capacités appartiennent au flux qu'on vient de fermer. Les
+     garder ferait afficher une torche au prochain démarrage sur un
+     appareil qui n'en a pas — et le bouton resterait allumé alors que
+     la lampe est éteinte depuis l'arrêt de la piste. */
+  Cam.torche = false; Cam.torcheDispo = false;
+  Cam.zoom = 1; Cam.zoomDispo = false; Cam.zoomMin = 1; Cam.zoomMax = 1;
 }
 
 
@@ -2296,29 +2451,162 @@ function ouvrirDetail(tracking) {
   });
 }
 
-function ouvrirPrix(c) {
-  modale('Poids et prix',
-    bloc('Le montant est recalculé à poids × prix. Un colis déjà facturé ne ' +
-         'peut plus être modifié.', 'info', 'ℹ️') +
-    '<div class="duo">' +
-      '<label class="champ"><span>Poids (lb)</span><input type="number" id="p-poids" ' +
-        'step="0.1" inputmode="decimal" value="' + e(c.poids_lb) + '" ' +
-        'oninput="majMontantPrix()"></label>' +
-      '<label class="champ"><span>Prix / lb ($)</span><input type="number" id="p-prix" ' +
-        'step="0.25" inputmode="decimal" value="' + e(c.prix_lb_usd) + '" ' +
-        'oninput="majMontantPrix()"></label>' +
-    '</div>' +
-    '<div class="total gros"><span class="l">Montant</span><span id="p-montant">' +
-      usd(Number(c.poids_lb) * Number(c.prix_lb_usd)) + '</span></div>' +
-    '<div id="p-res"></div>' +
-    '<button class="btn vert" style="margin-top:12px" onclick="validerPrix(\'' +
-      e(c.tracking) + '\')">Enregistrer</button>');
+/* Le catalogue, chargé une fois puis gardé : il change quelques fois
+   par an, et le relire à chaque ouverture de la feuille ajouterait une
+   seconde d'attente sur chaque colis. */
+var Catalogue = null;
+
+function chargerCatalogue(suite) {
+  if (Catalogue) { suite(); return; }
+  api('tarifs').then(function (d) { Catalogue = d; suite(); })
+    .catch(function () { Catalogue = { tarifs: [], frais: [] }; suite(); });
 }
 
+function ouvrirPrix(c) {
+  modale('Poids et prix', chargement());
+  chargerCatalogue(function () { dessinerPrix(c); });
+}
+
+function dessinerPrix(c) {
+  var peut = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
+  var tarifs = (Catalogue.tarifs || []).filter(function (t) {
+    // Un tarif retiré reste affiché s'il est celui du colis : sinon
+    // l'écran mentirait sur ce qui a servi à facturer.
+    return t.actif || t.tarif_id === c.tarif_id;
+  });
+  var frais = (Catalogue.frais || []).filter(function (f) { return f.actif; });
+  var choisis = fraisDuColis(c, frais);
+
+  var h = bloc(peut
+    ? 'Choisis la catégorie : au poids, au forfait, ou au poids avec un ' +
+      'minimum. Les frais s\'ajoutent au tarif. Un colis déjà facturé ne ' +
+      'peut plus être modifié.'
+    : 'Seules la direction et le super administrateur peuvent changer la ' +
+      'catégorie ou les frais. Tu peux corriger le poids.', 'info', 'ℹ️');
+
+  h += '<label class="champ"><span>Catégorie</span>' +
+    '<select id="p-tarif" onchange="majMontantPrix()"' + (peut ? '' : ' disabled') + '>' +
+    tarifs.map(function (t) {
+      var sel = (t.tarif_id === c.tarif_id) ||
+                (!c.tarif_id && t.par_defaut) ? ' selected' : '';
+      return '<option value="' + t.tarif_id + '"' + sel + '>' +
+        e(t.nom) + ' — ' + libelleTarif(t) + (t.actif ? '' : ' (retiré)') +
+        '</option>';
+    }).join('') + '</select></label>';
+
+  h += '<div class="duo">' +
+    '<label class="champ"><span>Poids (lb)</span><input type="number" id="p-poids" ' +
+      'step="0.1" inputmode="decimal" value="' + e(c.poids_lb) + '" ' +
+      'oninput="majMontantPrix()"></label>' +
+    '<label class="champ"><span>Prix / lb ($)</span><input type="number" id="p-prix" ' +
+      'step="0.25" inputmode="decimal" placeholder="tarif" value="" ' +
+      (peut ? '' : 'disabled ') + 'oninput="majMontantPrix()"></label>' +
+    '</div>';
+
+  h += '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
+    'Laisse le prix vide pour appliquer le tarif. Le remplir force un prix ' +
+    'négocié et ignore la catégorie.</div>';
+
+  if (frais.length) {
+    h += '<div class="champ"><span>Frais de service</span>' +
+      frais.map(function (f) {
+        return '<label class="case"><input type="checkbox" class="p-frais" ' +
+          'value="' + f.frais_id + '"' +
+          (choisis.indexOf(f.frais_id) !== -1 ? ' checked' : '') +
+          (peut ? '' : ' disabled') + ' onchange="majMontantPrix()"> ' +
+          e(f.nom) + ' <span style="color:var(--doux)">(' +
+          (f.mode === 'pourcentage' ? f.valeur + ' %' : usd(f.valeur)) +
+          ')</span></label>';
+      }).join('') + '</div>';
+  }
+
+  h += '<div class="total"><span class="l">Base</span>' +
+       '<span id="p-base">—</span></div>' +
+       '<div class="total"><span class="l">Frais</span>' +
+       '<span id="p-frais-total">—</span></div>' +
+       '<div class="total gros"><span class="l">Montant</span>' +
+       '<span id="p-montant">—</span></div>' +
+       '<div id="p-res"></div>' +
+       '<button class="btn vert" style="margin-top:12px" onclick="validerPrix(\'' +
+         e(c.tracking) + '\')">Enregistrer</button>';
+
+  majModale('Poids et prix', h);
+  majMontantPrix();
+}
+
+/** Le libellé court d'un tarif, celui qui tient dans une liste. */
+function libelleTarif(t) {
+  if (t.mode === 'forfait') return 'forfait ' + usd(t.forfait_usd);
+  if (t.mode === 'mini') return usd(t.prix_lb_usd) + '/lb, min ' + usd(t.minimum_usd);
+  return usd(t.prix_lb_usd) + '/lb';
+}
+
+/**
+ * Retrouve les frais d'un colis depuis le texte de sa facture.
+ *
+ * Le colis garde « Emballage spécial 2,00 $ · Manutention 1,10 $ », une
+ * phrase lisible par le client et non une liste d'identifiants. Pour
+ * recocher les bonnes cases il faut donc refaire le chemin inverse. Même
+ * logique que fraisIdsDepuisColis_ côté serveur, qui fait seul foi.
+ */
+function fraisDuColis(c, frais) {
+  var texte = String(c.frais_detail || '');
+  if (!texte) return [];
+  return frais.filter(function (f) { return texte.indexOf(f.nom) !== -1; })
+              .map(function (f) { return f.frais_id; });
+}
+
+/**
+ * L'aperçu du calcul, refait à chaque frappe.
+ *
+ * Il reproduit tariferColis_ à l'identique. Le serveur recalcule tout à
+ * l'enregistrement et reste la seule autorité : cet aperçu sert à ne pas
+ * annoncer un prix au client avant de l'avoir vu.
+ */
 function majMontantPrix() {
-  var p = Number(document.getElementById('p-poids').value) || 0;
-  var pr = Number(document.getElementById('p-prix').value) || 0;
-  document.getElementById('p-montant').textContent = usd(p * pr);
+  var poids = Number(document.getElementById('p-poids').value) || 0;
+  var force = document.getElementById('p-prix').value;
+  var selTarif = document.getElementById('p-tarif');
+  var base = 0;
+
+  if (force !== '' && force !== null) {
+    base = poids * (Number(force) || 0);
+  } else {
+    var t = (Catalogue.tarifs || []).filter(function (x) {
+      return selTarif && x.tarif_id === selTarif.value;
+    })[0];
+    if (!t) {
+      base = poids * (Catalogue.prix_lb_defaut || 5);
+    } else if (t.mode === 'forfait') {
+      base = t.forfait_usd;
+    } else {
+      base = poids * (t.prix_lb_usd || Catalogue.prix_lb_defaut || 5);
+      if (t.mode === 'mini' && t.minimum_usd > 0 && base < t.minimum_usd) {
+        base = t.minimum_usd;
+      }
+    }
+  }
+  base = Math.round(base * 100) / 100;
+
+  var frais = 0;
+  Array.prototype.forEach.call(
+    document.querySelectorAll('.p-frais:checked'), function (cb) {
+      var f = (Catalogue.frais || []).filter(function (x) {
+        return x.frais_id === cb.value;
+      })[0];
+      if (!f) return;
+      // Les pourcentages portent TOUS sur la base, jamais en cascade
+      frais += f.mode === 'pourcentage'
+        ? Math.round(base * f.valeur) / 100
+        : Number(f.valeur);
+    });
+  frais = Math.round(frais * 100) / 100;
+
+  var b = document.getElementById('p-base');
+  var ft = document.getElementById('p-frais-total');
+  if (b) b.textContent = usd(base);
+  if (ft) ft.textContent = usd(frais);
+  document.getElementById('p-montant').textContent = usd(base + frais);
 }
 
 
@@ -2491,10 +2779,15 @@ function validerDateColis(tracking) {
 }
 
 function validerPrix(tracking) {
+  var selTarif = document.getElementById('p-tarif');
   var p = {
     tracking: tracking,
     poids_lb: document.getElementById('p-poids').value,
-    prix_lb_usd: document.getElementById('p-prix').value
+    prix_lb_usd: document.getElementById('p-prix').value,
+    tarif_id: selTarif ? selTarif.value : '',
+    frais_ids: Array.prototype.map.call(
+      document.querySelectorAll('.p-frais:checked'),
+      function (cb) { return cb.value; }).join(',')
   };
   ecrire('colis_prix', p, 'Prix ' + tracking).then(function (d) {
     fermerModale();
@@ -3551,6 +3844,191 @@ function blocVersion() {
     'Certaines fonctions ne marcheront pas.', 'attention', '⚠️');
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  CATALOGUE DES TARIFS — direction seulement
+// ═══════════════════════════════════════════════════════════════════
+//
+// Facturer tout au poids ne marche pas. Un téléphone de 0,8 lb ne vaut
+// pas quatre dollars, et deux parfums de 0,3 et 0,5 lb posent le même
+// problème de transport. D'où trois modes : au poids, au forfait, et au
+// poids avec un plancher.
+
+function ouvrirCatalogue() {
+  modale('Catégories et frais', chargement());
+  // Toujours relire : on vient ici pour modifier, le cache mentirait
+  api('tarifs').then(function (d) {
+    Catalogue = d;
+    dessinerCatalogue();
+  }).catch(function (err) {
+    majModale('Catégories et frais', bloc(err.message, 'ko', '❌'));
+  });
+}
+
+function dessinerCatalogue() {
+  var h = bloc('Ces réglages s\'appliquent aux prochains colis. Un colis déjà ' +
+               'reçu garde le tarif sous lequel il a été facturé.', 'info', 'ℹ️');
+
+  h += '<div class="titre-section">Catégories</div>';
+  h += (Catalogue.tarifs || []).map(function (t) {
+    return '<div class="ligne" onclick="ouvrirTarif(\'' + t.tarif_id + '\')">' +
+      '<div class="corps"><div class="t1">' + e(t.nom) +
+        (t.par_defaut ? ' <span style="color:var(--or)">★</span>' : '') +
+        (t.actif ? '' : ' <span style="color:var(--doux)">(retiré)</span>') +
+      '</div><div class="t2">' + libelleTarif(t) + '</div></div>' +
+      '<div style="color:var(--doux)">›</div></div>';
+  }).join('');
+  h += '<button class="btn vide" onclick="ouvrirTarif()">➕ Nouvelle catégorie</button>';
+
+  h += '<div class="titre-section">Frais de service</div>';
+  h += (Catalogue.frais || []).map(function (f) {
+    return '<div class="ligne" onclick="ouvrirFrais(\'' + f.frais_id + '\')">' +
+      '<div class="corps"><div class="t1">' + e(f.nom) +
+        (f.actif ? '' : ' <span style="color:var(--doux)">(retiré)</span>') +
+      '</div><div class="t2">' +
+        (f.mode === 'pourcentage' ? f.valeur + ' % du montant de base'
+                                  : usd(f.valeur) + ' fixes') +
+      '</div></div><div style="color:var(--doux)">›</div></div>';
+  }).join('');
+  h += '<button class="btn vide" onclick="ouvrirFrais()">➕ Nouveau frais</button>';
+
+  majModale('Catégories et frais', h);
+}
+
+function ouvrirTarif(id) {
+  var t = (Catalogue.tarifs || []).filter(function (x) {
+    return x.tarif_id === id;
+  })[0] || { mode: 'au_poids', actif: true, par_defaut: false,
+             prix_lb_usd: Catalogue.prix_lb_defaut || 5 };
+
+  majModale(id ? 'Catégorie' : 'Nouvelle catégorie',
+    '<input type="hidden" id="t-id" value="' + e(id || '') + '">' +
+    '<label class="champ"><span>Nom</span><input type="text" id="t-nom" value="' +
+      e(t.nom || '') + '" placeholder="Électronique, Parfum…"></label>' +
+    '<label class="champ"><span>Mode de calcul</span>' +
+      '<select id="t-mode" onchange="majChampsTarif()">' +
+        '<option value="au_poids"' + (t.mode === 'au_poids' ? ' selected' : '') +
+          '>Au poids</option>' +
+        '<option value="mini"' + (t.mode === 'mini' ? ' selected' : '') +
+          '>Au poids, avec un minimum</option>' +
+        '<option value="forfait"' + (t.mode === 'forfait' ? ' selected' : '') +
+          '>Forfait, quel que soit le poids</option>' +
+      '</select></label>' +
+    '<div id="t-champs"></div>' +
+    '<label class="case"><input type="checkbox" id="t-defaut"' +
+      (t.par_defaut ? ' checked' : '') + '> Tarif par défaut</label>' +
+    '<label class="case"><input type="checkbox" id="t-actif"' +
+      (t.actif ? ' checked' : '') + '> Actif</label>' +
+    '<label class="champ"><span>Note</span><input type="text" id="t-note" value="' +
+      e(t.note || '') + '"></label>' +
+    '<div id="t-res"></div>' +
+    '<button class="btn vert" style="margin-top:12px" onclick="validerTarif()">' +
+      'Enregistrer</button>' +
+    '<button class="btn vide" onclick="ouvrirCatalogue()">Retour</button>');
+
+  Etat.tarifEnCours = t;
+  majChampsTarif();
+}
+
+/** Les champs dépendent du mode : montrer les trois serait un piège. */
+function majChampsTarif() {
+  var t = Etat.tarifEnCours || {};
+  var mode = document.getElementById('t-mode').value;
+  var h = '';
+
+  if (mode !== 'forfait') {
+    h += '<label class="champ"><span>Prix par livre ($)</span>' +
+      '<input type="number" id="t-prix" step="0.25" inputmode="decimal" value="' +
+      e(t.prix_lb_usd || '') + '"></label>';
+  }
+  if (mode === 'mini') {
+    h += '<label class="champ"><span>Montant minimum ($)</span>' +
+      '<input type="number" id="t-mini" step="0.5" inputmode="decimal" value="' +
+      e(t.minimum_usd || '') + '"></label>' +
+      '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
+      'Le colis est facturé au poids, sauf si le résultat tombe sous ce ' +
+      'montant.</div>';
+  }
+  if (mode === 'forfait') {
+    h += '<label class="champ"><span>Montant fixe ($)</span>' +
+      '<input type="number" id="t-forfait" step="0.5" inputmode="decimal" value="' +
+      e(t.forfait_usd || '') + '"></label>' +
+      '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
+      'Le poids n\'entre plus dans le calcul.</div>';
+  }
+  document.getElementById('t-champs').innerHTML = h;
+}
+
+function validerTarif() {
+  var mode = document.getElementById('t-mode').value;
+  var champ = function (id) {
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  };
+
+  ecrire('tarif_enregistrer', {
+    tarif_id: champ('t-id'),
+    nom: champ('t-nom'),
+    mode: mode,
+    prix_lb_usd: champ('t-prix'),
+    minimum_usd: champ('t-mini'),
+    forfait_usd: champ('t-forfait'),
+    par_defaut: document.getElementById('t-defaut').checked ? 'OUI' : 'NON',
+    actif: document.getElementById('t-actif').checked ? 'OUI' : 'NON',
+    note: champ('t-note')
+  }, 'Tarif ' + champ('t-nom')).then(function (d) {
+    toast(d._en_attente ? 'Mis en attente.' : d.message, 'ok');
+    Catalogue = null;                       // le catalogue a changé
+    ouvrirCatalogue();
+  }).catch(function (err) {
+    document.getElementById('t-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ouvrirFrais(id) {
+  var f = (Catalogue.frais || []).filter(function (x) {
+    return x.frais_id === id;
+  })[0] || { mode: 'fixe', actif: true };
+
+  majModale(id ? 'Frais de service' : 'Nouveau frais',
+    '<input type="hidden" id="f-id" value="' + e(id || '') + '">' +
+    '<label class="champ"><span>Nom</span><input type="text" id="f-nom" value="' +
+      e(f.nom || '') + '" placeholder="Emballage spécial…"></label>' +
+    '<label class="champ"><span>Mode</span><select id="f-mode">' +
+      '<option value="fixe"' + (f.mode === 'fixe' ? ' selected' : '') +
+        '>Montant fixe en dollars</option>' +
+      '<option value="pourcentage"' + (f.mode === 'pourcentage' ? ' selected' : '') +
+        '>Pourcentage du montant de base</option>' +
+    '</select></label>' +
+    '<label class="champ"><span>Valeur</span><input type="number" id="f-valeur" ' +
+      'step="0.5" inputmode="decimal" value="' + e(f.valeur || '') + '"></label>' +
+    '<label class="case"><input type="checkbox" id="f-actif"' +
+      (f.actif ? ' checked' : '') + '> Actif</label>' +
+    '<label class="champ"><span>Note</span><input type="text" id="f-note" value="' +
+      e(f.note || '') + '"></label>' +
+    '<div id="f-res"></div>' +
+    '<button class="btn vert" style="margin-top:12px" onclick="validerFrais()">' +
+      'Enregistrer</button>' +
+    '<button class="btn vide" onclick="ouvrirCatalogue()">Retour</button>');
+}
+
+function validerFrais() {
+  ecrire('frais_enregistrer', {
+    frais_id: document.getElementById('f-id').value,
+    nom: document.getElementById('f-nom').value,
+    mode: document.getElementById('f-mode').value,
+    valeur: document.getElementById('f-valeur').value,
+    actif: document.getElementById('f-actif').checked ? 'OUI' : 'NON',
+    note: document.getElementById('f-note').value
+  }, 'Frais ' + document.getElementById('f-nom').value).then(function (d) {
+    toast(d._en_attente ? 'Mis en attente.' : d.message, 'ok');
+    Catalogue = null;
+    ouvrirCatalogue();
+  }).catch(function (err) {
+    document.getElementById('f-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
 function ouvrirReglages() {
   var u = Etat.user || {};
   var nb = Queue.nb();
@@ -3591,6 +4069,10 @@ function ouvrirReglages() {
       '🏬 Inventaire de l\'agence</button>' +
     (peutReglages()
       ? '<button class="btn vide" onclick="ouvrirParametres()">⚙️ Paramètres et tarifs</button>'
+      : '') +
+    (Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix
+      ? '<button class="btn vide" onclick="ouvrirCatalogue()">' +
+        '🏷️ Catégories et frais</button>'
       : '') +
     (peutTextes()
       ? '<button class="btn vide" onclick="ouvrirTextes()">📝 Textes et mentions</button>'
