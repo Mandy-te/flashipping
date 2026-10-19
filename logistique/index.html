@@ -2476,6 +2476,7 @@ function dessinerPrix(c) {
   });
   var frais = (Catalogue.frais || []).filter(function (f) { return f.actif; });
   var choisis = fraisDuColis(c, frais);
+  Etat.colisPrix = c;                       // pour le recalcul à la frappe
 
   var h = bloc(peut
     ? 'Choisis la catégorie : au poids, au forfait, ou au poids avec un ' +
@@ -2499,26 +2500,28 @@ function dessinerPrix(c) {
       'step="0.1" inputmode="decimal" value="' + e(c.poids_lb) + '" ' +
       'oninput="majMontantPrix()"></label>' +
     '<label class="champ"><span>Prix / lb ($)</span><input type="number" id="p-prix" ' +
-      'step="0.25" inputmode="decimal" placeholder="tarif" value="" ' +
+      'step="0.25" inputmode="decimal" placeholder="tarif" value="' +
+      e(prixPrerempli(c)) + '" ' +
       (peut ? '' : 'disabled ') + 'oninput="majMontantPrix()"></label>' +
     '</div>';
 
-  h += '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
-    'Laisse le prix vide pour appliquer le tarif. Le remplir force un prix ' +
-    'négocié et ignore la catégorie.</div>';
+  /* Le montant libre n'apparaît que pour une catégorie en mode « saisi ».
+     C'est le cas de l'électronique et des parfums : un iPhone 12 et un 14
+     pèsent pareil et ne valent pas pareil, aucune formule ne les sépare. */
+  h += '<div id="p-zone-montant"></div>';
 
-  if (frais.length) {
-    h += '<div class="champ"><span>Frais de service</span>' +
-      frais.map(function (f) {
-        return '<label class="case"><input type="checkbox" class="p-frais" ' +
-          'value="' + f.frais_id + '"' +
-          (choisis.indexOf(f.frais_id) !== -1 ? ' checked' : '') +
-          (peut ? '' : ' disabled') + ' onchange="majMontantPrix()"> ' +
-          e(f.nom) + ' <span style="color:var(--doux)">(' +
-          (f.mode === 'pourcentage' ? f.valeur + ' %' : usd(f.valeur)) +
-          ')</span></label>';
-      }).join('') + '</div>';
-  }
+  h += '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
+    (c.tarif_id
+      ? 'Laisse le prix vide pour appliquer le tarif. Le remplir force un ' +
+        'prix négocié et ignore la catégorie.'
+      : 'Ce colis est antérieur aux catégories : son prix réel est repris ' +
+        'ci-dessus. Vide le champ pour basculer sur le tarif choisi.') +
+    '</div>';
+
+  h += '<div class="champ"><span>Frais de service</span>' +
+       '<div id="p-zone-frais"></div></div>';
+  Etat.fraisChoisis = choisis;
+  Etat.fraisPeut = peut;
 
   h += '<div class="total"><span class="l">Base</span>' +
        '<span id="p-base">—</span></div>' +
@@ -2531,11 +2534,131 @@ function dessinerPrix(c) {
          e(c.tracking) + '\')">Enregistrer</button>';
 
   majModale('Poids et prix', h);
+  rendreZonesPrix();
   majMontantPrix();
+}
+
+/**
+ * Redessine les deux zones qui dépendent du contexte : le montant libre
+ * et la liste des frais.
+ *
+ * Elles changent quand on change de catégorie ou de poids — un frais de
+ * manutention réservé aux colis de 10 lb et plus doit disparaître dès
+ * que l'agent corrige la pesée à 4 lb. Afficher une case qui serait
+ * refusée à l'enregistrement ferait annoncer au client un prix qu'on ne
+ * pourrait pas facturer.
+ */
+function rendreZonesPrix() {
+  var c = Etat.colisPrix || {};
+  var peut = Etat.fraisPeut;
+  var sel = document.getElementById('p-tarif');
+  var t = (Catalogue.tarifs || []).filter(function (x) {
+    return sel && x.tarif_id === sel.value;
+  })[0];
+
+  // ── Montant libre ──
+  var zm = document.getElementById('p-zone-montant');
+  if (zm) {
+    if (t && t.mode === 'saisi') {
+      var actuel = document.getElementById('p-montant-libre');
+      var valeur = actuel ? actuel.value
+        : (Number(c.montant_base_usd) > 0 ? c.montant_base_usd
+                                          : (t.forfait_usd || ''));
+      zm.innerHTML =
+        '<label class="champ"><span>Montant du colis ($)</span>' +
+        '<input type="number" id="p-montant-libre" step="1" ' +
+          'inputmode="decimal" value="' + e(valeur) + '" ' +
+          (peut ? '' : 'disabled ') + 'oninput="majMontantPrix()"></label>' +
+        '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
+        'Cette catégorie se facture au cas par cas. ' +
+        (t.forfait_usd ? usd(t.forfait_usd) + ' est une suggestion, pas une règle.'
+                       : 'Saisis le montant convenu.') + '</div>';
+    } else {
+      zm.innerHTML = '';
+    }
+  }
+
+  // ── Frais applicables ici et maintenant ──
+  var zf = document.getElementById('p-zone-frais');
+  if (!zf) return;
+
+  var poids = Number(document.getElementById('p-poids').value) || 0;
+  var agence = String(c.agence_destination || '');
+  var dispo = (Catalogue.frais || []).filter(function (f) {
+    return f.actif && !fraisHorsContexte(f, poids, agence);
+  });
+
+  if (!dispo.length) {
+    zf.innerHTML = '<div style="font-size:13px;color:var(--doux);padding:4px 0">' +
+      'Aucun frais de service ne s\'applique ' +
+      (agence ? 'à ' + e(villeAgence(agence)) : 'ici') +
+      ' pour ce poids.</div>';
+    return;
+  }
+
+  zf.innerHTML = dispo.map(function (f) {
+    return '<label class="case"><input type="checkbox" class="p-frais" ' +
+      'value="' + f.frais_id + '"' +
+      (Etat.fraisChoisis.indexOf(f.frais_id) !== -1 ? ' checked' : '') +
+      (peut ? '' : ' disabled') + ' onchange="noterFraisChoisis();majMontantPrix()"> ' +
+      e(f.nom) + ' <span style="color:var(--doux)">(' +
+      (f.mode === 'pourcentage' ? f.valeur + ' %' : usd(f.valeur)) +
+      ')</span></label>';
+  }).join('');
+}
+
+/* Les cases cochées survivent au redessin : sinon corriger le poids
+   décocherait tout ce que l'agent vient de sélectionner. */
+function noterFraisChoisis() {
+  Etat.fraisChoisis = Array.prototype.map.call(
+    document.querySelectorAll('.p-frais:checked'),
+    function (cb) { return cb.value; });
+}
+
+/**
+ * La même règle que fraisInapplicable_ côté serveur, qui fait seul foi.
+ * Elle est répétée ici pour que la liste se filtre à la frappe sans
+ * aller-retour réseau — un agent qui corrige une pesée ne doit pas
+ * attendre.
+ */
+function fraisHorsContexte(f, poids, agenceId) {
+  var min = Number(f.poids_min_lb) || 0;
+  var max = Number(f.poids_max_lb) || 0;
+  if (min > 0 && poids < min) return true;
+  if (max > 0 && poids > max) return true;
+
+  var liste = String(f.agences || '').trim();
+  if (!liste) return false;
+  var ag = String(agenceId || '').trim().toUpperCase();
+  return !ag || liste.toUpperCase().split(/[,;]/).map(function (x) {
+    return x.trim();
+  }).indexOf(ag) === -1;
+}
+
+/**
+ * Faut-il préremplir le prix à la livre ?
+ *
+ * Oui, tant que le colis n'a pas de catégorie. Les colis reçus avant
+ * cette mise à jour ont un prix mais pas de `tarif_id` : laisser le
+ * champ vide ferait appliquer le tarif par défaut au premier
+ * enregistrement, et un colis négocié à 7 $/lb repasserait à 5 sans que
+ * personne ne le demande. Un écran qui modifie un prix sans qu'on y ait
+ * touché est pire qu'un écran incomplet.
+ *
+ * Dès qu'une catégorie est posée, c'est elle qui gouverne : le champ
+ * redevient vide et le catalogue reprend la main.
+ */
+function prixPrerempli(c) {
+  if (c.tarif_id) return '';
+  var p = Number(c.prix_lb_usd);
+  return p > 0 ? p : '';
 }
 
 /** Le libellé court d'un tarif, celui qui tient dans une liste. */
 function libelleTarif(t) {
+  if (t.mode === 'saisi') {
+    return 'au cas par cas' + (t.forfait_usd ? ' (~' + usd(t.forfait_usd) + ')' : '');
+  }
   if (t.mode === 'forfait') return 'forfait ' + usd(t.forfait_usd);
   if (t.mode === 'mini') return usd(t.prix_lb_usd) + '/lb, min ' + usd(t.minimum_usd);
   return usd(t.prix_lb_usd) + '/lb';
@@ -2564,12 +2687,19 @@ function fraisDuColis(c, frais) {
  * annoncer un prix au client avant de l'avoir vu.
  */
 function majMontantPrix() {
+  rendreZonesPrix();
+
   var poids = Number(document.getElementById('p-poids').value) || 0;
   var force = document.getElementById('p-prix').value;
   var selTarif = document.getElementById('p-tarif');
+  var libre = document.getElementById('p-montant-libre');
   var base = 0;
 
-  if (force !== '' && force !== null) {
+  /* Le montant saisi l'emporte sur tout, comme côté serveur : c'est le
+     seul ordre qui donne le même prix dans l'aperçu et sur la facture. */
+  if (libre && libre.value !== '') {
+    base = Number(libre.value) || 0;
+  } else if (force !== '' && force !== null) {
     base = poids * (Number(force) || 0);
   } else {
     var t = (Catalogue.tarifs || []).filter(function (x) {
@@ -2588,6 +2718,7 @@ function majMontantPrix() {
   }
   base = Math.round(base * 100) / 100;
 
+  var agence = String((Etat.colisPrix || {}).agence_destination || '');
   var frais = 0;
   Array.prototype.forEach.call(
     document.querySelectorAll('.p-frais:checked'), function (cb) {
@@ -2595,6 +2726,7 @@ function majMontantPrix() {
         return x.frais_id === cb.value;
       })[0];
       if (!f) return;
+      if (fraisHorsContexte(f, poids, agence)) return;
       // Les pourcentages portent TOUS sur la base, jamais en cascade
       frais += f.mode === 'pourcentage'
         ? Math.round(base * f.valeur) / 100
@@ -2780,11 +2912,16 @@ function validerDateColis(tracking) {
 
 function validerPrix(tracking) {
   var selTarif = document.getElementById('p-tarif');
+  var libre = document.getElementById('p-montant-libre');
   var p = {
     tracking: tracking,
     poids_lb: document.getElementById('p-poids').value,
     prix_lb_usd: document.getElementById('p-prix').value,
     tarif_id: selTarif ? selTarif.value : '',
+    /* Chaîne vide plutôt que champ absent : le serveur distingue
+       « pas de montant libre ici » de « ne touche pas au montant
+       existant », et confondre les deux effacerait un prix négocié. */
+    montant_force_usd: libre ? libre.value : '',
     frais_ids: Array.prototype.map.call(
       document.querySelectorAll('.p-frais:checked'),
       function (cb) { return cb.value; }).join(',')
@@ -3888,11 +4025,30 @@ function dessinerCatalogue() {
       '</div><div class="t2">' +
         (f.mode === 'pourcentage' ? f.valeur + ' % du montant de base'
                                   : usd(f.valeur) + ' fixes') +
+        critereFrais(f) +
       '</div></div><div style="color:var(--doux)">›</div></div>';
   }).join('');
   h += '<button class="btn vide" onclick="ouvrirFrais()">➕ Nouveau frais</button>';
 
   majModale('Catégories et frais', h);
+}
+
+/** La portée d'un frais, en une ligne lisible. */
+function critereFrais(f) {
+  var bouts = [];
+  if (Number(f.poids_min_lb) > 0 && Number(f.poids_max_lb) > 0) {
+    bouts.push('de ' + f.poids_min_lb + ' à ' + f.poids_max_lb + ' lb');
+  } else if (Number(f.poids_min_lb) > 0) {
+    bouts.push('dès ' + f.poids_min_lb + ' lb');
+  } else if (Number(f.poids_max_lb) > 0) {
+    bouts.push('jusqu\'à ' + f.poids_max_lb + ' lb');
+  }
+  if (String(f.agences || '').trim()) {
+    bouts.push(String(f.agences).split(/[,;]/).map(function (a) {
+      return villeAgence(a.trim()) || a.trim();
+    }).join(', '));
+  }
+  return bouts.length ? ' · ' + e(bouts.join(' · ')) : '';
 }
 
 function ouvrirTarif(id) {
@@ -3913,6 +4069,8 @@ function ouvrirTarif(id) {
           '>Au poids, avec un minimum</option>' +
         '<option value="forfait"' + (t.mode === 'forfait' ? ' selected' : '') +
           '>Forfait, quel que soit le poids</option>' +
+        '<option value="saisi"' + (t.mode === 'saisi' ? ' selected' : '') +
+          '>Au cas par cas, montant saisi par colis</option>' +
       '</select></label>' +
     '<div id="t-champs"></div>' +
     '<label class="case"><input type="checkbox" id="t-defaut"' +
@@ -3955,6 +4113,15 @@ function majChampsTarif() {
       e(t.forfait_usd || '') + '"></label>' +
       '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
       'Le poids n\'entre plus dans le calcul.</div>';
+  }
+  if (mode === 'saisi') {
+    h += '<label class="champ"><span>Montant suggéré ($)</span>' +
+      '<input type="number" id="t-forfait" step="0.5" inputmode="decimal" value="' +
+      e(t.forfait_usd || '') + '"></label>' +
+      '<div style="font-size:12px;color:var(--doux);margin:-4px 0 10px">' +
+      'Le vrai montant se saisit colis par colis. Celui-ci n\'est qu\'un ' +
+      'point de départ proposé à l\'agent — laisse vide si aucun ordre de ' +
+      'grandeur ne se dégage.</div>';
   }
   document.getElementById('t-champs').innerHTML = h;
 }
@@ -4002,6 +4169,27 @@ function ouvrirFrais(id) {
     '</select></label>' +
     '<label class="champ"><span>Valeur</span><input type="number" id="f-valeur" ' +
       'step="0.5" inputmode="decimal" value="' + e(f.valeur || '') + '"></label>' +
+    '<div class="duo">' +
+      '<label class="champ"><span>Poids min (lb)</span><input type="number" ' +
+        'id="f-pmin" step="0.5" inputmode="decimal" placeholder="tous" value="' +
+        e(f.poids_min_lb || '') + '"></label>' +
+      '<label class="champ"><span>Poids max (lb)</span><input type="number" ' +
+        'id="f-pmax" step="0.5" inputmode="decimal" placeholder="tous" value="' +
+        e(f.poids_max_lb || '') + '"></label>' +
+    '</div>' +
+    '<div class="champ"><span>Succursales concernées</span>' +
+      ((Etat.ref && Etat.ref.agences) || []).map(function (a) {
+        var cochee = !String(f.agences || '').trim() ||
+          String(f.agences).toUpperCase().split(/[,;]/)
+            .map(function (x) { return x.trim(); })
+            .indexOf(String(a.agence_id).toUpperCase()) !== -1;
+        return '<label class="case"><input type="checkbox" class="f-agence" ' +
+          'value="' + e(a.agence_id) + '"' + (cochee ? ' checked' : '') + '> ' +
+          e(a.ville || a.agence_id) + '</label>';
+      }).join('') +
+      '<div style="font-size:12px;color:var(--doux);margin-top:4px">' +
+      'Décoche une succursale pour qu\'elle ne facture pas ce frais. ' +
+      'Tout cocher revient à l\'appliquer partout.</div></div>' +
     '<label class="case"><input type="checkbox" id="f-actif"' +
       (f.actif ? ' checked' : '') + '> Actif</label>' +
     '<label class="champ"><span>Note</span><input type="text" id="f-note" value="' +
@@ -4013,11 +4201,22 @@ function ouvrirFrais(id) {
 }
 
 function validerFrais() {
+  var cochees = Array.prototype.map.call(
+    document.querySelectorAll('.f-agence:checked'),
+    function (cb) { return cb.value; });
+  var toutes = document.querySelectorAll('.f-agence').length;
+
   ecrire('frais_enregistrer', {
     frais_id: document.getElementById('f-id').value,
     nom: document.getElementById('f-nom').value,
     mode: document.getElementById('f-mode').value,
     valeur: document.getElementById('f-valeur').value,
+    poids_min_lb: document.getElementById('f-pmin').value,
+    poids_max_lb: document.getElementById('f-pmax').value,
+    /* Toutes cochées = aucune restriction. On envoie une liste vide
+       plutôt que la liste complète : une succursale ouverte demain
+       héritera du frais au lieu d'en être exclue en silence. */
+    agences: (cochees.length === toutes) ? '' : cochees.join(','),
     actif: document.getElementById('f-actif').checked ? 'OUI' : 'NON',
     note: document.getElementById('f-note').value
   }, 'Frais ' + document.getElementById('f-nom').value).then(function (d) {
