@@ -533,14 +533,24 @@ function api(action, params) {
         // Deux causes très différentes, d'où les deux phrases : avant la
         // première connexion c'est le déploiement, après c'est le script
         // qui a planté ou dépassé son temps d'exécution.
-        throw new Error(Etat.token
+        var eh = new Error(Etat.token
           ? 'Google a renvoyé une page d\'erreur : le script a échoué ou a ' +
             'dépassé son temps d\'exécution sur cette opération. Regarde ' +
             '« Exécutions » dans Apps Script pour la cause exacte.'
           : 'L\'API a renvoyé une page web au lieu de données. Vérifie que le ' +
             'déploiement est réglé sur « Accès : Tout le monde ».');
+        /* Le serveur a RÉPONDU — mal, mais il a répondu. Ce n'est donc
+           pas une panne de réseau, et rejouer à l'identique redonnera
+           le même résultat. Sans cette marque, la file reclassait ces
+           échecs en « réseau » et les rejouait indéfiniment : l'agent
+           voyait « 1 opération en attente » pour toujours, en ligne,
+           sans jamais lire le message qui disait pourquoi. */
+        eh.serveur = true;
+        throw eh;
       }
-      throw new Error('Réponse illisible du serveur.');
+      var ei = new Error('Réponse illisible du serveur.');
+      ei.serveur = true;
+      throw ei;
     }
     if (d.ok === false) {
       var e2 = new Error(d.erreur || 'Erreur inconnue.');
@@ -550,7 +560,7 @@ function api(action, params) {
     return d.data !== undefined ? d.data : d;
   })
   .catch(function (e) {
-    if (e.metier) throw e;
+    if (e.metier || e.serveur) throw e;
     if (/Session expirée|Jeton/i.test(e.message)) { deconnecter(); throw e; }
     e.reseau = true;
     throw e;
@@ -612,12 +622,34 @@ var Queue = {
         return api(item.action, item.params)
           .then(function () { Queue.retirer(item.id); reussis++; })
           .catch(function (e) {
-            if (e.metier) {
-              // Règle refusée : la rejouer ne changera rien, on la sort
+            if (e.metier || e.serveur) {
+              /* Règle refusée, ou script planté : rejouer à l'identique
+                 redonnera le même résultat. On sort l'opération et on
+                 montre le message, au lieu de la garder éternellement. */
               Queue.retirer(item.id);
               echecs.push(item.resume + ' — ' + e.message);
+              return;
             }
-            // Erreur réseau : on la laisse en file pour plus tard
+
+            /* Vraie panne réseau : on réessaiera. Mais pas sans fin.
+               Au-delà de trois tentatives, quelque chose d'autre cloche
+               — un corps de requête que le serveur n'avale pas, un
+               proxy qui coupe — et une file qui grossit en silence finit
+               par cacher des mouvements de colis que personne ne cherche
+               plus. On la sort en l'expliquant. */
+            var reste = Queue.liste();
+            for (var i = 0; i < reste.length; i++) {
+              if (reste[i].id !== item.id) continue;
+              reste[i].essais = (reste[i].essais || 0) + 1;
+              if (reste[i].essais >= 3) {
+                Queue.retirer(item.id);
+                echecs.push(item.resume + ' — abandonnée après 3 tentatives : '
+                          + e.message);
+              } else {
+                S.ecrireJson(CLE_FILE, reste);
+              }
+              break;
+            }
           });
       });
     }, Promise.resolve())
@@ -626,7 +658,13 @@ var Queue = {
       if (reussis) toast(reussis + ' opération(s) enregistrée(s).', 'ok');
       if (echecs.length) {
         Etat.echecsQueue = echecs;
-        toast(echecs.length + ' refusée(s) — voir Réglages.', 'ko');
+        /* Le message complet, tout de suite. « Voir Réglages » obligeait
+           à aller le chercher — et personne ne va chercher un message
+           qu'il ne sait pas exister. */
+        toast(echecs[0], 'ko');
+        if (echecs.length > 1) {
+          toast('et ' + (echecs.length - 1) + ' autre(s) — voir Réglages.', 'ko');
+        }
       }
       if (Etat.onglet) dessiner();
     });

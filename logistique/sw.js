@@ -13,7 +13,7 @@
       franchement et l'application met l'écriture en file d'attente.
    ═══════════════════════════════════════════════════════════════════ */
 
-var VERSION = 'fls-log-v21';
+var VERSION = 'fls-log-v22';
 var COQUILLE = [
   './',
   './index.html',
