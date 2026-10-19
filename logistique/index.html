@@ -1745,9 +1745,17 @@ function demarrerCamera() {
      illisible. L'appareil photo du téléphone, lui, travaille en pleine
      résolution — d'où un code qu'il voit et que l'app ne voit pas. */
   navigator.mediaDevices.getUserMedia({
+    /* `ideal` SEUL, jamais `min`.
+       Un `min` n'est pas une préférence : c'est une exigence. Une
+       caméra incapable de fournir 1280×720 dans ce sens de visée fait
+       alors échouer getUserMedia d'un OverconstrainedError, et l'agent
+       n'a plus de caméra du tout — sur un téléphone d'entrée de gamme
+       en succursale, c'est l'app entière qui devient inutilisable pour
+       gagner de la définition qu'on n'aura pas. Avec `ideal`, le
+       navigateur descend tout seul au mieux de ce qu'il a. */
     video: { facingMode: { ideal: 'environment' },
-             width:  { ideal: 1920, min: 1280 },
-             height: { ideal: 1080, min: 720 },
+             width:  { ideal: 1920 },
+             height: { ideal: 1080 },
              /* LA correction principale. Sans mise au point continue,
                 la caméra reste fixée sur l'infini et le code à vingt
                 centimètres ne sera JAMAIS net. C'est ce seul réglage
@@ -1759,8 +1767,23 @@ function demarrerCamera() {
     Cam.flux = flux;
     reglerCapacites_(flux);
     rendreOnglet();
-  }).catch(function () {
-    toast('Accès à la caméra refusé.', 'ko');
+  }).catch(function (err) {
+    /* Trois pannes très différentes se cachaient derrière « accès
+       refusé ». Dire « refusé » quand la caméra est simplement occupée
+       par une autre application envoie l'agent fouiller les permissions
+       du téléphone pendant dix minutes pour rien. */
+    var nom = (err && err.name) || '';
+    toast(
+      nom === 'NotAllowedError'  ? 'Accès à la caméra refusé. Autorise-la dans '
+                                 + 'les réglages du navigateur.' :
+      nom === 'NotFoundError'    ? 'Aucune caméra détectée sur cet appareil.' :
+      nom === 'NotReadableError' ? 'La caméra est déjà utilisée par une autre '
+                                 + 'application. Ferme-la et réessaie.' :
+      nom === 'OverconstrainedError' ? 'Cette caméra ne gère pas les réglages '
+                                 + 'demandés. Saisis le numéro à la main.'
+                                 : 'Caméra indisponible' + (nom ? ' (' + nom + ')' : '')
+                                 + '. Saisis le numéro à la main.',
+      'ko');
   });
 }
 
