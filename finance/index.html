@@ -1101,8 +1101,10 @@ var Saisie = { type: 'depense' };
 function ongletSaisie() {
   poser(
     '<div class="segments">' +
-      ['depense', 'revenu', 'contribution'].map(function (t) {
-        var nom = t === 'depense' ? 'Dépense' : (t === 'revenu' ? 'Revenu' : 'Apport');
+      ['depense', 'revenu', 'contribution', 'stock'].map(function (t) {
+        var nom = t === 'depense' ? 'Dépense'
+                : t === 'revenu' ? 'Revenu'
+                : t === 'contribution' ? 'Apport' : 'Stock';
         return '<button class="' + (Saisie.type === t ? 'actif' : '') +
           '" onclick="choisirSaisie(\'' + t + '\')">' + nom + '</button>';
       }).join('') +
@@ -1110,6 +1112,130 @@ function ongletSaisie() {
     '<div id="form-saisie"></div>'
   );
   rendreFormulaire();
+}
+
+/* ── INVENTAIRE DU STOCK ──────────────────────────────────────────
+ *
+ * Cet écran manquait. `enregistrer_stock` existait côté serveur depuis
+ * l'origine, branché sur rien : tout le calcul du coût des ventes
+ * reposait sur une table que personne ne pouvait remplir depuis
+ * l'application. Le 20 octobre, un inventaire vieux de quatre jours a
+ * transformé 790 Gdes de bénéfice en 7 995 de perte, sans qu'il existe
+ * le moindre moyen de le corriger autrement qu'à la main dans le
+ * classeur.
+ *
+ * Le formulaire propose le stock THÉORIQUE — dernier inventaire plus
+ * les achats de lots depuis. L'agent n'a donc pas à calculer : il
+ * compare à ce qu'il voit sur l'étagère, et corrige si ça diffère.
+ * L'écart est le vrai renseignement : il révèle un colis perdu, une
+ * livraison non saisie, ou un coût oublié.
+ */
+function formulaireStock() {
+  var z = document.getElementById('form-saisie');
+  z.innerHTML = chargement('Calcul du stock théorique…');
+
+  api('rapprochement_stock', { debut: '', fin: aujourdhui() })
+    .then(function (d) {
+      var theo = Number(d.stock_theorique_gdes) || 0;
+      var dernier = d.stock_cloture && d.stock_cloture.connu
+        ? d.stock_cloture : null;
+
+      var h = bloc('Compte ce qui reste en stock et saisis sa valeur. ' +
+        'Le chiffre proposé est le stock théorique : dernier inventaire ' +
+        'plus les lots achetés depuis. S\'il ne correspond pas à ce que tu ' +
+        'vois, c\'est l\'écart qui t\'apprend quelque chose.', 'info', 'ℹ️');
+
+      h += '<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v">' + court(theo) + '</div>' +
+          '<div class="l">stock théorique</div></div>' +
+        '<div class="stat"><div class="v">' +
+          court(d.entrees_periode_gdes) + '</div>' +
+          '<div class="l">lots achetés</div></div>' +
+        '</div>';
+
+      if (dernier) {
+        h += '<div style="font-size:12px;color:var(--doux);margin:-6px 0 12px">' +
+          'Dernier inventaire : ' + dateCourte(dernier.date) + ' — ' +
+          htg(dernier.valeur) + (dernier.nb_colis ? ', ' + dernier.nb_colis +
+          ' colis' : '') + '.</div>';
+      } else {
+        h += bloc('Aucun inventaire enregistré à ce jour. Celui-ci sera le ' +
+                  'premier, et il servira de point de départ à tous les ' +
+                  'calculs de coût.', 'attention', '⚠️');
+      }
+
+      h += '<div class="duo">' +
+        '<label class="champ"><span>Valeur du stock (Gdes)</span>' +
+          '<input type="number" id="stk-valeur" step="1" min="0" ' +
+            'inputmode="decimal" value="' + e(theo ? theo.toFixed(2) : '') +
+            '" oninput="majEcartStock(' + theo + ')"></label>' +
+        '<label class="champ"><span>Nombre de colis</span>' +
+          '<input type="number" id="stk-colis" step="1" min="0" ' +
+            'inputmode="numeric" placeholder="facultatif"></label>' +
+        '</div>' +
+        '<label class="champ"><span>Date du comptage</span>' +
+          '<input type="date" id="stk-date" value="' + aujourdhui() + '"></label>' +
+        '<div id="stk-ecart"></div>' +
+        '<label class="champ"><span>Note</span>' +
+          '<input type="text" id="stk-note" placeholder="contexte, colis manquant…">' +
+        '</label>' +
+        '<div id="stk-res"></div>' +
+        '<button class="btn vert" style="margin-top:12px" ' +
+          'onclick="validerStock()">Enregistrer l\'inventaire</button>';
+
+      z.innerHTML = h;
+      majEcartStock(theo);
+    })
+    .catch(function (err) {
+      z.innerHTML = bloc(err.message, 'ko', '❌');
+    });
+}
+
+/* L'écart se lit PENDANT la saisie, pas après : c'est au moment où on
+   tape un chiffre différent du théorique qu'on se demande pourquoi, et
+   qu'on va recompter ou chercher la livraison oubliée. */
+function majEcartStock(theorique) {
+  var z = document.getElementById('stk-ecart');
+  if (!z) return;
+  var v = document.getElementById('stk-valeur').value;
+  if (v === '') { z.innerHTML = ''; return; }
+
+  var ecart = (Number(v) || 0) - Number(theorique || 0);
+  if (Math.abs(ecart) < 1) {
+    z.innerHTML = bloc('Conforme au stock théorique.', 'ok', '✅');
+    return;
+  }
+  z.innerHTML = bloc(
+    (ecart < 0 ? 'Il manque ' + htg(-ecart) + ' par rapport au théorique. '
+               + 'Des colis ont été livrés sans que leur sortie soit saisie, '
+               + 'ou il en manque physiquement.'
+               : 'Il y a ' + htg(ecart) + ' de plus que le théorique. '
+               + 'Des coûts d\'entrée n\'ont pas été saisis en dépense.'),
+    'attention', '⚠️');
+}
+
+function validerStock() {
+  var v = document.getElementById('stk-valeur').value;
+  if (v === '' || Number(v) < 0) {
+    document.getElementById('stk-res').innerHTML =
+      bloc('Saisis la valeur du stock.', 'ko', '❌');
+    return;
+  }
+
+  /* api() direct : l'app Finance n'a pas de file hors ligne, et c'est
+     voulu — un inventaire saisi hors ligne puis envoyé trois heures plus
+     tard porterait une heure de comptage qui ne correspond plus à rien. */
+  api('enregistrer_stock', {
+    valeur_stock_gdes: v,
+    nb_colis: document.getElementById('stk-colis').value,
+    date: document.getElementById('stk-date').value,
+    note: document.getElementById('stk-note').value
+  }).then(function () {
+    toast('Inventaire enregistré.', 'ok');
+    ongletSaisie();
+  }).catch(function (err) {
+    document.getElementById('stk-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
 }
 
 function choisirSaisie(t) { Saisie.type = t; ongletSaisie(); }
@@ -1160,6 +1286,12 @@ function majConversion(id) {
 
 function rendreFormulaire() {
   var z = document.getElementById('form-saisie');
+
+  /* Le stock se dessine à part : il lit le serveur pour proposer le
+     stock théorique, donc il remplit la zone lui-même au lieu de
+     renvoyer du HTML tout prêt. */
+  if (Saisie.type === 'stock') { formulaireStock(); return; }
+
   if (Saisie.type === 'depense')      z.innerHTML = formDepense();
   else if (Saisie.type === 'revenu')  z.innerHTML = formRevenu();
   else                                 z.innerHTML = formContribution();
