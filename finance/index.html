@@ -955,7 +955,9 @@ function ongletCaisse() {
         '<div class="stat"><div class="v" style="color:var(--vert)">' +
           court(d.total_revenus_gdes) + '</div><div class="l">revenus</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--rouge)">' +
-          court(d.total_depenses_gdes) + '</div><div class="l">dépenses</div></div>' +
+          court(d.total_charges_gdes !== undefined
+                  ? d.total_charges_gdes : d.total_depenses_gdes) +
+          '</div><div class="l">charges</div></div>' +
         (d.tresorerie_gdes !== undefined
           ? '<div class="stat"><div class="v">' + court(d.tresorerie_gdes) +
             '</div><div class="l">trésorerie</div></div>' : '') +
@@ -1563,7 +1565,8 @@ function jrnVueMouvements(d) {
       '<div class="stat"><div class="v" style="color:var(--vert)">' +
         court(t.revenus_gdes) + '</div><div class="l">revenus</div></div>' +
       '<div class="stat"><div class="v" style="color:var(--rouge)">' +
-        court(t.depenses_gdes) + '</div><div class="l">dépenses</div></div>' +
+        court(t.charges_gdes !== undefined ? t.charges_gdes : t.depenses_gdes) +
+        '</div><div class="l">charges</div></div>' +
       '<div class="stat"><div class="v">' + court(t.profit_gdes) +
         '</div><div class="l">bénéfice</div></div>' +
     '</div>';
@@ -1577,6 +1580,12 @@ function jrnVueMouvements(d) {
   if (t.apports_gdes) aside.push(htg(t.apports_gdes) + ' d\'apports');
   if (aside.length) {
     h += bloc('Hors bénéfice : ' + aside.join(', ') + '.', 'info', '↔️');
+  }
+
+  /* L'avertissement se lit À CÔTÉ du bénéfice, pas dans un écran
+     annexe : c'est le chiffre juste au-dessus qu'il met en doute. */
+  if (t.cout_des_ventes_fiable === false && t.cout_des_ventes_anomalie) {
+    h += bloc(t.cout_des_ventes_anomalie, 'attention', '⚠️');
   }
 
   if (!d.lignes.length) {
