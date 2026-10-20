@@ -1140,10 +1140,19 @@ function formulaireStock() {
       var dernier = d.stock_cloture && d.stock_cloture.connu
         ? d.stock_cloture : null;
 
-      var h = bloc('Compte ce qui reste en stock et saisis sa valeur. ' +
-        'Le chiffre proposé est le stock théorique : dernier inventaire ' +
-        'plus les lots achetés depuis. S\'il ne correspond pas à ce que tu ' +
-        'vois, c\'est l\'écart qui t\'apprend quelque chose.', 'info', 'ℹ️');
+      /* La question se pose à chaque fois, et la réponse décide de tout :
+         un stock valorisé au prix de vente ferait soustraire des recettes
+         à venir d'un coût déjà payé, et l'entreprise encaisserait son
+         bénéfice sur des colis encore sur l'étagère. */
+      var h = bloc('Compte les colis NON LIVRÉS et saisis ce qu\'ils t\'ont ' +
+        'COÛTÉ — ce que tu as payé à Boxpaq, transport et frais compris. ' +
+        'Jamais ce que les clients paieront : cette marge-là n\'est gagnée ' +
+        'qu\'à la livraison.', 'info', '💰');
+
+      h += bloc('Le chiffre proposé est le stock théorique : dernier ' +
+        'inventaire plus les lots achetés depuis. S\'il ne correspond pas à ' +
+        'ce que tu vois, c\'est l\'écart qui t\'apprend quelque chose.',
+        'info', 'ℹ️');
 
       h += '<div class="stats" style="margin-bottom:14px">' +
         '<div class="stat"><div class="v">' + court(theo) + '</div>' +
@@ -1165,7 +1174,7 @@ function formulaireStock() {
       }
 
       h += '<div class="duo">' +
-        '<label class="champ"><span>Valeur du stock (Gdes)</span>' +
+        '<label class="champ"><span>Coût du stock (Gdes)</span>' +
           '<input type="number" id="stk-valeur" step="1" min="0" ' +
             'inputmode="decimal" value="' + e(theo ? theo.toFixed(2) : '') +
             '" oninput="majEcartStock(' + theo + ')"></label>' +
@@ -1218,7 +1227,7 @@ function validerStock() {
   var v = document.getElementById('stk-valeur').value;
   if (v === '' || Number(v) < 0) {
     document.getElementById('stk-res').innerHTML =
-      bloc('Saisis la valeur du stock.', 'ko', '❌');
+      bloc('Saisis le coût du stock.', 'ko', '❌');
     return;
   }
 
