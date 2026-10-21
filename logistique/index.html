@@ -3762,16 +3762,51 @@ var Tri = { colis: [], coches: {}, client: null };
 
 function ongletTri() {
   poser(chargement('Colis à identifier…'));
-  Tri = { colis: [], coches: {}, client: null };
+  Tri = { colis: [], coches: {}, client: null, q: '', total: 0, poids: 0 };
 
   api('colis_a_identifier').then(function (d) {
     Tri.colis = d.colis;
-    rendreTri(d);
+    Tri.total = d.total;
+    Tri.poids = d.poids_total_lb;
+    rendreTri();
   }).catch(function (err) { poser(bloc(err.message, 'ko', '❌')); });
 }
 
-function rendreTri(d) {
-  if (!d.total) {
+/**
+ * Les colis que la recherche laisse passer.
+ *
+ * On cherche dans le tracking, le contenu et la ville : un agent qui a
+ * le colis en main lit le numéro, mais celui qui trie une pile cherche
+ * plutôt « torche » ou « Ouanaminthe ». Les espaces sont ignorés, parce
+ * qu'un numéro lu à voix haute s'écrit souvent par groupes.
+ */
+function triFiltres() {
+  var q = String(Tri.q || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (!q) return Tri.colis;
+
+  return Tri.colis.filter(function (c) {
+    return (String(c.tracking || '').toUpperCase().indexOf(q) !== -1)
+        || (String(c.contenu || '').toUpperCase().replace(/\s+/g, '').indexOf(q) !== -1)
+        || (String(c.ville_courante || '').toUpperCase().replace(/\s+/g, '')
+              .indexOf(q) !== -1);
+  });
+}
+
+function chercherTri() {
+  var ch = document.getElementById('tri-q');
+  Tri.q = ch ? ch.value : '';
+  rendreTri(true);
+}
+
+/**
+ * `garderFocus` sert à la frappe dans le champ de recherche : redessiner
+ * tout l'onglet referme le clavier du téléphone à chaque lettre. On
+ * remet donc le curseur là où il était.
+ */
+function rendreTri(garderFocus) {
+  var d = { total: Tri.total, poids_total_lb: Tri.poids, colis: triFiltres() };
+
+  if (!Tri.total) {
     poser(vide('✅', 'Aucun colis en attente d\'identification.') +
       '<button class="btn vide" onclick="allerA(\'stock\')">' +
       '🏬 Voir l\'inventaire</button>');
@@ -3779,7 +3814,16 @@ function rendreTri(d) {
   }
 
   var choisis = Object.keys(Tri.coches).filter(function (k) { return Tri.coches[k]; });
-  var vieux = d.colis.filter(function (c) { return c.jours_attente >= 7; }).length;
+  var vieux = Tri.colis.filter(function (c) { return c.jours_attente >= 7; }).length;
+  var filtre = !!String(Tri.q || '').trim();
+
+  /* Un colis coché puis masqué par la recherche reste coché — c'est le
+     but : on cherche successivement trois numéros pour les attribuer
+     ensemble. Mais attribuer ce qu'on ne voit pas est dangereux, donc
+     on le dit. */
+  var visibles = {};
+  d.colis.forEach(function (c) { visibles[c.tracking] = true; });
+  var caches = choisis.filter(function (t) { return !visibles[t]; }).length;
 
   poser(
     '<div class="stats" style="margin-bottom:12px">' +
@@ -3791,14 +3835,29 @@ function rendreTri(d) {
         '</div><div class="l">+ de 7 jours</div></div>' : '') +
     '</div>' +
 
-    bloc('Ces colis circulent normalement, mais aucun ne pourra devenir ' +
-         '« disponible » tant qu\'il n\'aura pas de client. Coche ceux qui ' +
-         'appartiennent à la même personne, puis attribue-les d\'un coup.',
-         'info', '🏷') +
+    '<div class="carte serree" style="margin-bottom:10px">' +
+      '<input type="search" id="tri-q" placeholder="Chercher un numéro, un contenu…" ' +
+        'value="' + e(Tri.q || '') + '" autocomplete="off" ' +
+        'autocapitalize="characters" spellcheck="false" ' +
+        'oninput="chercherTri()" style="width:100%;font-family:' +
+        '\'SF Mono\',Menlo,Consolas,monospace;letter-spacing:.4px">' +
+    '</div>' +
+
+    (filtre
+      ? '<div style="font-size:12.5px;color:var(--doux);margin:-4px 0 10px">' +
+        d.colis.length + ' sur ' + d.total + ' affiché(s)' +
+        (d.colis.length ? '' : ' — aucun colis ne correspond') + '.</div>'
+      : bloc('Ces colis circulent normalement, mais aucun ne pourra devenir ' +
+             '« disponible » tant qu\'il n\'aura pas de client. Coche ceux qui ' +
+             'appartiennent à la même personne, puis attribue-les d\'un coup.',
+             'info', '🏷')) +
 
     '<div class="rangee-btn" style="margin-bottom:10px">' +
-      '<button class="btn vide petit" onclick="cocherTri(true)">Tout cocher</button>' +
-      '<button class="btn vide petit" onclick="cocherTri(false)">Tout décocher</button>' +
+      '<button class="btn vide petit" onclick="cocherTri(true)">' +
+        (filtre ? 'Cocher les ' + d.colis.length + ' affichés' : 'Tout cocher') +
+      '</button>' +
+      '<button class="btn vide petit" onclick="cocherTri(false)">' +
+        (filtre ? 'Décocher les affichés' : 'Tout décocher') + '</button>' +
     '</div>' +
 
     d.colis.map(function (c) {
@@ -3820,20 +3879,44 @@ function rendreTri(d) {
     }).join('') +
 
     (choisis.length
-      ? '<button class="btn or" onclick="ouvrirAttribution()">👤 Attribuer ' +
+      ? (caches
+          ? bloc(caches + ' colis coché(s) ne sont pas affichés par la ' +
+                 'recherche. Ils seront attribués quand même.', 'attention', '⚠️')
+          : '') +
+        '<button class="btn or" onclick="ouvrirAttribution()">👤 Attribuer ' +
         choisis.length + ' colis à un client</button>'
       : '<div style="text-align:center;color:var(--doux);font-size:13px;' +
-        'padding:10px">Coche au moins un colis.</div>')
+        'padding:10px">' +
+        (filtre && !d.colis.length
+          ? 'Aucun colis ne correspond à cette recherche.'
+          : 'Coche au moins un colis.') + '</div>')
   );
+
+  /* Redessiner referme le clavier : on rend le curseur au champ, à la
+     position où il était. Sans ça, chercher un numéro de quinze
+     chiffres demande quinze réouvertures du clavier. */
+  if (garderFocus) {
+    var ch = document.getElementById('tri-q');
+    if (ch) { ch.focus(); ch.setSelectionRange(ch.value.length, ch.value.length); }
+  }
 }
 
+/* Cocher une case ne demande rien au serveur.
+   Chaque clic relançait colis_a_identifier : un aller-retour réseau par
+   case, et la liste qui se redessine après coup. Sur une pile de
+   quarante colis dans un dépôt en 4G, c'est inutilisable — et la
+   réponse ne contenait rien que l'écran ne sache déjà. */
 function basculerTri(t) {
   Tri.coches[t] = !Tri.coches[t];
-  api('colis_a_identifier').then(rendreTri).catch(function () {});
+  rendreTri();
 }
+
+/* Avec une recherche active, on ne coche QUE les colis affichés :
+   cocher silencieusement quarante colis qu'on ne voit pas, puis les
+   attribuer au même client, ne se répare qu'un par un. */
 function cocherTri(on) {
-  Tri.colis.forEach(function (c) { Tri.coches[c.tracking] = on; });
-  api('colis_a_identifier').then(rendreTri).catch(function () {});
+  triFiltres().forEach(function (c) { Tri.coches[c.tracking] = on; });
+  rendreTri();
 }
 
 function ouvrirAttribution() {
