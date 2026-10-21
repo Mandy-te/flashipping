@@ -1,0 +1,1815 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B3C4A">
+<title>Flashipping — Statistiques</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+
+/* ═══════════════════════════════════════════════════════════════
+   Même grammaire visuelle que les quatre autres applications,
+   en-tête sarcelle : celui qui a les cinq apps installées voit
+   d'un coup d'œil laquelle est ouverte.
+
+   Le document imprimé, lui, est identique partout — un rapport
+   Flashipping doit se reconnaître sur le papier, pas l'app qui
+   l'a produit.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --marine:#0B3C4A; --or:#11899E; --or-fonce:#0C6F80;
+  --vert:#1B7F4B; --rouge:#C62828; --orange:#E67E22; --bleu:#1565C0;
+  --fond:#F2F7F8; --carte:#FFFFFF; --bord:#D5E3E6;
+  --texte:#0E2429; --doux:#5A7278;
+  --ombre:0 1px 3px rgba(11,60,74,.12);
+  --haut:env(safe-area-inset-top,0px);
+  --bas:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--fond); color:var(--texte); overscroll-behavior-y:none;
+}
+input,select,textarea,button{font:inherit;color:inherit}
+a{color:var(--bleu)}
+
+#app{min-height:100vh;display:flex;flex-direction:column}
+.entete{
+  background:var(--marine); color:#fff;
+  padding:calc(var(--haut) + 10px) 14px 10px;
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;
+}
+.entete h1{font-size:16px;margin:0;font-weight:700;flex:1;letter-spacing:.2px}
+.entete .sous{font-size:11.5px;opacity:.78;font-weight:400;display:block}
+.pastille{width:9px;height:9px;border-radius:50%;background:#7FD9E6;flex:none}
+.pastille.hors{background:#FF8A80}
+.btn-entete{
+  background:rgba(255,255,255,.16);border:0;color:#fff;
+  width:38px;height:38px;border-radius:10px;font-size:17px;flex:none;
+}
+main{flex:1;padding:12px 12px 96px;max-width:760px;margin:0 auto;width:100%}
+
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;
+  border-top:1px solid var(--bord);display:flex;padding-bottom:var(--bas);
+  box-shadow:0 -1px 8px rgba(11,60,74,.08);
+}
+nav button{
+  flex:1;background:none;border:0;padding:8px 2px 7px;display:flex;
+  flex-direction:column;align-items:center;gap:3px;font-size:10.5px;
+  color:var(--doux);font-weight:600;
+}
+nav button .ic{font-size:21px;line-height:1}
+nav button.actif{color:var(--marine)}
+
+.carte{
+  background:var(--carte);border:1px solid var(--bord);border-radius:12px;
+  padding:14px;margin-bottom:12px;box-shadow:var(--ombre);
+}
+.carte.serree{padding:11px 12px}
+.titre-section{
+  font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--doux);margin:18px 2px 8px;
+}
+.titre-section:first-child{margin-top:2px}
+
+label.champ{display:block;margin-bottom:12px}
+label.champ > span{
+  display:block;font-size:12px;font-weight:700;color:var(--doux);
+  margin-bottom:5px;letter-spacing:.2px;
+}
+input[type=text],input[type=date],input[type=number],input[type=password],
+input[type=url],select{
+  width:100%;padding:13px 12px;border:1.5px solid var(--bord);
+  border-radius:10px;background:#fff;font-size:16px;
+}
+input:focus,select:focus{
+  outline:0;border-color:var(--or-fonce);box-shadow:0 0 0 3px rgba(17,137,158,.18);
+}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:14px;border:0;border-radius:11px;background:var(--or);
+  color:#fff;font-weight:800;font-size:15.5px;
+}
+.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.45}
+.btn.sombre{background:var(--marine);color:#fff}
+.btn.rouge{background:var(--rouge);color:#fff}
+.btn.vide{background:#fff;color:var(--marine);border:1.5px solid var(--bord);font-weight:700}
+.btn.petit{padding:10px;font-size:14px;border-radius:9px}
+.btn + .btn{margin-top:9px}
+
+.puces{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;
+  scrollbar-width:none;-ms-overflow-style:none}
+.puces::-webkit-scrollbar{display:none}
+.puce{
+  flex:none;padding:8px 13px;border-radius:999px;border:1.5px solid var(--bord);
+  background:#fff;font-size:13px;font-weight:650;white-space:nowrap;color:var(--doux);
+}
+.puce.actif{background:var(--marine);color:#fff;border-color:var(--marine)}
+
+.mono{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px}
+
+.msg{padding:12px 13px;border-radius:11px;margin-bottom:12px;font-size:14px;
+  font-weight:500;line-height:1.4;display:flex;gap:9px;align-items:flex-start}
+.msg.ok{background:#E8F5E9;color:#145A32;border:1px solid #BEE3C8}
+.msg.ko{background:#FFEBEE;color:#8E1F1F;border:1px solid #F5C6C6}
+.msg.info{background:#EAF3FB;color:#0D3C6E;border:1px solid #C3DEF3}
+.msg.attention{background:#FFF8E1;color:#7A4F00;border:1px solid #FFE0A3}
+.msg .ic{font-size:17px;flex:none;line-height:1.3}
+
+.vide{text-align:center;padding:42px 20px;color:var(--doux)}
+.vide .gros{font-size:40px;margin-bottom:10px;opacity:.5}
+.chargement{text-align:center;padding:30px;color:var(--doux);font-size:14px}
+.tourne{display:inline-block;width:19px;height:19px;border:2.5px solid var(--bord);
+  border-top-color:var(--or-fonce);border-radius:50%;animation:t .7s linear infinite;
+  vertical-align:-4px;margin-right:8px}
+@keyframes t{to{transform:rotate(360deg)}}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:9px}
+.stat{background:#fff;border:1px solid var(--bord);border-radius:11px;
+  padding:12px 9px;text-align:center}
+.stat .v{font-size:19px;font-weight:800;line-height:1.1}
+.stat .l{font-size:10px;color:var(--doux);margin-top:3px;font-weight:650;
+  text-transform:uppercase;letter-spacing:.4px}
+.stat.pos .v{color:#1B7F4B}
+.stat.neg .v{color:var(--rouge)}
+
+.total{display:flex;justify-content:space-between;align-items:baseline;
+  padding:8px 0;font-size:14.5px}
+.total + .total{border-top:1px solid var(--bord)}
+.total .l{color:var(--doux);font-weight:650}
+
+/* ── Sélecteur de période ─────────────────────────────────────── */
+.periode{
+  display:flex;align-items:center;gap:8px;background:#fff;
+  border:1px solid var(--bord);border-radius:12px;padding:8px 9px;
+  margin-bottom:10px;box-shadow:var(--ombre);
+}
+.periode .fleche{
+  flex:none;width:40px;height:40px;border-radius:10px;border:0;
+  background:#E7F1F3;color:var(--marine);font-size:17px;font-weight:800;
+}
+.periode .fleche:disabled{opacity:.3}
+.periode .milieu{flex:1;min-width:0;text-align:center}
+.periode .milieu .t{font-size:14.5px;font-weight:800;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.periode .milieu .s{font-size:11.5px;color:var(--doux);margin-top:2px}
+
+/* ── Une succursale, et la cascade qui mène à son résultat ─────
+   Le résultat ne s'affiche jamais seul : la contribution est un
+   fait, la quote-part une convention. Les montrer côte à côte est
+   la seule façon honnête de donner le troisième chiffre. */
+.ag-tete{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.rang{
+  flex:none;width:27px;height:27px;border-radius:8px;background:var(--marine);
+  color:#fff;font-weight:800;font-size:13px;display:flex;
+  align-items:center;justify-content:center;
+}
+.ag-tete .corps{flex:1;min-width:0}
+.ag-tete .t1{font-weight:800;font-size:15.5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ag-tete .t2{font-size:11.5px;color:var(--doux);margin-top:1px}
+.chip{
+  flex:none;padding:5px 10px;border-radius:9px;font-weight:800;font-size:13.5px;
+  white-space:nowrap;
+}
+.chip.pos{background:#E8F5E9;color:#145A32}
+.chip.neg{background:#FFEBEE;color:#8E1F1F}
+.chip.nul{background:#EEF2F3;color:var(--doux)}
+
+.cascade{border:1px solid var(--bord);border-radius:10px;overflow:hidden}
+.cascade .c-l{
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:9px 11px;font-size:13.5px;border-bottom:1px solid var(--bord);
+}
+.cascade .c-l:last-child{border-bottom:0}
+.cascade .c-l > span{color:var(--doux);min-width:0}
+.cascade .c-l > span i{font-style:normal;display:block;font-size:11px;opacity:.85}
+.cascade .c-l > b{flex:none;font-weight:800;white-space:nowrap}
+.cascade .c-l.neg > b{color:#C0392B}
+.cascade .c-l.somme{background:#F5FAFB}
+.cascade .c-l.somme > span,.cascade .c-l.total > span{color:var(--texte);font-weight:700}
+.cascade .c-l.total{background:var(--marine);color:#fff;font-size:15px}
+.cascade .c-l.total > span{color:#fff}
+.cascade .c-l.total > b{font-size:16.5px}
+.ag-pied{font-size:12px;color:var(--doux);margin-top:9px;line-height:1.5}
+
+/* ── Série d'évolution ────────────────────────────────────────── */
+.serie-l{margin-bottom:11px}
+.serie-tete{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:12.5px;margin-bottom:4px}
+.serie-tete .n{font-weight:700;color:var(--doux)}
+.serie-tete .v{font-weight:800;font-size:14px}
+.serie-tete .v.neg{color:var(--rouge)}
+.barre{height:10px;border-radius:7px;background:#E7F1F3;overflow:hidden}
+.barre > div{height:100%;border-radius:7px;background:var(--or);min-width:2px}
+.barre > div.neg{background:var(--rouge)}
+.barre > div.cour{background:var(--marine)}
+
+.voile{position:fixed;inset:0;background:rgba(14,36,41,.5);z-index:60;
+  display:flex;align-items:flex-end;justify-content:center}
+.modale{
+  background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;
+  padding:18px 16px calc(18px + var(--bas));max-height:92vh;overflow-y:auto;
+  animation:monte .22s ease-out;
+}
+@keyframes monte{from{transform:translateY(18px);opacity:.4}}
+.modale h3{margin:0 0 14px;font-size:17px}
+.poignee{width:40px;height:4px;background:var(--bord);border-radius:9px;
+  margin:0 auto 14px}
+
+#bandeau{
+  background:var(--rouge);color:#fff;padding:9px 13px;font-size:13px;
+  font-weight:700;display:none;align-items:center;gap:8px;
+  position:sticky;top:0;z-index:29;
+}
+#bandeau.vu{display:flex}
+
+#toast{position:fixed;left:12px;right:12px;bottom:calc(84px + var(--bas));
+  z-index:80;pointer-events:none}
+#toast div{
+  background:var(--marine);color:#fff;padding:13px 15px;border-radius:11px;
+  font-size:14px;font-weight:650;box-shadow:0 5px 22px rgba(11,60,74,.3);
+  animation:monte .2s ease-out;margin-top:8px;
+}
+#toast div.ko{background:var(--rouge)}
+#toast div.ok{background:var(--vert)}
+
+/* ── Impression ───────────────────────────────────────────────── */
+#zone-impression{display:none}
+@media print{
+  /* Le format de page n'est PAS figé ici : imprimer() injecte @page
+     au moment du clic. Une règle fixe à cet endroit imposerait un
+     format à tous les documents de l'application. */
+  body{background:#fff;margin:0}
+  /* .voile est frère de #app : sans cette ligne, c'est la modale
+     affichée à l'écran qui part sur le papier. */
+  #app,#toast,#bandeau,nav,.voile{display:none!important}
+  #zone-impression{display:block!important}
+
+  .doc{
+    font-family:Arial,Helvetica,sans-serif;color:#16222E;font-size:10.5pt;
+    line-height:1.45;
+  }
+  .doc-tete{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3px solid #0B2545;padding-bottom:4mm;margin-bottom:5mm;
+  }
+  .doc-marque{font-size:21pt;font-weight:bold;letter-spacing:3px;color:#0B2545;
+    line-height:1}
+  .doc-eclair{color:#F0A818}
+  .doc-slogan{font-size:8pt;font-weight:bold;color:#C62828;letter-spacing:2.5px;
+    margin-top:1mm}
+  .doc-coord{font-size:7.5pt;color:#5F7183;text-align:right;line-height:1.5}
+  .doc-titre{
+    background:#0B2545;color:#fff;padding:2.5mm 4mm;font-size:12pt;
+    font-weight:bold;letter-spacing:1px;display:flex;
+    justify-content:space-between;margin-bottom:5mm;
+  }
+
+  table.doc-t{width:100%;border-collapse:collapse;margin-bottom:4mm}
+  table.doc-t th{
+    background:#EEF2F6;font-size:7.5pt;text-transform:uppercase;letter-spacing:.6px;
+    color:#0B2545;padding:1.8mm;text-align:left;border-bottom:1.5px solid #0B2545;
+  }
+  table.doc-t td{padding:1.8mm;border-bottom:1px solid #E6ECF1;font-size:9pt;
+    vertical-align:top}
+  table.doc-t .num{text-align:right;white-space:nowrap}
+  table.doc-t .ref{font-family:'Courier New',monospace;font-size:8.5pt}
+  table.doc-t tfoot td{
+    font-weight:bold;border-top:1.5px solid #0B2545;border-bottom:0;
+    background:#F7F9FB;
+  }
+  table.doc-t td.pos{color:#145A32;font-weight:bold}
+  table.doc-t td.neg{color:#8E1F1F;font-weight:bold}
+
+  .doc-h2{
+    font-size:9pt;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;
+    color:#0B2545;border-bottom:1.5px solid #0B2545;padding-bottom:1mm;
+    margin:6mm 0 2.5mm;
+  }
+  .doc-h2:first-of-type{margin-top:0}
+  .doc-cadre{border:1.5px solid #0B2545;padding:3mm 4mm;margin-bottom:5mm}
+  .doc-cadre .l{display:flex;justify-content:space-between;padding:1mm 0;
+    font-size:10pt}
+  .doc-cadre .l.creux{font-size:8.5pt;color:#5F7183}
+  .doc-cadre .l.fort{font-size:12.5pt;font-weight:bold;
+    border-top:1px solid #0B2545;margin-top:1.5mm;padding-top:2mm}
+  .doc-alerte{
+    border-left:3px solid #C62828;background:#FDF3F3;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-bottom:3mm;color:#8E1F1F;
+  }
+  .doc-note{
+    background:#F7F9FB;border-left:3px solid #F0A818;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-top:4mm;color:#16222E;
+  }
+  .doc-note b{display:block;margin-bottom:1mm}
+  .doc-sign{display:flex;gap:10mm;margin-top:12mm}
+  .doc-sign div{flex:1;border-top:1px solid #16222E;padding-top:1.5mm;
+    font-size:8pt;color:#5F7183}
+  .doc-pied{
+    margin-top:7mm;border-top:1px solid #D9E0E6;padding-top:2.5mm;
+    font-size:7.5pt;color:#5F7183;text-align:center;line-height:1.6;
+  }
+  .doc-pied b{color:#C62828;letter-spacing:1.5px}
+  .doc-saut{page-break-before:always}
+  /* Un tableau de douze succursales ne doit pas se couper au milieu
+     d'une ligne : la moitié haute d'un chiffre n'est pas un chiffre. */
+  table.doc-t tr{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<div id="bandeau"><span>📴</span><span id="bandeau-txt">Hors ligne</span></div>
+<div id="app"></div>
+<div id="toast"></div>
+<div id="zone-impression"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLASHIPPING — STATISTIQUES
+
+   Cette application sert à évaluer des succursales, donc à juger le
+   travail de collègues. Deux principes en découlent.
+
+   1. LE FAIT ET LA CONVENTION NE SE MÉLANGENT PAS. Les volumes — colis,
+      livres, clients, commandes — sont des faits lus dans les tables.
+      La rentabilité, non : elle dépend de la façon de répartir les
+      coûts partagés, et cette façon change le classement. L'écran
+      affiche donc toujours les trois niveaux ensemble — contribution,
+      quote-part, résultat — et nomme la clé employée. Jamais un
+      résultat seul.
+
+   2. L'APPLICATION NE CORRIGE PAS LES DONNÉES, ELLE LES DÉNONCE. Si
+      une succursale encaisse sans qu'aucune charge ne lui soit
+      imputée, le serveur le dit en alerte au lieu de la couronner
+      meilleure du réseau.
+
+   Elle ne fait que lire. Aucun écran d'ici n'écrit dans le classeur.
+   ═══════════════════════════════════════════════════════════════════ */
+
+var APP = 'statistiques';
+
+var CLE_URL   = 'fls_api_url';
+var CLE_TOKEN = 'fls_sta_token';
+var CLE_USER  = 'fls_sta_user';
+var CLE_CACHE = 'fls_sta_cache';
+
+var S = {
+  lire: function (c, d) {
+    try { var v = localStorage.getItem(c); return v === null ? d : v; }
+    catch (e) { return d; }
+  },
+  ecrire: function (c, v) { try { localStorage.setItem(c, v); } catch (e) {} },
+  effacer: function (c) { try { localStorage.removeItem(c); } catch (e) {} },
+  lireJson: function (c, d) {
+    try { return JSON.parse(localStorage.getItem(c)) || d; } catch (e) { return d; }
+  },
+  ecrireJson: function (c, v) { S.ecrire(c, JSON.stringify(v)); }
+};
+
+var Etat = {
+  url: S.lire(CLE_URL, ''),
+  token: S.lire(CLE_TOKEN, ''),
+  user: S.lireJson(CLE_USER, null),
+  ref: null,
+  onglet: 'tableau'
+};
+
+/* Les noms de période sont ceux du serveur (bornes_). « mois » au lieu
+   de « mensuel » tombe dans le défaut et renvoie l'année entière. */
+var PERIODES = [
+  { id: 'journalier',   nom: 'Jour' },
+  { id: 'hebdomadaire', nom: 'Semaine' },
+  { id: 'mensuel',      nom: 'Mois' },
+  { id: 'trimestriel',  nom: 'Trimestre' },
+  { id: 'semestriel',   nom: 'Semestre' },
+  { id: 'annuel',       nom: 'Année' }
+];
+
+var Per = { type: 'mensuel', ref: '', agence: '',
+            data: null, err: null, enCours: false };
+
+var METRIQUES = [
+  { id: 'revenus_gdes',     nom: 'Revenus',   fmt: 'htg' },
+  { id: 'resultat_gdes',    nom: 'Résultat',  fmt: 'htg' },
+  { id: 'colis_traites',    nom: 'Colis',     fmt: 'nb'  },
+  { id: 'livres_lb',        nom: 'Livres',    fmt: 'lb'  },
+  { id: 'clients_nouveaux', nom: 'Nouveaux clients', fmt: 'nb' },
+  { id: 'commandes',        nom: 'Commandes', fmt: 'nb'  }
+];
+
+var Evo = { metrique: 'revenus_gdes', nb: 6, data: null, err: null };
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  API
+// ═══════════════════════════════════════════════════════════════════
+
+function api(action, params) {
+  params = params || {};
+  if (!Etat.url) return Promise.reject(new Error('Aucune URL d\'API configurée.'));
+  if (!navigator.onLine) {
+    return Promise.reject(new Error(
+      'Pas de réseau. Les statistiques se calculent sur le serveur : ' +
+      'il n\'y a rien à lire hors ligne.'));
+  }
+
+  var corps = Object.assign({ action: action }, params);
+  if (Etat.token && !corps.token) corps.token = Etat.token;
+
+  // text/plain : Apps Script ne répond pas au préalable CORS
+  return fetch(Etat.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(corps),
+    redirect: 'follow'
+  })
+  .then(function (r) { return r.text(); })
+  .then(function (txt) {
+    var d;
+    try { d = JSON.parse(txt); }
+    catch (e) {
+      if (txt.indexOf('<!DOCTYPE') === 0 || txt.indexOf('<html') === 0) {
+        throw new Error(Etat.token
+          ? 'Google a renvoyé une page d\'erreur : le script a échoué ou a ' +
+            'dépassé son temps d\'exécution. Une série de 24 périodes relit ' +
+            'tout le classeur 24 fois — réduis le nombre de périodes, ou ' +
+            'regarde « Exécutions » dans Apps Script.'
+          : 'L\'API a renvoyé une page web. Vérifie que le déploiement est ' +
+            'réglé sur « Accès : Tout le monde ».');
+      }
+      throw new Error('Réponse illisible du serveur.');
+    }
+    if (d.ok === false) { var x = new Error(d.erreur || 'Erreur inconnue.');
+                          x.metier = true; x.detail = d; throw x; }
+    return d.data !== undefined ? d.data : d;
+  })
+  .catch(function (er) {
+    if (er.metier) throw er;
+    if (/Session expirée|Jeton/i.test(er.message)) { deconnecter(); throw er; }
+    throw er;
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  OUTILS
+// ═══════════════════════════════════════════════════════════════════
+
+function e(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function n2(v) { return (Math.round((Number(v) || 0) * 100) / 100).toFixed(2); }
+function n0(v) { return Math.round(Number(v) || 0).toLocaleString('fr-FR'); }
+function n1(v) { return (Math.round((Number(v) || 0) * 10) / 10).toLocaleString('fr-FR'); }
+function usd(v) { return n2(v) + ' $'; }
+function htg(v) { return n0(v) + ' HTG'; }
+function lb(v)  { return n1(v) + ' lb'; }
+function pct(v) { return (Math.round((Number(v) || 0) * 10) / 10) + ' %'; }
+function signe(v) { return (Number(v) || 0) > 0 ? '+' : ''; }
+
+/** Les gros montants se lisent mieux abrégés sur un téléphone. */
+function court(v) {
+  var n = Number(v) || 0, s = n < 0 ? '-' : '';
+  n = Math.abs(n);
+  if (n >= 1000000) return s + (n / 1000000).toFixed(1).replace('.0', '') + ' M';
+  if (n >= 10000)   return s + Math.round(n / 1000) + ' k';
+  return s + n0(n);
+}
+
+/**
+ * « 2026-09-30 » tout seul se lit en UTC, et minuit UTC tombe la veille
+ * au soir en Haïti. Une période affichée telle quelle reculait d'un
+ * jour — et un mois entier pouvait basculer sur le précédent.
+ */
+function jourLocal_(d) {
+  var j = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(d).trim());
+  return j ? new Date(Number(j[1]), Number(j[2]) - 1, Number(j[3])) : new Date(d);
+}
+function ymdLocal_(d) {
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) +
+         '-' + ('0' + d.getDate()).slice(-2);
+}
+function dateCourte(d) {
+  if (!d) return '';
+  var x = jourLocal_(d);
+  if (isNaN(x)) return String(d).substring(0, 10);
+  return ('0' + x.getDate()).slice(-2) + '/' + ('0' + (x.getMonth() + 1)).slice(-2) +
+         '/' + x.getFullYear();
+}
+function aujourdhui() { return ymdLocal_(new Date()); }
+
+function toast(txt, genre) {
+  var z = document.getElementById('toast');
+  var d = document.createElement('div');
+  if (genre) d.className = genre;
+  d.textContent = txt;
+  z.appendChild(d);
+  setTimeout(function () { d.remove(); }, genre === 'ko' ? 5600 : 3200);
+}
+
+function bloc(msg, genre, icone) {
+  return '<div class="msg ' + genre + '"><span class="ic">' + (icone || 'ℹ️') +
+         '</span><span>' + e(msg) + '</span></div>';
+}
+function chargement(t) {
+  return '<div class="chargement"><span class="tourne"></span>' +
+         e(t || 'Chargement…') + '</div>';
+}
+function vide(ic, t) {
+  return '<div class="vide"><div class="gros">' + ic + '</div>' + e(t) + '</div>';
+}
+
+function nomPeriode(id) {
+  var p = PERIODES.filter(function (x) { return x.id === id; })[0];
+  return p ? p.nom : id;
+}
+
+/**
+ * Déplace la période de référence d'un cran.
+ *
+ * On ancre au 1er du mois avant toute arithmétique de mois : partir du
+ * 31 octobre et retirer un mois donne le 1er octobre en passant par le
+ * 31 septembre, qui n'existe pas et que le navigateur traduit en 1er
+ * octobre — on sauterait donc un mois sur deux. Le serveur normalise
+ * ensuite la borne exacte ; il suffit d'atterrir dans la bonne période.
+ */
+function decaler(sens) {
+  var d = jourLocal_(Per.ref || aujourdhui());
+  if (isNaN(d)) d = new Date();
+
+  if (Per.type === 'journalier')        d.setDate(d.getDate() + sens);
+  else if (Per.type === 'hebdomadaire') d.setDate(d.getDate() + sens * 7);
+  else if (Per.type === 'annuel')       { d.setMonth(0, 1);
+                                          d.setFullYear(d.getFullYear() + sens); }
+  else {
+    var pas = Per.type === 'trimestriel' ? 3 : Per.type === 'semestriel' ? 6 : 1;
+    d.setDate(1);
+    d.setMonth(d.getMonth() + sens * pas);
+  }
+
+  Per.ref = ymdLocal_(d);
+  chargerStats();
+}
+
+/**
+ * Les périodes futures n'ont rien à montrer : la flèche s'éteint.
+ *
+ * Le test porte sur la FIN de la période chargée, pas sur la date de
+ * référence. Comparer la référence laissait avancer d'un cran de trop :
+ * revenu sur septembre puis repassé en avant, la référence devenait le
+ * 1er octobre — antérieure à aujourd'hui, donc la flèche restait
+ * active et ouvrait novembre, vide par construction.
+ */
+function periodeFuture() {
+  if (Per.data && Per.data.periode && Per.data.periode.fin) {
+    return String(Per.data.periode.fin) >= aujourdhui();
+  }
+  var d = jourLocal_(Per.ref || aujourdhui());
+  return !isNaN(d) && ymdLocal_(d) >= aujourdhui();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  SQUELETTE
+// ═══════════════════════════════════════════════════════════════════
+
+var TOUS_ONGLETS = [
+  { id: 'tableau',   ic: '📊', nom: 'Période',   droit: 'voir_stats' },
+  { id: 'evolution', ic: '📈', nom: 'Évolution', droit: 'voir_stats' },
+  { id: 'rapport',   ic: '🖨️', nom: 'Rapport',   droit: 'voir_stats' }
+];
+
+var ONGLETS = TOUS_ONGLETS;
+
+function majOnglets() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  ONGLETS = TOUS_ONGLETS.filter(function (o) { return d[o.droit]; });
+  if (!ONGLETS.length) ONGLETS = [TOUS_ONGLETS[0]];
+  if (!ONGLETS.some(function (o) { return o.id === Etat.onglet; })) {
+    Etat.onglet = ONGLETS[0].id;
+  }
+}
+
+var Nav = { modaleOuverte: false };
+
+function dessiner() {
+  var app = document.getElementById('app');
+  if (!Etat.url)   { app.innerHTML = ecranReglage(); return; }
+  if (!Etat.token) { app.innerHTML = ecranConnexion(); chargerUtilisateurs(); return; }
+
+  if (!Etat.user || !Etat.user.droits || !Etat.user.droits.voir_stats) {
+    app.innerHTML =
+      '<header class="entete"><h1>Statistiques<span class="sous">' +
+      e(Etat.user ? Etat.user.nom : '') + '</span></h1>' +
+      '<button class="btn-entete" onclick="deconnecter()">⏻</button></header>' +
+      '<main>' + bloc('Les statistiques sont réservées à la direction, aux ' +
+        'responsables de succursale et à la comptabilité. Ton compte n\'y a ' +
+        'pas accès.', 'attention', '🔒') +
+      '<button class="btn vide" onclick="deconnecter()">Se déconnecter</button></main>';
+    return;
+  }
+
+  majOnglets();
+
+  var u = Etat.user;
+  app.innerHTML =
+    '<header class="entete">' +
+      '<span class="pastille' + (navigator.onLine ? '' : ' hors') + '"></span>' +
+      '<h1>' + e(titreOnglet()) + '<span class="sous">' + e(u.nom) +
+        ' · ' + e(u.role_libelle || u.role) + '</span></h1>' +
+      '<button class="btn-entete" onclick="ouvrirReglages()">⚙️</button>' +
+    '</header>' +
+    '<main id="contenu">' + chargement() + '</main>' +
+    '<nav>' + ONGLETS.map(function (o) {
+      return '<button class="' + (Etat.onglet === o.id ? 'actif' : '') +
+        '" onclick="allerA(\'' + o.id + '\')"><span class="ic">' + o.ic +
+        '</span>' + e(o.nom) + '</button>';
+    }).join('') + '</nav>';
+
+  majBandeau();
+  rendreOnglet();
+}
+
+function titreOnglet() {
+  var o = ONGLETS.filter(function (x) { return x.id === Etat.onglet; })[0];
+  return o ? o.nom : 'Statistiques';
+}
+
+function allerA(id) {
+  if (Etat.onglet === id) return;
+  Etat.onglet = id;
+  try { history.pushState({ onglet: id }, '', '#' + id); } catch (e2) {}
+  dessiner();
+}
+
+window.addEventListener('popstate', function (ev) {
+  if (Nav.modaleOuverte) { fermerModaleDom(); return; }
+  var st = ev.state || {};
+  if (st.onglet && st.onglet !== Etat.onglet) {
+    Etat.onglet = st.onglet; dessiner();
+  }
+});
+
+function poser(h) { var c = document.getElementById('contenu'); if (c) c.innerHTML = h; }
+
+function rendreOnglet() {
+  switch (Etat.onglet) {
+    case 'tableau':   return ongletTableau();
+    case 'evolution': return ongletEvolution();
+    case 'rapport':   return ongletRapport();
+  }
+}
+
+function majBandeau() {
+  var b = document.getElementById('bandeau');
+  if (!b) return;
+  b.className = navigator.onLine ? '' : 'vu';
+  if (!navigator.onLine) {
+    document.getElementById('bandeau-txt').textContent =
+      'Hors ligne — les statistiques se calculent sur le serveur';
+  }
+  var p = document.querySelector('.pastille');
+  if (p) p.className = 'pastille' + (navigator.onLine ? '' : ' hors');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  RÉGLAGE INITIAL ET CONNEXION
+// ═══════════════════════════════════════════════════════════════════
+
+function ecranReglage() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">' +
+    'Première configuration</span></h1></header><main><div class="carte">' +
+    bloc('Colle l\'URL de ton déploiement Apps Script — la même que pour les ' +
+         'autres applications. Elle se termine par /exec.', 'info', '🔗') +
+    '<label class="champ"><span>URL de l\'API</span>' +
+    '<input type="url" id="in-url" placeholder="https://script.google.com/macros/s/…/exec" ' +
+    'autocomplete="off" autocapitalize="off" spellcheck="false"></label>' +
+    '<button class="btn" onclick="validerUrl()">Vérifier et continuer</button>' +
+    '<div id="res-url"></div></div></main>';
+}
+
+function validerUrl() {
+  var v = (document.getElementById('in-url').value || '').trim();
+  var res = document.getElementById('res-url');
+
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec$/.test(v)) {
+    res.innerHTML = bloc('L\'URL doit finir par /exec, pas /dev.', 'ko', '⚠️');
+    return;
+  }
+  res.innerHTML = chargement('Vérification…');
+  Etat.url = v;
+
+  api('diag').then(function (d) {
+    if (d.modules && !d.modules.statistiques) {
+      Etat.url = '';
+      res.innerHTML = bloc('L\'API répond, mais Stats.gs n\'y est pas ' +
+        'enregistré. Ouvre le projet Apps Script, colle le fichier, ' +
+        'enregistre, puis redéploie en « Nouvelle version ».', 'ko', '❌');
+      return;
+    }
+    S.ecrire(CLE_URL, v);
+    toast('API joignable.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    Etat.url = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ecranConnexion() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">Statistiques' +
+    '</span></h1></header><main><div class="carte">' +
+    '<div id="liste-users">' + chargement('Chargement des comptes…') + '</div></div>' +
+    '<button class="btn vide petit" onclick="changerUrl()">Changer l\'URL de l\'API</button>' +
+    '</main>';
+}
+
+function chargerUtilisateurs() {
+  api('utilisateurs_publics', { app: APP }).then(function (liste) {
+    var z = document.getElementById('liste-users');
+    if (!z) return;
+    /* Le serveur n'a renvoyé que les comptes autorisés dans cette app.
+       Un second filtre ici ne protégerait rien et finirait par oublier
+       un rôle ajouté plus tard. */
+    if (!liste.length) {
+      z.innerHTML = bloc('Aucun compte autorisé à lire les statistiques.',
+                         'attention', '⚠️');
+      return;
+    }
+    z.innerHTML =
+      '<label class="champ"><span>Qui es-tu ?</span><select id="in-user">' +
+      liste.map(function (u) {
+        return '<option value="' + e(u.user_id) + '">' + e(u.nom) + ' — ' +
+               e(u.role_libelle || u.role) + '</option>';
+      }).join('') + '</select></label>' +
+      '<label class="champ"><span>Code à 6 chiffres</span>' +
+      '<input type="password" id="in-code" inputmode="numeric" maxlength="6" ' +
+      'autocomplete="current-password" style="text-align:center;font-size:25px;' +
+      'letter-spacing:9px;font-weight:700"></label>' +
+      '<button class="btn" id="btn-login" onclick="connecter()">Entrer</button>' +
+      '<div id="res-login"></div>';
+
+    var ic = document.getElementById('in-code');
+    ic.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') connecter(); });
+    ic.addEventListener('input', function () { if (ic.value.length === 6) connecter(); });
+  }).catch(function (err) {
+    var z = document.getElementById('liste-users');
+    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function connecter() {
+  var uid = document.getElementById('in-user').value;
+  var code = document.getElementById('in-code').value;
+  var b = document.getElementById('btn-login');
+  var res = document.getElementById('res-login');
+
+  if (!/^\d{6}$/.test(code)) { res.innerHTML = bloc('Six chiffres.', 'ko', '⚠️'); return; }
+  b.disabled = true; b.textContent = 'Connexion…'; res.innerHTML = '';
+
+  api('login', { user_id: uid, code: code, app: APP }).then(function (d) {
+    Etat.token = d.token; Etat.user = d.utilisateur;
+    S.ecrire(CLE_TOKEN, d.token); S.ecrireJson(CLE_USER, d.utilisateur);
+    verifierVersion();
+    return chargerReferentiels();
+  }).then(function () {
+    toast('Bienvenue ' + (Etat.user.nom || '') + '.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Entrer';
+    document.getElementById('in-code').value = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function chargerReferentiels() {
+  return api('referentiels').then(function (r) {
+    Etat.ref = r;
+    S.ecrireJson(CLE_CACHE, { ref: r, date: Date.now() });
+    return r;
+  }).catch(function (err) {
+    var c = S.lireJson(CLE_CACHE, null);
+    if (c && c.ref) { Etat.ref = c.ref; return c.ref; }
+    throw err;
+  });
+}
+
+function deconnecter() {
+  S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  Etat.token = ''; Etat.user = null; Etat.onglet = 'tableau';
+  Per.data = null; Evo.data = null;
+  dessiner();
+}
+
+function changerUrl() {
+  if (!confirm('Changer l\'URL de l\'API ? Tu devras te reconnecter.')) return;
+  S.effacer(CLE_URL); S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  Etat.url = ''; Etat.token = ''; Etat.user = null;
+  dessiner();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET PÉRIODE
+// ═══════════════════════════════════════════════════════════════════
+
+function ongletTableau() {
+  repeindre();
+  if (!Per.data && !Per.err && !Per.enCours) chargerStats();
+}
+
+/** Le sélecteur est commun aux trois onglets : même période partout. */
+function selecteurPeriode() {
+  var agences = (Etat.ref && Etat.ref.agences) || [];
+  var comparer = Etat.user && Etat.user.droits && Etat.user.droits.comparer_agences;
+  var libelle = Per.data ? Per.data.libelle_periode
+                         : nomPeriode(Per.type) + ' du ' + dateCourte(Per.ref);
+
+  var h = '<div class="puces">' + PERIODES.map(function (p) {
+    return '<button class="puce' + (Per.type === p.id ? ' actif' : '') +
+      '" onclick="choisirPeriode(\'' + p.id + '\')">' + e(p.nom) + '</button>';
+  }).join('') + '</div>';
+
+  h += '<div class="periode">' +
+    '<button class="fleche" onclick="decaler(-1)" aria-label="Période précédente">◀</button>' +
+    '<div class="milieu"><div class="t">' + e(libelle) + '</div>' +
+      '<div class="s">' + (Per.data
+        ? dateCourte(Per.data.periode.debut) + ' → ' + dateCourte(Per.data.periode.fin)
+        : nomPeriode(Per.type)) + '</div></div>' +
+    '<button class="fleche" onclick="decaler(1)" ' +
+      (periodeFuture() ? 'disabled ' : '') + 'aria-label="Période suivante">▶</button>' +
+    '</div>';
+
+  if (comparer && agences.length > 1) {
+    h += '<label class="champ"><span>Succursale</span>' +
+      '<select onchange="choisirAgence(this.value)">' +
+      '<option value="">Toutes les succursales</option>' +
+      agences.filter(function (a) { return String(a.agence_id).trim() !== 'AG00'; })
+        .map(function (a) {
+          return '<option value="' + e(a.agence_id) + '"' +
+            (Per.agence === String(a.agence_id) ? ' selected' : '') + '>' +
+            e(a.ville || a.agence_id) + '</option>';
+        }).join('') + '</select></label>';
+  }
+
+  return h;
+}
+
+function choisirPeriode(id) {
+  if (Per.type === id) return;
+  Per.type = id;
+  Evo.data = null;          // la série suit le type de période
+  chargerStats();
+}
+function choisirAgence(v) {
+  Per.agence = v || '';
+  Evo.data = null;
+  chargerStats();
+}
+
+function chargerStats() {
+  Per.data = null; Per.err = null; Per.enCours = true;
+  repeindre();
+
+  return api('stats', { type_periode: Per.type, ref: Per.ref,
+                        agence_id: Per.agence })
+    .then(function (d) {
+      Per.enCours = false; Per.data = d;
+      repeindre();
+      return d;
+    })
+    .catch(function (err) {
+      Per.enCours = false; Per.err = err.message;
+      repeindre();
+    });
+}
+
+/**
+ * Repeint l'onglet courant sans relancer d'appel.
+ *
+ * Séparer le dessin du chargement n'est pas de l'élégance : la version
+ * précédente redessinait en appelant ongletTableau(), qui relance un
+ * chargement s'il n'y a pas de données. Une erreur réseau laissait donc
+ * Per.data vide et bouclait sur l'API jusqu'au quota.
+ */
+function repeindre() {
+  if (Etat.onglet !== 'tableau' && Etat.onglet !== 'rapport') return;
+  var corps = Per.err     ? bloc(Per.err, 'ko', '❌')
+            : Per.enCours ? chargement('Calcul de la période…')
+            : Per.data    ? (Etat.onglet === 'tableau' ? corpsTableau() : corpsRapport())
+                          : chargement();
+  poser(selecteurPeriode() + '<div id="zone-stats">' + corps + '</div>');
+}
+
+function corpsTableau() {
+  if (Per.err) return bloc(Per.err, 'ko', '❌');
+  var d = Per.data;
+  if (!d) return chargement();
+
+  var t = d.totaux;
+  var h = '';
+
+  (d.alertes || []).forEach(function (a) {
+    h += bloc(a, 'attention', '⚠️');
+  });
+
+  if (!d.comparaison) {
+    h += bloc('Ton compte voit sa propre succursale. La quote-part des coûts ' +
+      'partagés reste calculée sur le réseau entier — sinon elle te ' +
+      'chargerait de tout.', 'info', '🏢');
+  }
+
+  // ── Les volumes : des faits ──
+  h += '<div class="titre-section">Volumes de la période</div>' +
+    '<div class="stats">' +
+    tuile(n0(t.colis_traites), 'Colis traités') +
+    tuile(n0(t.colis_livres), 'Dont livrés') +
+    tuile(n1(t.livres_lb), 'Livres') +
+    tuile(n0(t.clients_actifs), 'Clients servis') +
+    tuile(n0(t.clients_nouveaux), 'Nouveaux') +
+    tuile(n0(t.commandes), 'Commandes') +
+    '</div>';
+
+  if (t.commandes > 0) {
+    h += '<div class="carte serree" style="margin-top:12px">' +
+      '<div class="total"><span class="l">Valeur des commandes</span><b>' +
+        usd(t.commandes_usd) + '</b></div>' +
+      '<div class="total"><span class="l">Commission encaissée</span><b>' +
+        usd(t.commission_usd) + '</b></div></div>';
+  }
+
+  // ── L'argent : un fait, puis une convention ──
+  h += '<div class="titre-section">Argent de la période</div>' +
+    '<div class="stats">' +
+    tuile(court(t.revenus_gdes), 'Revenus HTG') +
+    tuile(court(t.charges_directes_gdes), 'Charges directes') +
+    tuile(signe(t.resultat_gdes) + court(t.resultat_gdes), 'Résultat',
+          t.resultat_gdes > 0 ? 'pos' : t.resultat_gdes < 0 ? 'neg' : '') +
+    '</div>';
+
+  if (t.couts_partages_gdes > 0) {
+    h += '<div class="carte serree" style="margin-top:12px">' +
+      '<div class="total"><span class="l">Coûts partagés du réseau</span><b>' +
+        htg(t.couts_partages_gdes) + '</b></div>' +
+      '<div style="font-size:12px;color:var(--doux);margin-top:6px;line-height:1.45">' +
+        'Marchandise en transit et frais qui servent toutes les succursales. ' +
+        'Répartis <b>' + e(d.cle_libelle) + '</b>' +
+        (d.cle_repartition === 'aucune'
+          ? ' — donc imputés à personne.'
+          : ', car c\'est le poids qui fait le coût chez le transitaire.') +
+      '</div></div>';
+  }
+
+  // ── Les succursales ──
+  h += '<div class="titre-section">' +
+    (d.agences.length > 1 ? 'Classement des succursales' : 'Succursale') +
+    '</div>';
+
+  if (!d.agences.length) {
+    h += vide('🏢', 'Aucune succursale active.');
+  } else {
+    d.agences.forEach(function (a, i) {
+      h += carteAgence(a, i + 1, d);
+    });
+  }
+
+  h += '<button class="btn sombre" style="margin-top:4px" onclick="imprimerPeriode()">' +
+    '🖨️ Imprimer ce rapport</button>';
+
+  return h;
+}
+
+function tuile(v, l, genre) {
+  return '<div class="stat' + (genre ? ' ' + genre : '') + '"><div class="v">' +
+    e(v) + '</div><div class="l">' + e(l) + '</div></div>';
+}
+
+/**
+ * Une succursale, et la cascade qui mène à son résultat.
+ *
+ * L'ordre des lignes n'est pas décoratif : il force à lire la
+ * contribution (un fait) avant le résultat (une convention). Un
+ * responsable qui ne voit que « −1 240 HTG » conteste le chiffre ; le
+ * même responsable qui voit d'où vient sa quote-part discute de la
+ * clé, ce qui est la bonne conversation.
+ */
+function carteAgence(a, rang, d) {
+  var r = Number(a.resultat_gdes) || 0;
+  var classe = r > 0 ? 'pos' : r < 0 ? 'neg' : 'nul';
+
+  var sous = e(a.agence_id);
+  if (a.part_poids_pct !== null && a.part_poids_pct !== undefined) {
+    sous += ' · ' + pct(a.part_poids_pct) + ' du poids du réseau';
+  }
+
+  var h = '<div class="carte"><div class="ag-tete">' +
+    (d.agences.length > 1 ? '<span class="rang">' + rang + '</span>' : '') +
+    '<div class="corps"><div class="t1">' + e(a.ville) + '</div>' +
+      '<div class="t2">' + sous + '</div></div>' +
+    '<span class="chip ' + classe + '">' + signe(r) + court(r) + '</span>' +
+    '</div>';
+
+  h += '<div class="cascade">' +
+    cascadeL('Revenus encaissés', htg(a.revenus_gdes),
+             a.nb_revenus + (a.nb_revenus === 1 ? ' écriture' : ' écritures')) +
+    cascadeL('Charges directes', '− ' + htg(a.charges_directes_gdes),
+             a.nb_charges === 0 ? 'aucune dépense imputée'
+               : a.nb_charges + (a.nb_charges === 1 ? ' dépense' : ' dépenses'),
+             'neg') +
+    cascadeL('Contribution', htg(a.contribution_gdes),
+             'un fait : ce que la succursale a dégagé', 'somme') +
+    (d.cle_repartition === 'aucune'
+      ? cascadeL('Quote-part des coûts partagés', '0 HTG',
+                 'aucune répartition choisie — le résultat est donc surévalué',
+                 'neg')
+      : cascadeL('Quote-part des coûts partagés', '− ' + htg(a.quote_part_gdes),
+                 'une convention : répartition ' + d.cle_libelle, 'neg')) +
+    cascadeL('Résultat', htg(a.resultat_gdes), null, 'total') +
+    '</div>';
+
+  var pied = [];
+  pied.push(n0(a.colis_traites) + ' colis traités');
+  if (a.colis_livres !== a.colis_traites) pied.push(n0(a.colis_livres) + ' livrés');
+  pied.push(lb(a.livres_lb));
+  if (a.revenu_par_lb_gdes > 0) pied.push(n0(a.revenu_par_lb_gdes) + ' HTG la livre');
+  pied.push(n0(a.clients_actifs) + ' clients servis');
+  if (a.clients_nouveaux) pied.push(n0(a.clients_nouveaux) + ' nouveaux');
+  if (a.commandes) pied.push(n0(a.commandes) + ' commandes · ' + usd(a.commission_usd) +
+                             ' de commission');
+
+  h += '<div class="ag-pied">' + e(pied.join(' · ')) + '</div></div>';
+  return h;
+}
+
+function cascadeL(libelle, valeur, aide, classe) {
+  return '<div class="c-l' + (classe ? ' ' + classe : '') + '">' +
+    '<span>' + e(libelle) + (aide ? '<i>' + e(aide) + '</i>' : '') + '</span>' +
+    '<b>' + e(valeur) + '</b></div>';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET ÉVOLUTION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Un chiffre seul ne dit rien.
+ *
+ * 16 000 HTG de revenus est un bon mois ou un mauvais mois selon les
+ * onze précédents. C'est cette série qui distingue une succursale qui
+ * démarre d'une succursale qui décline — la seule chose qu'on puisse
+ * honnêtement appeler une évaluation.
+ */
+function ongletEvolution() {
+  var h = '<div class="puces">' + PERIODES.map(function (p) {
+    return '<button class="puce' + (Per.type === p.id ? ' actif' : '') +
+      '" onclick="choisirPeriodeEvo(\'' + p.id + '\')">' + e(p.nom) + '</button>';
+  }).join('') + '</div>';
+
+  h += '<div class="puces">' + METRIQUES.map(function (m) {
+    return '<button class="puce' + (Evo.metrique === m.id ? ' actif' : '') +
+      '" onclick="choisirMetrique(\'' + m.id + '\')">' + e(m.nom) + '</button>';
+  }).join('') + '</div>';
+
+  h += '<label class="champ"><span>Nombre de périodes</span>' +
+    '<select onchange="choisirNb(this.value)">' +
+    [3, 6, 12, 18, 24].map(function (n) {
+      return '<option value="' + n + '"' + (Evo.nb === n ? ' selected' : '') +
+        '>' + n + ' ' + nomPeriode(Per.type).toLowerCase() +
+        (Per.type === 'mensuel' ? ' derniers' : '') + '</option>';
+    }).join('') + '</select></label>';
+
+  if (Per.agence) {
+    var ag = ((Etat.ref && Etat.ref.agences) || []).filter(function (a) {
+      return String(a.agence_id) === Per.agence; })[0];
+    h += bloc('Série filtrée sur ' + ((ag && ag.ville) || Per.agence) +
+      '. Change de succursale depuis l\'onglet Période.', 'info', '🏢');
+  }
+
+  h += '<div id="zone-evo">' + chargement('Calcul de la série…') + '</div>';
+  poser(h);
+
+  if (Evo.data) majEvo(); else chargerEvolution();
+}
+
+function choisirPeriodeEvo(id) {
+  if (Per.type === id) return;
+  Per.type = id; Per.data = null; Evo.data = null;
+  ongletEvolution();
+}
+function choisirMetrique(id) {
+  Evo.metrique = id;
+  if (Evo.data) { ongletEvolution(); } else { chargerEvolution(); }
+}
+function choisirNb(v) {
+  Evo.nb = Number(v) || 6; Evo.data = null;
+  ongletEvolution();
+}
+
+function chargerEvolution() {
+  Evo.err = null;
+  return api('stats_evolution', { type_periode: Per.type, nb: Evo.nb,
+                                  ref: Per.ref, agence_id: Per.agence })
+    .then(function (d) { Evo.data = d; majEvo(); return d; })
+    .catch(function (err) {
+      Evo.err = err.message; majEvo();
+    });
+}
+
+function majEvo() {
+  var z = document.getElementById('zone-evo');
+  if (!z) return;
+  if (Evo.err) { z.innerHTML = bloc(Evo.err, 'ko', '❌'); return; }
+  if (!Evo.data) { z.innerHTML = chargement(); return; }
+  z.innerHTML = corpsEvolution();
+}
+
+function corpsEvolution() {
+  var serie = (Evo.data && Evo.data.serie) || [];
+  if (!serie.length) return vide('📈', 'Aucune période à montrer.');
+
+  var m = METRIQUES.filter(function (x) { return x.id === Evo.metrique; })[0]
+          || METRIQUES[0];
+  var fmt = function (v) {
+    return m.fmt === 'htg' ? htg(v) : m.fmt === 'lb' ? lb(v) : n0(v);
+  };
+
+  /* L'échelle se prend sur la plus grande valeur absolue : un résultat
+     négatif doit se voir à sa taille, pas écrasé contre zéro. */
+  var max = 0;
+  serie.forEach(function (s) {
+    var v = Math.abs(Number(s[m.id]) || 0);
+    if (v > max) max = v;
+  });
+  if (!max) max = 1;
+
+  var h = '';
+  serie.forEach(function (s, i) {
+    var v = Number(s[m.id]) || 0;
+    var l = Math.max(2, Math.abs(v) / max * 100);
+    var derniere = i === serie.length - 1;
+    h += '<div class="serie-l"><div class="serie-tete">' +
+      '<span class="n">' + e(s.libelle) + '</span>' +
+      '<span class="v' + (v < 0 ? ' neg' : '') + '">' +
+        (m.fmt === 'htg' && v > 0 ? '+' : '') + e(fmt(v)) + '</span></div>' +
+      '<div class="barre"><div class="' +
+        (v < 0 ? 'neg' : derniere ? 'cour' : '') + '" style="width:' +
+        l.toFixed(1) + '%"></div></div></div>';
+  });
+
+  // ── Ce que la série dit, en une phrase ──
+  var prem = Number(serie[0][m.id]) || 0;
+  var dern = Number(serie[serie.length - 1][m.id]) || 0;
+  var somme = 0;
+  serie.forEach(function (s) { somme += Number(s[m.id]) || 0; });
+  var moy = somme / serie.length;
+
+  var tendance;
+  if (prem === 0 && dern === 0) {
+    tendance = 'Rien sur toute la série.';
+  } else if (prem === 0) {
+    tendance = 'Parti de zéro à ' + fmt(dern) + '.';
+  } else {
+    var var_pct = (dern - prem) / Math.abs(prem) * 100;
+    tendance = (var_pct >= 0 ? 'En hausse de ' : 'En baisse de ') +
+      pct(Math.abs(var_pct)) + ' entre la première et la dernière période.';
+  }
+
+  h = '<div class="carte serree" style="margin-bottom:14px">' +
+    '<div class="total"><span class="l">Moyenne par ' +
+      e(nomPeriode(Per.type).toLowerCase()) + '</span><b>' + fmt(moy) + '</b></div>' +
+    '<div class="total"><span class="l">Total de la série</span><b>' +
+      fmt(somme) + '</b></div>' +
+    '<div style="font-size:12.5px;color:var(--doux);margin-top:7px;' +
+      'line-height:1.45">' + e(tendance) + '</div></div>' + h;
+
+  if (Evo.metrique === 'resultat_gdes') {
+    h += bloc('Le résultat inclut une quote-part des coûts partagés, répartie ' +
+      'par convention. Une variation peut donc venir du réseau entier plutôt ' +
+      'que de la succursale. Les revenus et les volumes, eux, sont des faits.',
+      'info', '⚖️');
+  }
+
+  h += '<button class="btn sombre" onclick="imprimerSerie()">' +
+    '🖨️ Imprimer la série</button>';
+
+  return h;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET RAPPORT
+// ═══════════════════════════════════════════════════════════════════
+
+function ongletRapport() {
+  repeindre();
+  if (!Per.data && !Per.err && !Per.enCours) chargerStats();
+}
+
+function corpsRapport() {
+  if (Per.err) return bloc(Per.err, 'ko', '❌');
+  var d = Per.data;
+  if (!d) return chargement();
+
+  var h = '<div class="carte"><div class="titre-section" style="margin-top:0">' +
+    'Ce que le rapport contient</div>' +
+    '<div class="total"><span class="l">Période</span><b>' +
+      e(d.libelle_periode) + '</b></div>' +
+    '<div class="total"><span class="l">Succursales</span><b>' +
+      n0(d.agences.length) + '</b></div>' +
+    '<div class="total"><span class="l">Clé de répartition</span><b>' +
+      e(d.cle_libelle) + '</b></div>' +
+    '<div class="total"><span class="l">Coûts partagés</span><b>' +
+      htg(d.totaux.couts_partages_gdes) + '</b></div>' +
+    '</div>';
+
+  h += '<button class="btn" onclick="imprimerPeriode()">' +
+    '🖨️ Rapport de période (A4)</button>';
+  h += '<button class="btn vide" onclick="imprimerSerie()">' +
+    '📈 Série d\'évolution (A4)</button>';
+  h += '<button class="btn vide" onclick="imprimerComplet()">' +
+    '📑 Les deux en un document</button>';
+
+  // ── La méthode, écrite une fois pour toutes ──
+  h += '<div class="titre-section">Comment ces chiffres sont obtenus</div>' +
+    '<div class="carte" style="font-size:13.5px;line-height:1.55">' +
+    '<p style="margin:0 0 10px"><b>Les volumes sont des faits.</b> Un colis ' +
+    'destiné à une succursale lui est compté, un client créé chez elle lui ' +
+    'est compté. Rien n\'est estimé.</p>' +
+    '<p style="margin:0 0 10px"><b>La rentabilité, non.</b> Une partie des ' +
+    'dépenses sert le réseau entier — la marchandise en transit d\'abord. ' +
+    'L\'imputer à la succursale où la facture a été saisie n\'apprendrait ' +
+    'rien sur cette succursale : cela la déclarerait déficitaire et ' +
+    'couronnerait les autres.</p>' +
+    '<p style="margin:0 0 10px">D\'où trois niveaux, toujours affichés ' +
+    'ensemble :</p>' +
+    '<div class="cascade" style="margin-bottom:10px">' +
+      cascadeL('1. Contribution', 'fait',
+               'revenus encaissés − charges directement imputées') +
+      cascadeL('2. Quote-part', 'convention',
+               'part des coûts partagés, répartie ' + d.cle_libelle) +
+      cascadeL('3. Résultat', 'différence', '1 − 2', 'somme') +
+    '</div>' +
+    '<p style="margin:0">Le niveau 3 n\'a de sens qu\'en sachant les deux ' +
+    'premiers. C\'est pourquoi aucun écran, et aucune page imprimée, ne ' +
+    'montre un résultat sans la convention qui l\'a produit.</p>' +
+    '</div>';
+
+  if (Etat.user && Etat.user.droits && Etat.user.droits.gerer_parametres) {
+    h += bloc('La clé de répartition se change dans ⚙️ Réglages. Elle ne ' +
+      'retouche aucune écriture : elle change la façon de lire les mêmes ' +
+      'données, donc le classement. À décider avant d\'évaluer, pas après.',
+      'attention', '⚖️');
+  }
+
+  return h;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  IMPRESSION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Le format de page se décide au clic, pas dans la feuille de style.
+ *
+ * `@page` ne peut pas se conditionner par une classe : une règle fixe
+ * dans le CSS imposerait le même format à tout ce que l'app imprime.
+ */
+function imprimer(html, format) {
+  var ancienne = document.getElementById('regle-page');
+  if (ancienne) ancienne.remove();
+
+  var st = document.createElement('style');
+  st.id = 'regle-page';
+  st.textContent = format === 'paysage'
+    ? '@media print{@page{size:A4 landscape;margin:10mm}}'
+    : '@media print{@page{size:A4;margin:12mm}}';
+  document.head.appendChild(st);
+
+  document.getElementById('zone-impression').innerHTML = html;
+  setTimeout(function () { window.print(); }, 150);
+}
+
+/**
+ * Ce qui s'imprime sur les documents.
+ *
+ * Rien n'est figé : l'administrateur change le nom, le slogan et les
+ * coordonnées depuis les paramètres. Les valeurs ci-dessous ne servent
+ * que si le paramètre a été effacé du classeur.
+ */
+function marque_(cle, defaut) {
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  var v = p[cle];
+  return (v === undefined || v === null || String(v).trim() === '')
+    ? defaut : String(v);
+}
+
+var MARQUE_DEFAUT = {
+  nom: 'FLASHIPPING',
+  slogan: 'FAST AND SECURE',
+  creole: 'PI RAPID · PI SEKIRIZE · PI BA PRI',
+  coord: '+509 43 31 40 28  ·  +509 47 15 64 24 | contact@flashipping-haiti.com'
+         + ' | www.flashipping-haiti.com'
+};
+
+function coordonnees_() {
+  return marque_('COORDONNEES_DOC', MARQUE_DEFAUT.coord)
+    .split('|').map(function (x) { return x.trim(); })
+    .filter(function (x) { return x; });
+}
+
+function enteteDoc(titre, reference) {
+  var ent = marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom);
+  return '<div class="doc-tete">' +
+      '<div><div class="doc-marque">' + e(ent) +
+        ' <span class="doc-eclair">⚡</span></div>' +
+        '<div class="doc-slogan">' +
+          e(marque_('SLOGAN_DOC', MARQUE_DEFAUT.slogan)) + '</div></div>' +
+      '<div class="doc-coord">' + coordonnees_().map(e).join('<br>') + '</div>' +
+    '</div>' +
+    '<div class="doc-titre"><span>' + e(titre) + '</span>' +
+      '<span>' + e(reference) + '</span></div>' +
+    '<div style="text-align:right;font-size:9pt;color:#5F7183;margin-top:-3mm;' +
+      'margin-bottom:4mm">Édité le ' + e(dateCourte(new Date())) + ' par ' +
+      e((Etat.user && Etat.user.nom) || '') + '</div>';
+}
+
+function piedDoc(role) {
+  return '<div class="doc-sign"><div>' + e(role || 'Le directeur réseau') +
+      '</div><div>Pour ' + e(marque_('NOM_ENTREPRISE', MARQUE_DEFAUT.nom)) +
+      '</div></div>' +
+    '<div class="doc-pied"><b>' +
+      e(marque_('MSG_PIED_DOC', MARQUE_DEFAUT.creole)) + '</b><br>' +
+      coordonnees_().map(e).join(' · ') + '</div>';
+}
+
+/**
+ * La note de méthode.
+ *
+ * Elle part sur CHAQUE page imprimée, et ce n'est pas une précaution de
+ * style. Ce document sert à évaluer des responsables de succursale ;
+ * celui qu'on évalue doit pouvoir lire, sur le papier qu'on lui montre,
+ * quelle part de son résultat est un fait et quelle part est une
+ * convention qu'il peut contester.
+ */
+function noteMethode(d) {
+  return '<div class="doc-note"><b>Comment lire ce rapport</b>' +
+    'Les volumes — colis, livres, clients, commandes — sont lus directement ' +
+    'dans les registres : ce sont des faits. La <b>contribution</b> ' +
+    '(revenus − charges directes) en est un aussi. La <b>quote-part</b> est ' +
+    'une convention : les coûts qui servent le réseau entier, au premier ' +
+    'rang la marchandise en transit, sont répartis ' + e(d.cle_libelle) + '. ' +
+    'Le <b>résultat</b> est la différence des deux, et change donc si la ' +
+    'convention change. Une charge saisie sous la mauvaise succursale ' +
+    'appauvrit l\'une et enrichit l\'autre sans que rien ne le signale : ' +
+    'c\'est la première chose à vérifier avant de conclure.</div>';
+}
+
+function docAlertes(d) {
+  return (d.alertes || []).map(function (a) {
+    return '<div class="doc-alerte"><b>À vérifier.</b> ' + e(a) + '</div>';
+  }).join('');
+}
+
+function imprimerPeriode() {
+  if (!Per.data) { toast('Période non chargée.', 'ko'); return; }
+  imprimer(docPeriode(Per.data), 'portrait');
+}
+
+function docPeriode(d) {
+  var t = d.totaux;
+  var h = '<div class="doc">' +
+    enteteDoc('RAPPORT DE SUCCURSALES', d.libelle_periode);
+
+  // ── Résumé encadré ──
+  h += '<div class="doc-cadre">' +
+    docL('Période', dateCourte(d.periode.debut) + ' au ' + dateCourte(d.periode.fin)) +
+    docL('Succursales au rapport', n0(d.agences.length)) +
+    docL('Revenus encaissés', htg(t.revenus_gdes)) +
+    docL('Charges directes', '− ' + htg(t.charges_directes_gdes)) +
+    docL('Coûts partagés du réseau', '− ' + htg(t.couts_partages_gdes)) +
+    docL('Répartis', e(d.cle_libelle), true) +
+    docL('Résultat', htg(t.resultat_gdes), false, true) +
+    '</div>';
+
+  h += docAlertes(d);
+
+  // ── Volumes ──
+  h += '<div class="doc-h2">Volumes traités</div>' +
+    '<table class="doc-t"><thead><tr>' +
+      '<th>Succursale</th><th class="num">Colis</th><th class="num">Livrés</th>' +
+      '<th class="num">Livres</th><th class="num">Clients</th>' +
+      '<th class="num">Nouveaux</th><th class="num">Cmd.</th>' +
+    '</tr></thead><tbody>' +
+    d.agences.map(function (a) {
+      return '<tr><td><b>' + e(a.ville) + '</b><br>' +
+        '<span class="ref">' + e(a.agence_id) + '</span></td>' +
+        '<td class="num">' + n0(a.colis_traites) + '</td>' +
+        '<td class="num">' + n0(a.colis_livres) + '</td>' +
+        '<td class="num">' + n1(a.livres_lb) + '</td>' +
+        '<td class="num">' + n0(a.clients_actifs) + '</td>' +
+        '<td class="num">' + n0(a.clients_nouveaux) + '</td>' +
+        '<td class="num">' + n0(a.commandes) + '</td></tr>';
+    }).join('') +
+    '</tbody><tfoot><tr><td>Réseau</td>' +
+      '<td class="num">' + n0(t.colis_traites) + '</td>' +
+      '<td class="num">' + n0(t.colis_livres) + '</td>' +
+      '<td class="num">' + n1(t.livres_lb) + '</td>' +
+      '<td class="num">' + n0(t.clients_actifs) + '</td>' +
+      '<td class="num">' + n0(t.clients_nouveaux) + '</td>' +
+      '<td class="num">' + n0(t.commandes) + '</td></tr></tfoot></table>';
+
+  // ── Rentabilité, trois niveaux côte à côte ──
+  h += '<div class="doc-h2">Contribution, quote-part et résultat</div>' +
+    '<table class="doc-t"><thead><tr>' +
+      '<th>Succursale</th><th class="num">Revenus</th>' +
+      '<th class="num">Charges<br>directes</th>' +
+      '<th class="num">Contribution<br><i>fait</i></th>' +
+      '<th class="num">Quote-part<br><i>convention</i></th>' +
+      '<th class="num">Résultat</th>' +
+    '</tr></thead><tbody>' +
+    d.agences.map(function (a, i) {
+      var r = Number(a.resultat_gdes) || 0;
+      return '<tr><td>' + (d.agences.length > 1 ? (i + 1) + '. ' : '') +
+        '<b>' + e(a.ville) + '</b>' +
+        (a.part_poids_pct !== null && a.part_poids_pct !== undefined
+          ? '<br><span class="ref">' + pct(a.part_poids_pct) + ' du poids</span>' : '') +
+        '</td>' +
+        '<td class="num">' + n0(a.revenus_gdes) + '</td>' +
+        '<td class="num">' + (a.charges_directes_gdes ? '− ' + n0(a.charges_directes_gdes)
+                                                      : '—') + '</td>' +
+        '<td class="num">' + n0(a.contribution_gdes) + '</td>' +
+        '<td class="num">' + (a.quote_part_gdes ? '− ' + n0(a.quote_part_gdes)
+                                                : '—') + '</td>' +
+        '<td class="num ' + (r > 0 ? 'pos' : r < 0 ? 'neg' : '') + '">' +
+          signe(r) + n0(r) + '</td></tr>';
+    }).join('') +
+    '</tbody><tfoot><tr><td>Réseau</td>' +
+      '<td class="num">' + n0(t.revenus_gdes) + '</td>' +
+      '<td class="num">− ' + n0(t.charges_directes_gdes) + '</td>' +
+      '<td class="num">' + n0(t.revenus_gdes - t.charges_directes_gdes) + '</td>' +
+      '<td class="num">− ' + n0(t.couts_partages_gdes) + '</td>' +
+      '<td class="num">' + signe(t.resultat_gdes) + n0(t.resultat_gdes) +
+      '</td></tr></tfoot></table>' +
+    '<div style="font-size:8pt;color:#5F7183;margin-top:-2mm">' +
+      'Montants en gourdes. Les colonnes « Contribution » et « Résultat » ne ' +
+      'se lisent pas l\'une sans l\'autre.</div>';
+
+  if (t.commandes > 0) {
+    h += '<div class="doc-h2">Commandes placées</div>' +
+      '<table class="doc-t"><thead><tr><th>Succursale</th>' +
+        '<th class="num">Commandes</th><th class="num">Valeur client</th>' +
+        '<th class="num">Commission</th></tr></thead><tbody>' +
+      d.agences.filter(function (a) { return a.commandes > 0; }).map(function (a) {
+        return '<tr><td>' + e(a.ville) + '</td>' +
+          '<td class="num">' + n0(a.commandes) + '</td>' +
+          '<td class="num">' + usd(a.commandes_usd) + '</td>' +
+          '<td class="num">' + usd(a.commission_usd) + '</td></tr>';
+      }).join('') +
+      '</tbody><tfoot><tr><td>Réseau</td>' +
+        '<td class="num">' + n0(t.commandes) + '</td>' +
+        '<td class="num">' + usd(t.commandes_usd) + '</td>' +
+        '<td class="num">' + usd(t.commission_usd) + '</td></tr></tfoot></table>';
+  }
+
+  h += noteMethode(d) + piedDoc() + '</div>';
+  return h;
+}
+
+function docL(libelle, valeur, creux, fort) {
+  return '<div class="l' + (fort ? ' fort' : '') + (creux ? ' creux' : '') + '">' +
+    '<span>' + e(libelle) + '</span><span>' + e(valeur) + '</span></div>';
+}
+
+function imprimerSerie() {
+  if (!Evo.data) {
+    toast('Série non chargée — ouvre l\'onglet Évolution.', 'ko');
+    return;
+  }
+  imprimer(docSerie(Evo.data), 'portrait');
+}
+
+function docSerie(ev) {
+  var serie = ev.serie || [];
+  var ag = ((Etat.ref && Etat.ref.agences) || []).filter(function (a) {
+    return String(a.agence_id) === Per.agence; })[0];
+
+  var h = '<div class="doc">' +
+    enteteDoc('ÉVOLUTION SUR ' + serie.length + ' ' +
+              nomPeriode(Per.type).toUpperCase() + (serie.length > 1 ? 'S' : ''),
+              Per.agence ? ((ag && ag.ville) || Per.agence) : 'Réseau entier');
+
+  var som = { revenus_gdes: 0, resultat_gdes: 0, colis_traites: 0,
+              livres_lb: 0, clients_nouveaux: 0, commandes: 0 };
+  serie.forEach(function (s) {
+    Object.keys(som).forEach(function (k) { som[k] += Number(s[k]) || 0; });
+  });
+
+  h += '<table class="doc-t"><thead><tr><th>Période</th>' +
+    '<th class="num">Revenus</th><th class="num">Résultat</th>' +
+    '<th class="num">Colis</th><th class="num">Livres</th>' +
+    '<th class="num">Nouv. clients</th><th class="num">Cmd.</th>' +
+    '</tr></thead><tbody>' +
+    serie.map(function (s) {
+      var r = Number(s.resultat_gdes) || 0;
+      return '<tr><td><b>' + e(s.libelle) + '</b></td>' +
+        '<td class="num">' + n0(s.revenus_gdes) + '</td>' +
+        '<td class="num ' + (r > 0 ? 'pos' : r < 0 ? 'neg' : '') + '">' +
+          signe(r) + n0(r) + '</td>' +
+        '<td class="num">' + n0(s.colis_traites) + '</td>' +
+        '<td class="num">' + n1(s.livres_lb) + '</td>' +
+        '<td class="num">' + n0(s.clients_nouveaux) + '</td>' +
+        '<td class="num">' + n0(s.commandes) + '</td></tr>';
+    }).join('') +
+    '</tbody><tfoot><tr><td>Total · moyenne</td>' +
+      '<td class="num">' + n0(som.revenus_gdes) + '<br>' +
+        '<span class="ref">' + n0(som.revenus_gdes / serie.length) + '</span></td>' +
+      '<td class="num">' + signe(som.resultat_gdes) + n0(som.resultat_gdes) + '<br>' +
+        '<span class="ref">' + n0(som.resultat_gdes / serie.length) + '</span></td>' +
+      '<td class="num">' + n0(som.colis_traites) + '<br>' +
+        '<span class="ref">' + n0(som.colis_traites / serie.length) + '</span></td>' +
+      '<td class="num">' + n1(som.livres_lb) + '<br>' +
+        '<span class="ref">' + n1(som.livres_lb / serie.length) + '</span></td>' +
+      '<td class="num">' + n0(som.clients_nouveaux) + '<br>' +
+        '<span class="ref">' + n0(som.clients_nouveaux / serie.length) + '</span></td>' +
+      '<td class="num">' + n0(som.commandes) + '<br>' +
+        '<span class="ref">' + n0(som.commandes / serie.length) + '</span></td>' +
+    '</tr></tfoot></table>' +
+    '<div style="font-size:8pt;color:#5F7183;margin-top:-2mm">' +
+      'Montants en gourdes. Deuxième ligne du total : la moyenne par ' +
+      e(nomPeriode(Per.type).toLowerCase()) + '.</div>';
+
+  h += (Per.data ? noteMethode(Per.data)
+                 : '<div class="doc-note"><b>Comment lire ce rapport</b>' +
+                   'Les volumes sont des faits lus dans les registres. Le ' +
+                   'résultat inclut une quote-part des coûts du réseau, ' +
+                   'répartie par convention : il change si la convention ' +
+                   'change.</div>') +
+    piedDoc() + '</div>';
+  return h;
+}
+
+/** Les deux documents agrafés : c'est ce qu'on classe au dossier. */
+function imprimerComplet() {
+  if (!Per.data) { toast('Période non chargée.', 'ko'); return; }
+  if (!Evo.data) {
+    toast('Chargement de la série…');
+    chargerEvolution().then(function () {
+      if (Evo.data) imprimer(docPeriode(Per.data) +
+        '<div class="doc-saut"></div>' + docSerie(Evo.data), 'portrait');
+      else imprimer(docPeriode(Per.data), 'portrait');
+    });
+    return;
+  }
+  imprimer(docPeriode(Per.data) + '<div class="doc-saut"></div>' +
+           docSerie(Evo.data), 'portrait');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  RÉGLAGES
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Le code déployé dans Apps Script n'est pas forcément celui qu'attend
+ * cette page : un fichier .gs oublié, ou un déploiement refait en
+ * « mise à jour » au lieu de « nouvelle version », donne des symptômes
+ * incompréhensibles — une action « inconnue », un écran vide. Cette
+ * vérification transforme tout ça en une phrase claire.
+ */
+var VERSION_ATTENDUE = '2026-10-21.1';
+
+function verifierVersion() {
+  return api('diag').then(function (d) {
+    var dep = String(d.version_code || '');
+    Etat.versionBackend = dep || '(ancienne)';
+    Etat.versionOk = (dep === VERSION_ATTENDUE);
+    return Etat.versionOk;
+  }).catch(function () { return null; });
+}
+
+function blocVersion() {
+  if (Etat.versionOk === undefined) {
+    verifierVersion().then(function (r) {
+      if (r !== null && document.getElementById('voile')) ouvrirReglages();
+    });
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Vérification de la version…</div>';
+  }
+  if (Etat.versionOk) {
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Code déployé ' + e(Etat.versionBackend) + ' — à jour</div>';
+  }
+  return bloc('Le code déployé dans Apps Script (' + Etat.versionBackend + ') ne ' +
+    'correspond pas à cette application (' + VERSION_ATTENDUE + '). Il manque un ' +
+    'fichier .gs, ou le déploiement n\'a pas été refait en « Nouvelle version ». ' +
+    'Certaines fonctions ne marcheront pas.', 'attention', '⚠️');
+}
+
+var CLES_COUTS = [
+  { id: 'poids',   nom: 'Au poids traité',
+    aide: 'C\'est le poids qui fait la facture du transitaire. Recommandé.' },
+  { id: 'revenus', nom: 'Au chiffre d\'affaires',
+    aide: 'Chaque succursale porte les coûts du réseau à proportion de ce ' +
+          'qu\'elle encaisse.' },
+  { id: 'colis',   nom: 'Au nombre de colis',
+    aide: 'Traite un colis de 2 lb comme un colis de 40 lb.' },
+  { id: 'aucune',  nom: 'Aucune répartition',
+    aide: 'Les coûts du réseau ne sont imputés à personne : tous les ' +
+          'résultats sont alors surévalués. À ne garder que pour comparer.' }
+];
+
+function ouvrirReglages() {
+  var u = Etat.user || {};
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  var cle = String(p.CLE_REPARTITION_COUTS || 'poids').trim();
+  var def = CLES_COUTS.filter(function (c) { return c.id === cle; })[0]
+            || CLES_COUTS[0];
+
+  modale('Réglages',
+    '<div class="carte serree" style="margin-bottom:12px">' +
+      '<div style="font-weight:800;font-size:16px">' + e(u.nom) + '</div>' +
+      '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
+        e(u.user_id) + ' · ' + e(u.role_libelle || u.role) + '</div>' +
+      '<div style="color:var(--doux);font-size:12.5px;margin-top:6px">' +
+        (u.droits && u.droits.comparer_agences
+          ? 'Compare toutes les succursales.'
+          : 'Voit uniquement sa succursale.') + '</div></div>' +
+
+    '<div class="carte"><div class="titre-section" style="margin-top:0">' +
+      'Répartition des coûts partagés</div>' +
+      '<div class="total"><span class="l">Clé en vigueur</span><b>' +
+        e(def.nom) + '</b></div>' +
+      '<div style="font-size:12.5px;color:var(--doux);margin-top:7px;' +
+        'line-height:1.45">' + e(def.aide) + '</div>' +
+    '</div>' +
+
+    (u.droits && u.droits.gerer_parametres
+      ? '<button class="btn vide" onclick="ouvrirCleCouts()">' +
+        '⚖️ Changer la clé de répartition</button>'
+      : '') +
+    '<button class="btn vide" onclick="rafraichirRef()">' +
+      '🔄 Recharger les référentiels</button>' +
+    '<button class="btn vide" onclick="changerUrl()">' +
+      '🔗 Changer l\'URL de l\'API</button>' +
+    '<button class="btn rouge" onclick="fermerModale();deconnecter()">' +
+      'Se déconnecter</button>' +
+    blocVersion());
+}
+
+/**
+ * Changer la clé ne retouche aucune écriture.
+ *
+ * Elle change la façon de lire les mêmes données — donc le classement
+ * des succursales. C'est un choix de gouvernance, pas un réglage
+ * d'affichage, et l'écran le dit avant de laisser toucher au menu.
+ */
+function ouvrirCleCouts() {
+  var p = (Etat.ref && Etat.ref.parametres) || {};
+  var cle = String(p.CLE_REPARTITION_COUTS || 'poids').trim();
+
+  modale('Clé de répartition',
+    bloc('Cette clé ne modifie aucune dépense enregistrée. Elle décide ' +
+         'comment les coûts qui servent tout le réseau sont imputés aux ' +
+         'succursales — et change donc leur classement. À fixer avant ' +
+         'd\'évaluer, pas après avoir vu le résultat.', 'attention', '⚖️') +
+    CLES_COUTS.map(function (c) {
+      return '<button class="carte serree" style="width:100%;text-align:left;' +
+        'border-width:' + (c.id === cle ? '2px' : '1px') + ';border-color:' +
+        (c.id === cle ? 'var(--or-fonce)' : 'var(--bord)') + '" ' +
+        'onclick="enregistrerCle(\'' + c.id + '\')">' +
+        '<div style="font-weight:800;font-size:14.5px">' + e(c.nom) +
+          (c.id === cle ? ' ✓' : '') + '</div>' +
+        '<div style="font-size:12.5px;color:var(--doux);margin-top:3px;' +
+          'line-height:1.4">' + e(c.aide) + '</div></button>';
+    }).join('') +
+    '<div id="cle-res"></div>');
+}
+
+function enregistrerCle(v) {
+  var z = document.getElementById('cle-res');
+  if (z) z.innerHTML = chargement('Enregistrement…');
+  api('admin_parametres', { cle: 'CLE_REPARTITION_COUTS', valeur: v })
+    .then(function () {
+      toast('Clé de répartition : ' + v, 'ok');
+      return chargerReferentiels();
+    })
+    .then(function () {
+      fermerModale();
+      Per.data = null; Evo.data = null;
+      if (Etat.onglet === 'evolution') ongletEvolution(); else chargerStats();
+    })
+    .catch(function (err) {
+      if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+      toast(err.message, 'ko');
+    });
+}
+
+function rafraichirRef() {
+  var c = document.getElementById('corps-modale');
+  if (c) c.innerHTML = chargement('Rechargement…');
+  chargerReferentiels().then(function () {
+    toast('Référentiels à jour.', 'ok');
+    Per.data = null; Evo.data = null;
+    fermerModale();
+    dessiner();
+  }).catch(function (err) {
+    if (c) c.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  MODALE ET DÉMARRAGE
+// ═══════════════════════════════════════════════════════════════════
+
+function modale(titre, html) {
+  var dejaOuverte = Nav.modaleOuverte;
+  fermerModaleDom();
+  var v = document.createElement('div');
+  v.className = 'voile'; v.id = 'voile';
+  v.innerHTML = '<div class="modale" onclick="event.stopPropagation()">' +
+    '<div class="poignee"></div><h3>' + e(titre) + '</h3>' +
+    '<div id="corps-modale">' + html + '</div></div>';
+  v.onclick = fermerModale;
+  document.body.appendChild(v);
+  document.body.style.overflow = 'hidden';
+  Nav.modaleOuverte = true;
+  if (!dejaOuverte) { try { history.pushState({ modale: true }, ''); } catch (e2) {} }
+}
+
+function majModale(titre, html) {
+  var c = document.getElementById('corps-modale');
+  var t = document.querySelector('.modale h3');
+  if (c) { c.innerHTML = html; if (t) t.textContent = titre; }
+  else modale(titre, html);
+}
+
+/** Ferme sans toucher à l'historique — réservé à popstate. */
+function fermerModaleDom() {
+  var v = document.getElementById('voile');
+  if (v) v.remove();
+  document.body.style.overflow = '';
+  Nav.modaleOuverte = false;
+}
+
+function fermerModale() {
+  if (Nav.modaleOuverte) {
+    Nav.modaleOuverte = false;
+    fermerModaleDom();
+    try { history.back(); } catch (e2) {}
+    return;
+  }
+  fermerModaleDom();
+}
+
+window.addEventListener('online',  function () { majBandeau(); toast('Réseau revenu.', 'ok'); });
+window.addEventListener('offline', function () { majBandeau(); toast('Réseau perdu.', 'ko'); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+
+(function demarrer() {
+  Per.ref = aujourdhui();
+
+  try {
+    var h = (location.hash || '').replace('#', '');
+    if (h && TOUS_ONGLETS.some(function (o) { return o.id === h; })) Etat.onglet = h;
+    history.replaceState({ onglet: Etat.onglet }, '', '#' + Etat.onglet);
+  } catch (e2) {}
+
+  if (Etat.url && Etat.token) {
+    document.getElementById('app').innerHTML =
+      '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
+      '</span></h1></header><main>' + chargement() + '</main>';
+    verifierVersion();
+    chargerReferentiels().then(dessiner).catch(function (err) {
+      if (/Session|Jeton/i.test(err.message)) { deconnecter(); return; }
+      toast(err.message, 'ko'); dessiner();
+    });
+  } else {
+    dessiner();
+  }
+})();
+</script>
+</body>
+</html>
