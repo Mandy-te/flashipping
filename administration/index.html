@@ -1636,6 +1636,9 @@ var ROLES_UI = [
     aide:'Tout, partout. Seul à gérer les comptes, la finance et le capital.' },
   { id:'admin', nom:'Direction logistique',
     aide:'Toute la logistique et les commandes, sur tout le réseau. Pas la caisse.' },
+  { id:'direction_reseau', nom:'Direction réseau',
+    aide:'Compare et évalue les succursales. Ne touche à rien : ni prix, ' +
+         'ni colis, ni caisse. Ouvre les Statistiques, et elles seules.' },
   { id:'responsable', nom:'Responsable de succursale',
     aide:'Son agence seulement. Scanne, livre, facture, compose les lots. ' +
          'Ne corrige ni statut ni prix.' },
@@ -2362,7 +2365,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-21.1';
+var VERSION_ATTENDUE = '2026-10-21.2';
 
 function verifierVersion() {
   return api('diag').then(function (d) {

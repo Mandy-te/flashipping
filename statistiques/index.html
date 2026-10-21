@@ -616,9 +616,9 @@ function dessiner() {
       '<header class="entete"><h1>Statistiques<span class="sous">' +
       e(Etat.user ? Etat.user.nom : '') + '</span></h1>' +
       '<button class="btn-entete" onclick="deconnecter()">⏻</button></header>' +
-      '<main>' + bloc('Les statistiques sont réservées à la direction, aux ' +
-        'responsables de succursale et à la comptabilité. Ton compte n\'y a ' +
-        'pas accès.', 'attention', '🔒') +
+      '<main>' + bloc('Les statistiques sont réservées à la direction, à la ' +
+        'direction réseau, aux responsables de succursale et à la ' +
+        'comptabilité. Ton compte n\'y a pas accès.', 'attention', '🔒') +
       '<button class="btn vide" onclick="deconnecter()">Se déconnecter</button></main>';
     return;
   }
@@ -1593,7 +1593,7 @@ function imprimerComplet() {
  * incompréhensibles — une action « inconnue », un écran vide. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-21.1';
+var VERSION_ATTENDUE = '2026-10-21.2';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
