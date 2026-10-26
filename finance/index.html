@@ -2226,6 +2226,73 @@ function docDetail(titre, objet, total) {
 //  ONGLET ASSOCIÉS
 // ═══════════════════════════════════════════════════════════════════
 
+/**
+ * Le calendrier d'acquisition.
+ *
+ * L'écran se contentait d'une barre et d'un pourcentage. À la seule
+ * question que l'associé se pose vraiment — « combien le mois
+ * prochain, et quand est-ce fini ? » — il n'y avait pas de réponse.
+ *
+ * La marche du cliff est montrée pour ce qu'elle est : au mois du
+ * cliff, tous les mois courus tombent ensemble. Sans cette phrase, le
+ * saut de 0 à 2,25 % passe pour une erreur de calcul, et c'est
+ * l'application entière qu'on cesse de croire.
+ */
+function calendrierVesting(a) {
+  var c = a.calendrier;
+  if (!c || !c.jalons || !c.jalons.length) return '';
+
+  var h = '<div class="titre-section">Calendrier d\'acquisition</div>' +
+    '<div class="carte serree">' +
+    '<div class="total"><span class="l">Rythme</span><b>' +
+      pct(c.par_mois_pct) + ' par mois</b></div>';
+
+  if (c.prochain_versement_pct > 0) {
+    h += '<div class="total"><span class="l">Prochain versement</span><b>' +
+      '+' + pct(c.prochain_versement_pct) + ' le ' +
+      dateCourte(c.date_prochain_versement) + '</b></div>';
+  }
+
+  h += '<div class="total"><span class="l">Reste à acquérir</span><b>' +
+      pct(c.restant_pct) + '</b></div>' +
+    '<div class="total"><span class="l">Terme</span><b>' +
+      dateCourte(c.date_terme) + '</b></div>' +
+    '</div>';
+
+  h += '<div class="carte serree">';
+  c.jalons.forEach(function (j) {
+    /* Trois états, trois teintes : ce qui est acquis, le point où on
+       en est, et ce qui reste à venir. Tout en gris, la ligne
+       « aujourd'hui » se perdrait au milieu des autres. */
+    var teinte = j.est_aujourdhui ? 'var(--marine)'
+               : j.passe          ? 'var(--vert)'
+                                  : 'var(--doux)';
+    var libelle = j.mois === 0 ? 'Entrée'
+                : j.est_terme  ? 'Terme'
+                : j.est_cliff  ? 'Cliff franchi'
+                               : 'Mois ' + j.mois;
+
+    h += '<div class="total" style="color:' + teinte + '">' +
+      '<span class="l" style="color:inherit' +
+        (j.est_aujourdhui ? ';font-weight:800' : '') + '">' +
+        (j.passe ? '●' : '○') + ' ' + e(libelle) +
+        (j.est_aujourdhui ? ' — aujourd\'hui' : '') +
+        '<span style="display:block;font-size:11px;opacity:.75">' +
+          dateCourte(j.date) + '</span></span>' +
+      '<b>' + pct(j.acquis_pct) + '</b></div>';
+  });
+  h += '</div>';
+
+  if (c.mois_ecoules < a.cliff_mois) {
+    h += bloc('Le cliff n\'est pas un retard : au mois ' + a.cliff_mois +
+      ', les ' + a.cliff_mois + ' mois courus s\'acquièrent d\'un seul ' +
+      'coup. Partir la veille ne laisse rien ; rester fait tout ' +
+      'basculer.', 'info', '⏳');
+  }
+
+  return h;
+}
+
 function ongletAssocies() {
   poser(chargement('Parts et vesting…'));
 
@@ -2334,7 +2401,8 @@ function ouvrirAssocie(id) {
               : (a.cliff_franchi
                   ? 'Cliff franchi, acquisition en cours.'
                   : 'Cliff non franchi : aucune part acquise à ce jour.')) +
-          '</div></div>';
+          '</div></div>' +
+          calendrierVesting(a);
       }
 
       h += '<div class="titre-section">Rôle</div><div class="carte serree">' +
@@ -3161,7 +3229,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-21.2';
+var VERSION_ATTENDUE = '2026-10-26.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
