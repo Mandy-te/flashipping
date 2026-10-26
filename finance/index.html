@@ -2242,7 +2242,29 @@ function calendrierVesting(a) {
   var c = a.calendrier;
   if (!c || !c.jalons || !c.jalons.length) return '';
 
-  var h = '<div class="titre-section">Calendrier d\'acquisition</div>' +
+  var h = '';
+
+  /* En titres, le calendrier cesse d'être une estimation : le terme
+     est un NOMBRE, que l'entrée d'un associé ne déplacera pas. On
+     l'affiche donc en premier, et le pourcentage en dessous — daté,
+     puisque lui bouge. */
+  if (c.en_titres) {
+    h += '<div class="titre-section">Tes titres</div>' +
+      '<div class="carte serree">' +
+      '<div class="total"><span class="l">Attribués à l\'entrée</span><b>' +
+        n0(c.titres_attribues) + ' titres</b></div>' +
+      '<div class="total"><span class="l">Acquis à ce jour</span><b>' +
+        n0(c.titres_acquis) + ' titres</b></div>' +
+      '<div class="total"><span class="l">Acquisition</span><b>' +
+        n0(c.titres_par_mois) + ' titres par mois</b></div>' +
+      '<div style="font-size:11.5px;color:var(--doux);margin-top:8px;' +
+        'line-height:1.45">Ces deux nombres ne bougent pas quand un ' +
+        'associé entre. C\'est le pourcentage qu\'ils représentent qui ' +
+        'baisse — parce que le capital, lui, grandit.</div>' +
+      '</div>';
+  }
+
+  h += '<div class="titre-section">Calendrier d\'acquisition</div>' +
     '<div class="carte serree">' +
     '<div class="total"><span class="l">Rythme</span><b>' +
       pct(c.par_mois_pct) + ' par mois</b></div>';
@@ -2265,9 +2287,13 @@ function calendrierVesting(a) {
        dilution réduit la part de tout le monde — mais l'afficher
        comme une promesse fixe, si. */
     '<div style="font-size:11.5px;color:var(--doux);margin-top:8px;' +
-      'line-height:1.45">Calculé sur ta part actuelle de ' +
-      pct(a.part_detenue) + '. L\'entrée d\'un nouvel associé dilue ' +
-      'cette part, donc aussi le rythme et le terme ci-dessus.</div>' +
+      'line-height:1.45">' + (c.en_titres
+        ? 'Les pourcentages ci-dessus valent au capital d\'aujourd\'hui. ' +
+          'L\'entrée d\'un associé les fera baisser sans toucher à tes ' +
+          'titres.'
+        : 'Calculé sur ta part actuelle de ' + pct(a.part_detenue) +
+          '. L\'entrée d\'un nouvel associé dilue cette part, donc aussi ' +
+          'le rythme et le terme ci-dessus.') + '</div>' +
     '</div>';
 
   h += '<div class="carte serree">';
@@ -2304,6 +2330,79 @@ function calendrierVesting(a) {
   return h;
 }
 
+var Assoc = { registre: null };
+
+/**
+ * Le registre des titres — le document qu'on pose devant quelqu'un.
+ *
+ * Un investisseur, un notaire ou un associé en désaccord ne lit pas un
+ * écran : il demande une feuille datée qui dit qui détient quoi, ce
+ * qui a été attribué, et ce qui est acquis. C'est exactement ce que
+ * l'ancien modèle ne pouvait plus produire, puisqu'il écrasait
+ * l'attribution d'origine à chaque dilution.
+ */
+function imprimerRegistre() {
+  var d = Assoc.registre;
+  if (!d) { toast('Registre non chargé.', 'ko'); return; }
+
+  var enTitres = !!d.en_titres;
+  var h = '<div class="doc">' +
+    enteteDoc('REGISTRE DES TITRES',
+      enTitres ? n0(d.capital_titres) + ' titres émis' : 'parts en pourcentage',
+      dateCourte(new Date()));
+
+  h += '<div class="doc-cadre">' +
+    docLigne('Associés actifs', n0(d.nb_associes)) +
+    (enTitres ? docLigne('Titres émis', n0(d.capital_titres)) : '') +
+    (enTitres ? docLigne('Titres détenus', n0(d.titres_attribues_total)) : '') +
+    docLigne('Parts détenues', n2(d.total_detenue) + ' %') +
+    docLigne('Parts acquises', n2(d.total_acquise) + ' %', false, true) +
+    '</div>';
+
+  h += '<table class="doc-t"><thead><tr>' +
+    '<th>Associé</th><th>Rang</th><th>Entré le</th>' +
+    (enTitres ? '<th class="num">Attribués</th><th class="num">Détenus</th>' +
+                '<th class="num">Acquis</th>' : '') +
+    '<th class="num">Détenue</th><th class="num">Acquise</th>' +
+    '</tr></thead><tbody>' +
+    d.associes.map(function (a) {
+      return '<tr><td><b>' + e(a.nom) + '</b>' +
+        (a.role ? '<br><span class="creux">' + e(a.role) + '</span>' : '') +
+        '</td><td>' + a.rang_entree + '</td>' +
+        '<td>' + dateCourte(a.date_entree) + '</td>' +
+        (enTitres
+          ? '<td class="num">' + n0(a.titres_attribues) + '</td>' +
+            '<td class="num">' + n0(a.titres) + '</td>' +
+            '<td class="num">' + n0(a.titres_acquis) + '</td>'
+          : '') +
+        '<td class="num">' + n2(a.part_detenue) + ' %</td>' +
+        '<td class="num">' + n2(a.part_acquise) + ' %</td></tr>';
+    }).join('') +
+    '</tbody><tfoot><tr><td colspan="' + (enTitres ? 6 : 3) + '">Total</td>' +
+      '<td class="num">' + n2(d.total_detenue) + ' %</td>' +
+      '<td class="num">' + n2(d.total_acquise) + ' %</td>' +
+    '</tr></tfoot></table>';
+
+  h += '<div class="doc-note"><b>Comment lire ce registre</b>' +
+    (enTitres
+      ? 'Les colonnes « Attribués » et « Acquis » sont des nombres de ' +
+        'titres : ils ne changent pas quand un nouvel associé entre. ' +
+        'Les pourcentages, eux, se calculent sur le capital du jour — ' +
+        'une émission de titres les fait baisser sans que personne ne ' +
+        'perde un seul titre. « Acquise » est la part effectivement ' +
+        'méritée au titre du vesting ; le reste s\'acquiert jusqu\'au ' +
+        'terme et retourne à l\'entreprise en cas de départ anticipé.'
+      : 'Le capital n\'est pas encore tenu en titres : les pourcentages ' +
+        'sont saisis et réécrits à chaque dilution, ce qui ne permet pas ' +
+        'de reconstituer l\'attribution d\'origine. Lance ' +
+        'MIGRER_CAPITAL_EN_TITRES avant de produire ce registre pour un ' +
+        'tiers.') +
+    '</div>';
+
+  h += piedDocFin('') + '</div>';
+  imprimer(h, 'a4');
+}
+
 function ongletAssocies() {
   poser(chargement('Parts et vesting…'));
 
@@ -2311,10 +2410,16 @@ function ongletAssocies() {
     .then(function (r) {
       var d = r[0], appel = r[1], integ = r[2];
 
+      Assoc.registre = d;      // gardé pour l'impression du registre
+
       var h =
         '<div class="stats" style="margin-bottom:14px">' +
           '<div class="stat"><div class="v">' + d.nb_associes + '</div>' +
             '<div class="l">associés</div></div>' +
+          (d.en_titres
+            ? '<div class="stat"><div class="v">' + court(d.capital_titres) +
+              '</div><div class="l">titres émis</div></div>'
+            : '') +
           '<div class="stat"><div class="v">' + n2(d.total_detenue) + ' %</div>' +
             '<div class="l">parts détenues</div></div>' +
           '<div class="stat"><div class="v" style="color:' +
@@ -2336,6 +2441,18 @@ function ongletAssocies() {
 
       var parAppel = {};
       (appel.associes || []).forEach(function (a) { parAppel[a.associe_id] = a; });
+
+      if (!d.en_titres) {
+        h += bloc('Le capital est encore tenu en pourcentages : chaque ' +
+          'dilution écrase l\'attribution d\'origine, et on ne peut plus ' +
+          'dire ce qui avait été promis à qui. Lance ' +
+          'MIGRER_CAPITAL_EN_TITRES dans Apps Script — les chiffres ' +
+          'affichés ne changeront pas, seulement leur source.',
+          'attention', '📜');
+      }
+
+      h += '<button class="btn vide" onclick="imprimerRegistre()">' +
+        '📜 Imprimer le registre des titres</button>';
 
       h += '<div class="titre-section">Les associés</div>';
       h += d.associes.map(function (a) {
@@ -3240,7 +3357,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-26.1';
+var VERSION_ATTENDUE = '2026-10-26.2';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
