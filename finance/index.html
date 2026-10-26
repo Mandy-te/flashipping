@@ -2257,6 +2257,17 @@ function calendrierVesting(a) {
       pct(c.restant_pct) + '</b></div>' +
     '<div class="total"><span class="l">Terme</span><b>' +
       dateCourte(c.date_terme) + '</b></div>' +
+    /* Sans cette ligne, le tableau promet un terme que la dilution
+       empêchera d'atteindre. L'acquisition se calcule sur la part
+       DÉTENUE du jour : à l'entrée d'un associé à 10 %, 36 % devient
+       32,40 %, le rythme tombe de 0,75 à 0,675 point, et le terme
+       affiché cesse d'être vrai. Ce n'est pas une injustice — une
+       dilution réduit la part de tout le monde — mais l'afficher
+       comme une promesse fixe, si. */
+    '<div style="font-size:11.5px;color:var(--doux);margin-top:8px;' +
+      'line-height:1.45">Calculé sur ta part actuelle de ' +
+      pct(a.part_detenue) + '. L\'entrée d\'un nouvel associé dilue ' +
+      'cette part, donc aussi le rythme et le terme ci-dessus.</div>' +
     '</div>';
 
   h += '<div class="carte serree">';
