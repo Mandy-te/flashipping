@@ -13,7 +13,7 @@
       franchement et l'application met l'écriture en file d'attente.
    ═══════════════════════════════════════════════════════════════════ */
 
-var VERSION = 'fls-log-v24';
+var VERSION = 'fls-log-v25';
 var COQUILLE = [
   './',
   './index.html',
@@ -52,10 +52,55 @@ self.addEventListener('fetch', function (ev) {
   // Les écritures ne passent pas par ici.
   if (req.method !== 'GET') return;
 
-  // L'API et toute origine tierce : réseau seul.
   var url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
+
+  /* Le lecteur de codes-barres de secours.
+     Safari et Brave n'exposent pas BarcodeDetector ; l'app charge
+     alors une bibliothèque depuis un CDN. Sans cette exception, elle
+     serait retéléchargée à chaque ouverture de la caméra et
+     deviendrait introuvable dès la première coupure — une succursale
+     perdrait son scanner au pire moment. On la garde donc en cache,
+     à sa version épinglée.
+
+     La réponse est opaque (requête vers une autre origine) : on ne
+     peut ni lire son code de statut, ni savoir si elle a réussi. Une
+     erreur du CDN serait donc mise en cache comme un succès, et
+     rejouée indéfiniment. On ne met en cache que ce qui a une taille
+     plausible, et la montée de VERSION purge l'ensemble. */
+  var lecteurTiers = /\/@zxing\/library@/.test(url.href);
+
+  if (url.origin !== self.location.origin && !lecteurTiers) return;
   if (url.pathname.indexOf('/macros/') !== -1) return;
+
+  if (lecteurTiers) {
+    ev.respondWith(
+      caches.match(req).then(function (enCache) {
+        if (enCache) return enCache;
+        return fetch(req).then(function (rep) {
+          if (!rep || (rep.type !== 'opaque' && rep.status !== 200)) return rep;
+
+          /* Les deux copies se prennent MAINTENANT. `rep` part au
+             navigateur qui va consommer son corps ; un clone demandé
+             plus tard, une fois la taille connue, échouerait sur
+             « body already used ». */
+          var pourTaille = rep.clone();
+          var pourCache = rep.clone();
+
+          ev.waitUntil(
+            pourTaille.blob().then(function (b) {
+              if (b.size < 50000) return;      // page d'erreur du CDN
+              return caches.open(VERSION).then(function (c) {
+                return c.put(req, pourCache);
+              });
+            }).catch(function () {})
+          );
+
+          return rep;
+        });
+      })
+    );
+    return;
+  }
 
   ev.respondWith(
     caches.match(req).then(function (enCache) {

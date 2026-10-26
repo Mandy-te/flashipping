@@ -1387,9 +1387,56 @@ var Rafale = [];
  */
 var ModeScanner = S.lire('fls_mode_scanner', '0') === '1';
 
-function ongletScan() {
-  var supporte = 'BarcodeDetector' in window;
+/**
+ * Ce que l'agent doit savoir sur le lecteur, en une phrase.
+ *
+ * Quatre états, quatre phrases. Le silence n'en est pas un : une
+ * caméra qui filme sans rien lire est exactement ce qui a fait perdre
+ * du temps en succursale, parce que rien à l'écran ne distinguait
+ * « je cherche » de « je ne sais pas chercher ».
+ */
+function aideScan() {
+  var gris = 'font-size:12px;color:var(--doux);margin-top:9px';
 
+  if (Lecteur.etat === 'chargement') {
+    return '<div style="' + gris + '">Ce navigateur ne lit pas les ' +
+      'codes-barres tout seul — téléchargement du lecteur…</div>';
+  }
+  if (Lecteur.etat === 'pret') {
+    return '<div style="' + gris + '">Lecteur de secours actif : ce ' +
+      'navigateur n\'a pas de lecteur intégré. Un peu plus lent, vise ' +
+      'bien le cadre et tiens le code à plat.</div>';
+  }
+  if (Lecteur.etat === 'absent') {
+    /* Deux pannes très différentes sous le même état. Dire « réseau »
+       quand la bibliothèque est arrivée mais ne contient pas ce qu'on
+       attendait enverrait chercher pendant une heure un problème qui
+       n'existe pas — et la vraie cause, une version qui a changé de
+       forme, ne se trouve que dans le code. */
+    var rouge = 'font-size:12px;color:var(--rouge);margin-top:9px;font-weight:650';
+    return Lecteur.detail === 'bibliothèque incomplète'
+      ? '<div style="' + rouge + '">Le lecteur a été téléchargé mais n\'est ' +
+        'pas celui attendu. Ce n\'est pas ton réseau : signale-le, la ' +
+        'version du lecteur doit être corrigée. En attendant, saisis le ' +
+        'numéro à la main ou branche une douchette.</div>'
+      : '<div style="' + rouge + '">Le lecteur n\'a pas pu être téléchargé. ' +
+        'Reconnecte-toi au réseau et rouvre la caméra, ou saisis le ' +
+        'numéro à la main.</div>';
+  }
+  if (Lecteur.etat === 'inconnu' && !natifDispo_()) {
+    return '<div style="' + gris + '">Ce navigateur n\'a pas de lecteur ' +
+      'intégré. Le lecteur de secours se chargera à l\'ouverture de ' +
+      'la caméra.</div>';
+  }
+  return '';
+}
+
+function majAideScan() {
+  var z = document.getElementById('aide-scan');
+  if (z) z.innerHTML = aideScan();
+}
+
+function ongletScan() {
   poser(
     '<div class="cadre-scan" id="zone-cam" style="display:none">' +
       '<video id="flux" playsinline muted></video><div class="viseur"></div>' +
@@ -1428,10 +1475,12 @@ function ongletScan() {
         ? '<div style="font-size:12px;color:var(--vert);margin-top:9px;' +
           'font-weight:650">Le champ reste actif entre deux colis et le clavier ' +
           'ne s\'ouvre plus. Avec la rafale, tu enchaînes sans toucher l\'écran.</div>'
-        : (supporte ? '' : '<div style="font-size:12px;color:var(--doux);' +
-          'margin-top:9px">Ce navigateur ne lit pas les codes-barres par la ' +
-          'caméra. Saisis le numéro, branche une douchette, ou utilise ' +
-          'Chrome sur Android.</div>')) +
+        : '') +
+      /* L'état du lecteur s'affiche TOUJOURS, mode douchette ou non.
+         Masqué derrière la douchette, l'avertissement n'a jamais
+         atteint celui qui en avait besoin : la caméra s'ouvrait, ne
+         lisait rien, et rien ne l'expliquait. */
+      '<div id="aide-scan">' + aideScan() + '</div>' +
     '</div>' +
     '<div id="zone-rafale">' + (ModeRafale ? zoneRafale() : '') + '</div>' +
     '<div id="res-scan"></div>'
@@ -1892,6 +1941,176 @@ function basculerZoom() {
     .catch(function () { toast('Zoom refusé par l\'appareil.', 'ko'); });
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   LIRE UN CODE-BARRES QUAND LE NAVIGATEUR NE SAIT PAS LE FAIRE
+
+   `BarcodeDetector` est une API native, et seul un navigateur sur
+   trois l'expose. Safari ne l'a jamais implémentée ; Brave la
+   désactive, parce qu'elle sert aussi à identifier un appareil. Sur
+   ces navigateurs, l'application ouvrait la caméra, affichait l'image,
+   le viseur, la torche — et personne ne regardait jamais l'image.
+   Rien ne le disait : l'avertissement prévu pour ce cas était masqué
+   dès que le mode douchette était actif.
+
+   D'où ce second lecteur, en JavaScript, chargé UNIQUEMENT quand le
+   natif manque : un navigateur qui sait lire n'a aucune raison de
+   télécharger trois cents kilo-octets.
+
+   Il est servi depuis un CDN parce que ce dépôt est public et sans
+   étape de compilation. Le service worker le met en cache dès la
+   première lecture réussie : une succursale qui perd le réseau garde
+   son scanner. La version est épinglée — une bibliothèque qui change
+   toute seule sous une application de production est une panne qui
+   attend son jour.
+   ═══════════════════════════════════════════════════════════════════ */
+
+var SOURCES_LECTEUR = [
+  'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js',
+  'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js'
+];
+
+var Lecteur = {
+  etat: 'inconnu',      // inconnu · natif · chargement · pret · absent
+  moteur: null,
+  toile: null,
+  ctx: null,
+  tour: 0,
+  detail: ''
+};
+
+function natifDispo_() { return 'BarcodeDetector' in window; }
+
+/** Charge une bibliothèque, en essayant chaque miroir à son tour. */
+function chargerScript_(sources, i) {
+  i = i || 0;
+  if (i >= sources.length) return Promise.reject(new Error('aucune source'));
+  return new Promise(function (ok, ko) {
+    var s = document.createElement('script');
+    s.src = sources[i];
+    s.async = true;
+    s.onload = ok;
+    s.onerror = function () { ko(new Error(sources[i])); };
+    document.head.appendChild(s);
+  }).catch(function () { return chargerScript_(sources, i + 1); });
+}
+
+function preparerLecteur_() {
+  if (Lecteur.etat === 'natif' || Lecteur.etat === 'pret') {
+    return Promise.resolve(true);
+  }
+  if (Lecteur.etat === 'absent')     return Promise.resolve(false);
+  if (Lecteur.etat === 'chargement') return Lecteur.promesse;
+
+  if (natifDispo_()) {
+    try {
+      Cam.detecteur = new window.BarcodeDetector({
+        formats: ['code_128', 'code_39', 'ean_13', 'qr_code', 'itf', 'codabar']
+      });
+      Lecteur.etat = 'natif';
+      return Promise.resolve(true);
+    } catch (e) { /* présente mais inutilisable : on prend le secours */ }
+  }
+
+  Lecteur.etat = 'chargement';
+  majAideScan();
+
+  Lecteur.promesse = chargerScript_(SOURCES_LECTEUR).then(function () {
+    var Z = window.ZXing;
+    if (!Z || !Z.MultiFormatReader || !Z.HybridBinarizer ||
+        !Z.BinaryBitmap || !Z.HTMLCanvasElementLuminanceSource) {
+      throw new Error('bibliothèque incomplète');
+    }
+
+    /* On utilise le cœur de la bibliothèque — un lecteur, une image —
+       et non son assistant « lis-moi cette vidéo ». La boucle, le
+       rythme, l'anti-rebond et le choix du code le plus long restent
+       les nôtres : ce sont eux qui ont été réglés sur de vraies
+       étiquettes, et ils doivent se comporter pareil que le lecteur
+       soit natif ou non. */
+    var indices = new Map();
+    indices.set(Z.DecodeHintType.POSSIBLE_FORMATS, [
+      Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.CODE_39,
+      Z.BarcodeFormat.EAN_13,   Z.BarcodeFormat.EAN_8,
+      Z.BarcodeFormat.UPC_A,    Z.BarcodeFormat.ITF,
+      Z.BarcodeFormat.CODABAR,  Z.BarcodeFormat.QR_CODE
+    ]);
+    // Plus lent, mais c'est ce qui lit une étiquette froissée.
+    indices.set(Z.DecodeHintType.TRY_HARDER, true);
+
+    var moteur = new Z.MultiFormatReader();
+    moteur.setHints(indices);
+    Lecteur.moteur = moteur;
+    Lecteur.zxing = Z;
+    Lecteur.toile = document.createElement('canvas');
+    Lecteur.ctx = Lecteur.toile.getContext('2d', { willReadFrequently: true });
+    Lecteur.etat = 'pret';
+    majAideScan();
+    return true;
+  }).catch(function (err) {
+    Lecteur.etat = 'absent';
+    Lecteur.detail = (err && err.message) || '';
+    majAideScan();
+    return false;
+  });
+
+  return Lecteur.promesse;
+}
+
+/**
+ * Une image, des codes — quel que soit le lecteur derrière.
+ *
+ * Le secours ne regarde pas toute l'image à chaque passage : il
+ * alterne entre la bande du viseur, où l'agent vise, et l'image
+ * entière, pour un QR posé en coin. Analyser 1920×1080 en JavaScript
+ * coûte bien plus cher que la détection native ; se limiter à la
+ * bande divise ce coût par deux sans rien perdre du cas courant.
+ */
+function detecterCodes_(v) {
+  if (Lecteur.etat === 'natif') {
+    if (!Cam.detecteur) return Promise.resolve([]);
+    return Cam.detecteur.detect(v);
+  }
+  if (Lecteur.etat !== 'pret') return Promise.resolve([]);
+
+  var L = v.videoWidth, H = v.videoHeight;
+  if (!L || !H) return Promise.resolve([]);
+
+  Lecteur.tour++;
+  var bande = (Lecteur.tour % 3) !== 0;          // 2 fois sur 3
+  var sx = bande ? Math.round(L * 0.05) : 0;
+  var sy = bande ? Math.round(H * 0.25) : 0;
+  var sl = bande ? Math.round(L * 0.90) : L;
+  var sh = bande ? Math.round(H * 0.50) : H;
+
+  /* On plafonne la largeur analysée. Au-delà, le temps de décodage
+     grimpe sans gagner en lecture : un code 128 d'étiquette occupe
+     déjà largement assez de pixels à 1280. */
+  var ech = Math.min(1, 1280 / sl);
+  var tl = Math.max(1, Math.round(sl * ech));
+  var th = Math.max(1, Math.round(sh * ech));
+
+  var t = Lecteur.toile;
+  if (t.width !== tl || t.height !== th) { t.width = tl; t.height = th; }
+
+  try {
+    Lecteur.ctx.drawImage(v, sx, sy, sl, sh, 0, 0, tl, th);
+    var Z = Lecteur.zxing;
+    var source = new Z.HTMLCanvasElementLuminanceSource(t);
+    var image = new Z.BinaryBitmap(new Z.HybridBinarizer(source));
+    var r = Lecteur.moteur.decode(image);
+    Lecteur.moteur.reset();
+    return Promise.resolve(r && r.getText
+      ? [{ rawValue: r.getText() }]
+      : []);
+  } catch (e) {
+    /* Aucun code dans l'image : la bibliothèque le signale par une
+       exception, pas par un retour vide. Ce n'est donc pas une panne,
+       et il ne faut surtout pas la remonter à l'agent. */
+    try { Lecteur.moteur.reset(); } catch (e2) {}
+    return Promise.resolve([]);
+  }
+}
+
 function brancherFlux() {
   var v = document.getElementById('flux');
   var z = document.getElementById('zone-cam');
@@ -1900,25 +2119,27 @@ function brancherFlux() {
   v.srcObject = Cam.flux;
   v.play().catch(function () {});
 
-  if (!('BarcodeDetector' in window)) return;
-  if (!Cam.detecteur) {
-    try {
-      Cam.detecteur = new window.BarcodeDetector({
-        formats: ['code_128', 'code_39', 'ean_13', 'qr_code', 'itf', 'codabar']
-      });
-    } catch (e) { return; }
-  }
+  preparerLecteur_().then(function (pret) {
+    if (!pret || !Cam.flux) return;
+    demarrerBoucle_(v);
+  });
+}
+
+function demarrerBoucle_(v) {
+  if (Cam.boucle) { clearInterval(Cam.boucle); Cam.boucle = null; }
 
   /* 120 ms au lieu de 300 : la lecture paraissait lente parce qu'on
      ne regardait l'image que trois fois par seconde. Le garde
      `Cam.enCours` empêche les appels de s'empiler quand une détection
      dure plus longtemps que l'intervalle — c'est ce qui faisait
-     chauffer le téléphone et ralentissait tout le reste. */
+     chauffer le téléphone et ralentissait tout le reste, et c'est lui
+     qui rend le rythme sûr pour le lecteur de secours, dont chaque
+     passage coûte bien plus que 120 ms. */
   Cam.boucle = setInterval(function () {
     if (!Cam.flux || Cam.pause || Cam.enCours || v.readyState < 2) return;
 
     Cam.enCours = true;
-    Cam.detecteur.detect(v).then(function (codes) {
+    detecterCodes_(v).then(function (codes) {
       Cam.enCours = false;
       if (!codes || !codes.length) return;
 
