@@ -590,7 +590,11 @@ function periodeFuture() {
 var TOUS_ONGLETS = [
   { id: 'tableau',   ic: '📊', nom: 'Période',   droit: 'voir_stats' },
   { id: 'evolution', ic: '📈', nom: 'Évolution', droit: 'voir_stats' },
-  { id: 'rapport',   ic: '🖨️', nom: 'Rapport',   droit: 'voir_stats' }
+  { id: 'rapport',   ic: '🖨️', nom: 'Rapport',   droit: 'voir_stats' },
+  /* La simulation tarifaire touche au prix : elle n'est proposée
+     qu'à ceux qui peuvent le fixer. Un responsable qui la verrait
+     sans pouvoir rien en faire y lirait une promesse. */
+  { id: 'tarif',     ic: '🧮', nom: 'Tarif',     droit: 'fixer_prix' }
 ];
 
 var ONGLETS = TOUS_ONGLETS;
@@ -671,6 +675,7 @@ function rendreOnglet() {
     case 'tableau':   return ongletTableau();
     case 'evolution': return ongletEvolution();
     case 'rapport':   return ongletRapport();
+    case 'tarif':     return ongletTarif();
   }
 }
 
@@ -1281,6 +1286,197 @@ function corpsRapport() {
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET TARIF — simuler avant de décider
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Essayer un tarif sur de vrais colis.
+ *
+ * La question posée : un prix à la livre plus BAS, compensé par un
+ * frais fixe par colis, rapporte-t-il autant ? Le concurrent affiche
+ * 3,80 $ la livre et facture 8 $ par colis — donc plus cher qu'un
+ * prix unique sous 6,7 lb — et gagne quand même des clients, parce
+ * que c'est le prix à la livre qu'on compare.
+ *
+ * La réponse dépend entièrement de la répartition des poids : un
+ * frais fixe enrichit sur les petits colis et appauvrit sur les gros.
+ * Aucune intuition ne la donne. Cet écran rejoue les colis réellement
+ * reçus et compare, colis par colis.
+ *
+ * Il n'écrit rien. Changer le tarif se fait dans l'app Logistique,
+ * en connaissance de cause.
+ */
+var Tarif = { prix: 5, frais: 0, data: null, err: null, enCours: false };
+
+function ongletTarif() {
+  poser(selecteurPeriode() + '<div id="zone-stats">' + corpsTarif() + '</div>');
+}
+
+function corpsTarif() {
+  var h = '<div class="carte">' +
+    '<div class="titre-section" style="margin-top:0">Tarif à tester</div>' +
+    '<div class="duo">' +
+      '<label class="champ"><span>Prix à la livre ($)</span>' +
+        '<input type="number" id="t-prix" step="0.05" min="0.1" ' +
+        'inputmode="decimal" value="' + e(Tarif.prix) + '"></label>' +
+      '<label class="champ"><span>Frais fixe par colis ($)</span>' +
+        '<input type="number" id="t-frais" step="0.5" min="0" ' +
+        'inputmode="decimal" value="' + e(Tarif.frais) + '"></label>' +
+    '</div>' +
+    '<div class="puces">' +
+      [[5, 0, 'Aujourd\'hui'], [4.5, 2, '4,50 + 2'], [4.25, 3, '4,25 + 3'],
+       [3.95, 5, '3,95 + 5'], [3.75, 6, '3,75 + 6']].map(function (x) {
+        return '<button class="puce" onclick="essaiTarif(' + x[0] + ',' +
+          x[1] + ')">' + e(x[2]) + '</button>';
+      }).join('') +
+    '</div>' +
+    '<button class="btn" onclick="lancerSimulation()">Simuler sur la période</button>' +
+  '</div>';
+
+  if (Tarif.err)     return h + bloc(Tarif.err, 'ko', '❌');
+  if (Tarif.enCours) return h + chargement('Relecture des colis…');
+  if (!Tarif.data)   return h + bloc('Choisis un tarif et lance la simulation. ' +
+    'Rien ne sera modifié : l\'écran rejoue les colis déjà reçus.', 'info', '🧮');
+
+  var d = Tarif.data;
+  h += resultatTarif(d);
+  return h;
+}
+
+function essaiTarif(prix, frais) {
+  Tarif.prix = prix; Tarif.frais = frais;
+  var a = document.getElementById('t-prix');
+  var b = document.getElementById('t-frais');
+  if (a) a.value = prix;
+  if (b) b.value = frais;
+  lancerSimulation();
+}
+
+function lancerSimulation() {
+  var a = document.getElementById('t-prix');
+  var b = document.getElementById('t-frais');
+  if (a) Tarif.prix = Number(a.value) || 0;
+  if (b) Tarif.frais = Number(b.value) || 0;
+  if (Tarif.prix <= 0) { toast('Prix à la livre invalide.', 'ko'); return; }
+
+  Tarif.enCours = true; Tarif.err = null; Tarif.data = null;
+  ongletTarif();
+
+  api('stats_simuler_tarif', {
+    type_periode: Per.type, ref: Per.ref, agence_id: Per.agence,
+    prix_lb_usd: Tarif.prix, frais_fixe_usd: Tarif.frais
+  }).then(function (d) {
+    Tarif.enCours = false; Tarif.data = d; ongletTarif();
+  }).catch(function (err) {
+    Tarif.enCours = false; Tarif.err = err.message; ongletTarif();
+  });
+}
+
+function resultatTarif(d) {
+  var gagne = d.ecart_usd >= 0;
+  var h = '';
+
+  (d.alertes || []).forEach(function (x) { h += bloc(x, 'attention', '⚠️'); });
+
+  if (!d.nb_colis) {
+    return h + vide('📦', 'Aucun colis au poids sur cette période.');
+  }
+
+  h += '<div class="titre-section">Sur ' + n0(d.nb_colis) + ' colis réels</div>' +
+    '<div class="stats">' +
+    tuile(usd(d.actuel_usd), 'Facturé') +
+    tuile(usd(d.simule_usd), 'Avec ce tarif') +
+    tuile((gagne ? '+' : '') + usd(d.ecart_usd), 'Écart',
+          gagne ? 'pos' : 'neg') +
+    '</div>';
+
+  h += '<div class="carte serree" style="margin-top:12px">' +
+    '<div class="total"><span class="l">Écart en pourcentage</span><b style="color:' +
+      (gagne ? 'var(--vert)' : 'var(--rouge)') + '">' +
+      (gagne ? '+' : '') + pct(d.ecart_pct) + '</b></div>' +
+    '<div class="total"><span class="l">Prix moyen réel aujourd\'hui</span><b>' +
+      usd(d.prix_moyen_actuel_usd) + ' la livre</b></div>' +
+    '<div class="total"><span class="l">Prix moyen simulé</span><b>' +
+      usd(d.prix_moyen_simule_usd) + ' la livre</b></div>' +
+    '<div class="total"><span class="l">Poids moyen d\'un colis</span><b>' +
+      n2(d.poids_moyen_lb) + ' lb</b></div>' +
+    '</div>';
+
+  // ── Qui paie plus, qui paie moins ──
+  h += '<div class="titre-section">Ce que vivent les clients</div>' +
+    '<div class="carte serree">' +
+    '<div class="total"><span class="l">Paieraient MOINS qu\'aujourd\'hui</span>' +
+      '<b style="color:var(--vert)">' + n0(d.nb_clients_paient_moins) + ' colis · ' +
+      pct(d.nb_colis ? d.nb_clients_paient_moins / d.nb_colis * 100 : 0) +
+      '</b></div>' +
+    '<div class="total"><span class="l">Paieraient PLUS</span>' +
+      '<b style="color:var(--rouge)">' + n0(d.nb_clients_paient_plus) + ' colis · ' +
+      pct(d.nb_colis ? d.nb_clients_paient_plus / d.nb_colis * 100 : 0) +
+      '</b></div>' +
+    (d.poids_bascule_lb
+      ? '<div style="font-size:12.5px;color:var(--doux);margin-top:7px;' +
+        'line-height:1.45">Point de bascule : au-delà de ' +
+        n2(d.poids_bascule_lb) + ' lb, le client paie plus qu\'aujourd\'hui.' +
+        '</div>' : '') +
+    '</div>';
+
+  // ── Face au concurrent ──
+  h += '<div class="titre-section">Face à ' + e(d.concurrent.nom) + '</div>' +
+    '<div class="carte serree">' +
+    '<div style="font-size:12.5px;color:var(--doux);margin-bottom:8px;' +
+      'line-height:1.45">Leur tarif : ' + usd(d.concurrent.prix_lb_usd) +
+      ' la livre + ' + usd(d.concurrent.frais_usd) + ' par colis.</div>' +
+    '<div class="total"><span class="l">Les mêmes colis chez eux</span><b>' +
+      usd(d.concurrent_usd) + '</b></div>' +
+    '<div class="total"><span class="l">Moins cher que chez eux</span><b>' +
+      n0(d.nb_moins_cher_que_concurrent) + ' colis sur ' + n0(d.nb_colis) +
+      '</b></div>' +
+    '</div>';
+
+  // ── Par tranche de poids : là où tout se joue ──
+  h += '<div class="titre-section">Par tranche de poids</div>' +
+    '<div class="carte serree" style="padding:0;overflow:hidden">';
+  d.tranches.forEach(function (t) {
+    var pos = t.ecart_usd >= 0;
+    h += '<div style="display:flex;justify-content:space-between;' +
+      'align-items:baseline;gap:8px;padding:10px 12px;' +
+      'border-bottom:1px solid var(--bord)">' +
+      '<span style="min-width:0"><b style="font-size:13.5px">' + e(t.tranche) +
+        '</b><span style="display:block;font-size:11.5px;color:var(--doux)">' +
+        n0(t.nb) + ' colis · ' + pct(t.part_colis_pct) + ' du volume</span></span>' +
+      '<span style="text-align:right;white-space:nowrap">' +
+        '<b style="color:' + (pos ? 'var(--vert)' : 'var(--rouge)') + '">' +
+        (pos ? '+' : '') + usd(t.ecart_usd) + '</b>' +
+        '<span style="display:block;font-size:11px;color:var(--doux)">' +
+        usd(t.actuel_usd) + ' → ' + usd(t.simule_usd) + '</span></span>' +
+    '</div>';
+  });
+  h += '</div>' +
+    '<div style="font-size:12px;color:var(--doux);margin-top:7px;' +
+      'line-height:1.45">Un frais fixe enrichit sur les petits colis et ' +
+      'appauvrit sur les gros. C\'est cette colonne qui décide, pas ' +
+      'l\'intuition.</div>';
+
+  if (d.agences && d.agences.length > 1) {
+    h += '<div class="titre-section">Par succursale</div>' +
+      '<div class="carte serree">' +
+      d.agences.map(function (a) {
+        var pos = a.ecart_usd >= 0;
+        return '<div class="total"><span class="l">' + e(a.ville) + ' · ' +
+          n0(a.nb) + ' colis</span><b style="color:' +
+          (pos ? 'var(--vert)' : 'var(--rouge)') + '">' +
+          (pos ? '+' : '') + usd(a.ecart_usd) + '</b></div>';
+      }).join('') + '</div>';
+  }
+
+  h += bloc('Cette simulation n\'a rien changé. Pour appliquer un tarif, ' +
+    'va dans l\'app Logistique, ⚙️ Tarifs et frais.', 'info', '🔒');
+
+  return h;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  IMPRESSION
 // ═══════════════════════════════════════════════════════════════════
@@ -1593,7 +1789,7 @@ function imprimerComplet() {
  * incompréhensibles — une action « inconnue », un écran vide. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-28.2';
+var VERSION_ATTENDUE = '2026-10-28.3';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
