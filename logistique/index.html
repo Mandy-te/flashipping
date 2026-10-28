@@ -1018,6 +1018,10 @@ function factureA4(f) {
     '<div class="doc-tot">' +
       '<div><span>Sous-total · ' + f.nb_colis + ' colis · ' + n2(f.poids_lb) +
         ' lb</span><span>' + usd(f.sous_total_usd) + '</span></div>' +
+      (f.frais_lignes || []).map(function (l) {
+        return '<div><span>' + e(l.nom) + '</span><span>+ ' +
+               usd(l.montant_usd) + '</span></div>';
+      }).join('') +
       (Number(f.remise_usd) > 0
         ? '<div><span>Remise accordée</span><span>− ' + usd(f.remise_usd) +
           '</span></div>' : '') +
@@ -1053,6 +1057,16 @@ function recuFacture(f) {
     '<div class="rec-l"><span>Poids</span><span>' + n2(f.poids_lb) + ' lb</span></div>' +
     '<div class="rec-sep"></div>' +
     '<div class="rec-l"><span>Sous-total</span><span>' + usd(f.sous_total_usd) + '</span></div>';
+
+  /* Chaque frais sur sa ligne, avec son nom.
+     Un total qui dépasse la somme des colis sans rien pour
+     l'expliquer, c'est ce que le client lit comme une arnaque — et
+     il a raison de le lire ainsi. */
+  (f.frais_lignes || []).forEach(function (l) {
+    h += '<div class="rec-l"><span>' + e(l.nom) + '</span><span>+' +
+         usd(l.montant_usd) + '</span></div>';
+  });
+
   if (Number(f.remise_usd) > 0) {
     h += '<div class="rec-l"><span>Remise</span><span>-' + usd(f.remise_usd) + '</span></div>';
   }
@@ -3691,7 +3705,8 @@ function envoyerWhatsapp(clientId) {
 //  ONGLET LIVRAISON
 // ═══════════════════════════════════════════════════════════════════
 
-var Livr = { client: null, prep: null, coches: {} };
+var Livr = { client: null, prep: null, coches: {},
+             catalogue: [], frais: [] };
 
 function allerLivrer(clientId) {
   Etat.onglet = 'livraison';
@@ -3749,9 +3764,25 @@ function preparerLivraison(clientId) {
     Livr.prep = d;
     Livr.client = d.client;
     Livr.coches = {};
+    Livr.frais = [];
     // Tout coché par défaut : le cas courant est « il prend tout »
     d.colis.forEach(function (c) { Livr.coches[c.tracking] = true; });
     rendreLivraison();
+
+    /* Le catalogue des frais du comptoir arrive après l'écran, et
+       non avant : il n'est pas indispensable pour remettre un colis,
+       et le faire attendre retarderait tout le monde pour un cas qui
+       ne se présente pas à chaque livraison. */
+    var poids = (d.colis || []).reduce(function (t, c) {
+      return t + Number(c.poids_lb || 0); }, 0);
+    api('frais_applicables', { poids_lb: poids,
+                               agence_id: (d.client || {}).agence_id || '',
+                               moment: 'livraison' })
+      .then(function (r) {
+        Livr.catalogue = (r && r.frais) || [];
+        majZoneFrais();
+      })
+      .catch(function () { Livr.catalogue = []; });
   }).catch(function (err) {
     if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
   });
@@ -3771,11 +3802,124 @@ function totauxLivraison() {
   (Livr.prep.colis || []).forEach(function (c) {
     if (Livr.coches[c.tracking]) { nb++; usdT += Number(c.montant_usd); poids += Number(c.poids_lb); }
   });
+
+  /* Un frais au pourcentage se calcule sur le sous-total des colis
+     COCHÉS : décocher un colis doit faire baisser la manutention,
+     sinon le client paie pour ce qu'il n'emporte pas. Le serveur
+     recalcule de son côté — ce chiffre-ci ne sert qu'à l'affichage. */
+  var frais = 0;
+  Livr.frais.forEach(function (f) {
+    frais += f.mode === 'pourcentage'
+      ? Math.round(usdT * Number(f.valeur) / 100 * 100) / 100
+      : Number(f.montant_usd || f.valeur || 0);
+  });
+  frais = Math.round(frais * 100) / 100;
+
+  var avantRemise = Math.round((usdT + frais) * 100) / 100;
   var remise = Number((document.getElementById('lv-remise') || {}).value) || 0;
-  if (remise > usdT) remise = usdT;
-  var net = Math.round((usdT - remise) * 100) / 100;
-  return { nb: nb, brut: usdT, remise: remise, net: net, poids: poids,
-           htg: net * Number(Livr.prep.taux) };
+  if (remise > avantRemise) remise = avantRemise;
+  var net = Math.round((avantRemise - remise) * 100) / 100;
+
+  return { nb: nb, brut: usdT, frais: frais, remise: remise, net: net,
+           poids: poids, htg: net * Number(Livr.prep.taux) };
+}
+
+/**
+ * Les frais ajoutés au comptoir.
+ *
+ * Ils n'existaient pas : l'écran ne savait que retirer de l'argent
+ * (la remise), jamais en ajouter. Un client qui demande la livraison
+ * à domicile au moment de la remise obligeait donc à facturer à côté,
+ * hors de l'application — donc hors de la caisse et hors du journal.
+ *
+ * Le catalogue d'abord, le montant libre ensuite : un prix choisi
+ * dans une liste est le même d'une succursale à l'autre, celui qu'on
+ * tape ne l'est jamais.
+ */
+function majZoneFrais() {
+  var z = document.getElementById('lv-frais');
+  if (z) z.innerHTML = zoneFrais();
+  var t = document.getElementById('lv-totaux');
+  if (t) t.innerHTML = blocTotaux();
+  majResteLivraison();
+}
+
+function zoneFrais() {
+  var peutLibre = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
+  var dispo = Livr.catalogue.filter(function (c) {
+    return !Livr.frais.some(function (f) { return f.frais_id === c.frais_id; });
+  });
+
+  if (!dispo.length && !Livr.frais.length && !peutLibre) return '';
+
+  var h = '<div class="titre-section">Frais</div>';
+
+  Livr.frais.forEach(function (f, i) {
+    h += '<div class="ligne" style="background:#FFF8E1">' +
+      '<div class="corps"><div class="t1">' + e(f.nom) + '</div>' +
+      '<div class="t2">' + (f.mode === 'pourcentage'
+        ? n2(f.valeur) + ' % du sous-total'
+        : (f.frais_id ? 'au catalogue' : 'ajouté à la main')) + '</div></div>' +
+      '<div class="droite" style="font-weight:800">' +
+        usd(f.mode === 'pourcentage'
+          ? Math.round(totauxLivraison().brut * Number(f.valeur) / 100 * 100) / 100
+          : Number(f.montant_usd || f.valeur || 0)) + '</div>' +
+      '<button class="btn vide petit" style="width:auto;padding:7px 11px;' +
+        'margin-left:8px" onclick="retirerFrais(' + i + ')">✕</button>' +
+    '</div>';
+  });
+
+  if (dispo.length) {
+    h += '<div class="puces" style="margin-top:4px">' + dispo.map(function (c) {
+      return '<button class="puce" onclick="ajouterFrais(\'' + e(c.frais_id) +
+        '\')">+ ' + e(c.nom) + ' · ' +
+        (c.mode === 'pourcentage' ? n2(c.valeur) + ' %' : usd(c.valeur)) +
+        '</button>';
+    }).join('') + '</div>';
+  }
+
+  if (peutLibre) {
+    h += '<div class="duo" style="margin-top:6px">' +
+      '<input type="text" id="lv-f-nom" placeholder="Autre frais — libellé" ' +
+        'maxlength="60">' +
+      '<input type="number" id="lv-f-montant" step="0.5" min="0" ' +
+        'inputmode="decimal" placeholder="$" style="max-width:110px">' +
+      '<button class="btn vide petit" style="width:auto;padding:0 14px" ' +
+        'onclick="ajouterFraisLibre()">+</button>' +
+    '</div>' +
+    '<div style="font-size:11.5px;color:var(--doux);margin-top:5px">' +
+      'Un frais hors catalogue doit porter un libellé : sans lui, la ' +
+      'facture ne s\'explique plus dans six mois.</div>';
+  } else if (!dispo.length && !Livr.frais.length) {
+    h += '<div style="font-size:12px;color:var(--doux)">Aucun frais de ' +
+      'comptoir prévu pour cette succursale.</div>';
+  }
+
+  return h;
+}
+
+function ajouterFrais(id) {
+  var c = Livr.catalogue.filter(function (x) { return x.frais_id === id; })[0];
+  if (!c) return;
+  Livr.frais.push({ frais_id: c.frais_id, nom: c.nom,
+                    mode: c.mode, valeur: c.valeur });
+  majZoneFrais();
+}
+
+function ajouterFraisLibre() {
+  var nom = (document.getElementById('lv-f-nom').value || '').trim();
+  var m = Number(document.getElementById('lv-f-montant').value) || 0;
+  if (!nom) { toast('Donne un libellé au frais.', 'ko'); return; }
+  if (m <= 0) { toast('Montant invalide.', 'ko'); return; }
+  Livr.frais.push({ frais_id: '', nom: nom, mode: 'fixe', montant_usd: m });
+  document.getElementById('lv-f-nom').value = '';
+  document.getElementById('lv-f-montant').value = '';
+  majZoneFrais();
+}
+
+function retirerFrais(i) {
+  Livr.frais.splice(i, 1);
+  majZoneFrais();
 }
 
 function rendreLivraison() {
@@ -3795,8 +3939,6 @@ function rendreLivraison() {
   }
 
   var t = totauxLivraison();
-  var peutRemise = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
-  var remiseVal = (document.getElementById('lv-remise') || {}).value || '';
   var payeVal = (document.getElementById('lv-paye') || {}).value;
   if (payeVal === undefined || payeVal === null) payeVal = '';
 
@@ -3835,22 +3977,10 @@ function rendreLivraison() {
       '</label>';
     }).join('') +
 
+    '<div id="lv-frais">' + zoneFrais() + '</div>' +
+
     '<div class="carte">' +
-      '<div class="total"><span class="l">' + t.nb + ' colis · ' + n2(t.poids) +
-        ' lb</span><span>' + usd(t.brut) + '</span></div>' +
-
-      (peutRemise
-        ? '<label class="champ" style="margin:10px 0 4px"><span>Remise ($)</span>' +
-          '<input type="number" id="lv-remise" step="0.5" min="0" inputmode="decimal" ' +
-          'value="' + e(remiseVal) + '" oninput="rendreLivraison()"></label>'
-        : '') +
-      (t.remise > 0
-        ? '<div class="total"><span class="l">Remise</span><span>-' + usd(t.remise) +
-          '</span></div>' : '') +
-
-      '<div class="total gros"><span class="l">À payer</span><span>' + usd(t.net) + '</span></div>' +
-      '<div class="total"><span class="l">Au taux ' + n0(d.taux) + '</span><b>' +
-        htg(t.htg) + '</b></div>' +
+      '<div id="lv-totaux">' + blocTotaux() + '</div>' +
 
       '<label class="champ" style="margin:14px 0 4px"><span>Montant encaissé ($)</span>' +
         '<input type="number" id="lv-paye" step="0.5" min="0" inputmode="decimal" ' +
@@ -3878,6 +4008,54 @@ function rendreLivraison() {
         bloc('Hors ligne — la facturation est bloquée.', 'ko', '📴')) +
     '</div>'
   );
+  majResteLivraison();
+}
+
+/**
+ * Le détail du montant, du sous-total au net.
+ *
+ * Isolé dans sa propre fonction pour qu'un frais ajouté ou retiré
+ * repeigne les totaux sans reconstruire tout l'écran : redessiner
+ * la liste des colis effacerait le champ « montant encaissé » que
+ * l'agent est peut-être en train de remplir.
+ */
+function blocTotaux() {
+  var t = totauxLivraison();
+  var d = Livr.prep;
+  var peutRemise = Etat.user && Etat.user.droits && Etat.user.droits.fixer_prix;
+  var champ = document.getElementById('lv-remise');
+  var remiseVal = champ ? champ.value : '';
+
+  return '<div class="total"><span class="l">' + t.nb + ' colis · ' +
+      n2(t.poids) + ' lb</span><span>' + usd(t.brut) + '</span></div>' +
+
+    (t.frais > 0
+      ? '<div class="total"><span class="l">Frais</span><span>+ ' +
+        usd(t.frais) + '</span></div>' : '') +
+
+    (peutRemise
+      ? '<label class="champ" style="margin:10px 0 4px"><span>Remise ($)</span>' +
+        '<input type="number" id="lv-remise" step="0.5" min="0" ' +
+        'inputmode="decimal" value="' + e(remiseVal) + '" ' +
+        'oninput="majTotauxSeuls()"></label>'
+      : '') +
+    (t.remise > 0
+      ? '<div class="total"><span class="l">Remise</span><span>-' +
+        usd(t.remise) + '</span></div>' : '') +
+
+    '<div class="total gros"><span class="l">À payer</span><span>' +
+      usd(t.net) + '</span></div>' +
+    '<div class="total"><span class="l">Au taux ' + n0(d.taux) + '</span><b>' +
+      htg(t.htg) + '</b></div>';
+}
+
+/* La remise se tape caractère par caractère : repeindre son propre
+   champ à chaque frappe lui ferait perdre le curseur. On ne touche
+   donc qu'au reste dû. */
+function majTotauxSeuls() {
+  var t = totauxLivraison();
+  var z = document.querySelector('#lv-totaux .total.gros span:last-child');
+  if (z) z.textContent = usd(t.net);
   majResteLivraison();
 }
 
@@ -3915,12 +4093,17 @@ function validerLivraison() {
   api('facture_creer', {
     client_id: Livr.client.client_id,
     trackings: JSON.stringify(trackings),
+    frais: JSON.stringify(Livr.frais.map(function (f) {
+      return f.frais_id
+        ? { frais_id: f.frais_id }
+        : { nom: f.nom, montant_usd: f.montant_usd };
+    })),
     remise_usd: t.remise || 0,
     montant_paye_usd: paye,
     methode: document.getElementById('lv-methode').value
   }).then(function (f) {
     bip();
-    Livr = { client: null, prep: null, coches: {} };
+    Livr = { client: null, prep: null, coches: {}, catalogue: [], frais: [] };
     afficherFacture(f);
   }).catch(function (err) {
     b.disabled = false;
@@ -3939,6 +4122,10 @@ function afficherFacture(f) {
         e(f.client.nom_complet) + '</div>' +
       '<div class="total"><span class="l">' + f.nb_colis + ' colis · ' +
         n2(f.poids_lb) + ' lb</span><span>' + usd(f.sous_total_usd) + '</span></div>' +
+      (f.frais_lignes || []).map(function (l) {
+        return '<div class="total"><span class="l">' + e(l.nom) +
+               '</span><span>+ ' + usd(l.montant_usd) + '</span></div>';
+      }).join('') +
       (Number(f.remise_usd) > 0
         ? '<div class="total"><span class="l">Remise</span><span>-' +
           usd(f.remise_usd) + '</span></div>' : '') +
@@ -4316,7 +4503,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-26.2';
+var VERSION_ATTENDUE = '2026-10-28.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
