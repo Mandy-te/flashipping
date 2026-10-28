@@ -3850,8 +3850,6 @@ function zoneFrais() {
     return !Livr.frais.some(function (f) { return f.frais_id === c.frais_id; });
   });
 
-  if (!dispo.length && !Livr.frais.length && !peutLibre) return '';
-
   var h = '<div class="titre-section">Frais</div>';
 
   Livr.frais.forEach(function (f, i) {
@@ -3890,9 +3888,21 @@ function zoneFrais() {
     '<div style="font-size:11.5px;color:var(--doux);margin-top:5px">' +
       'Un frais hors catalogue doit porter un libellé : sans lui, la ' +
       'facture ne s\'explique plus dans six mois.</div>';
-  } else if (!dispo.length && !Livr.frais.length) {
-    h += '<div style="font-size:12px;color:var(--doux)">Aucun frais de ' +
-      'comptoir prévu pour cette succursale.</div>';
+  }
+
+  /* Un écran vide laissait croire à un droit manquant. C'est ce qui
+     est arrivé : le catalogue revenait vide faute de réglage, seule
+     la direction voyait le champ libre, et l'agent en a conclu qu'il
+     n'avait pas le droit d'ajouter un frais. Il l'avait. */
+  if (!dispo.length && !Livr.frais.length) {
+    h += '<div style="font-size:12px;color:var(--doux);line-height:1.45">' +
+      'Aucun frais de comptoir n\'est réglé pour cette succursale. ' +
+      (peutLibre
+        ? 'Pour qu\'un frais apparaisse ici, ouvre ⚙️ → Tarifs et frais et ' +
+          'passe son moment à « à la remise ».'
+        : 'Ce n\'est pas une question de droit : tu peux facturer un frais ' +
+          'dès qu\'il est au catalogue. Demande à la direction de l\'y ' +
+          'ajouter.') + '</div>';
   }
 
   return h;
@@ -4503,7 +4513,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-28.1';
+var VERSION_ATTENDUE = '2026-10-28.2';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
@@ -4588,6 +4598,9 @@ function dessinerCatalogue() {
 /** La portée d'un frais, en une ligne lisible. */
 function critereFrais(f) {
   var bouts = [];
+  var quand = String(f.moment || 'reception');
+  if (quand === 'livraison')      bouts.push('au comptoir');
+  else if (quand === 'les deux')  bouts.push('réception et comptoir');
   if (Number(f.poids_min_lb) > 0 && Number(f.poids_max_lb) > 0) {
     bouts.push('de ' + f.poids_min_lb + ' à ' + f.poids_max_lb + ' lb');
   } else if (Number(f.poids_min_lb) > 0) {
@@ -4713,6 +4726,24 @@ function ouvrirFrais(id) {
     '<input type="hidden" id="f-id" value="' + e(id || '') + '">' +
     '<label class="champ"><span>Nom</span><input type="text" id="f-nom" value="' +
       e(f.nom || '') + '" placeholder="Emballage spécial…"></label>' +
+    /* Le moment passe AVANT le mode : c'est lui qui décide sur quel
+       écran le frais apparaîtra, et c'est le réglage qu'on vient
+       chercher quand un frais « n'existe pas » au comptoir. */
+    '<label class="champ"><span>Quand l\'appliquer</span><select id="f-moment">' +
+      '<option value="reception"' +
+        ((f.moment || 'reception') === 'reception' ? ' selected' : '') +
+        '>À la réception du colis</option>' +
+      '<option value="livraison"' +
+        (f.moment === 'livraison' ? ' selected' : '') +
+        '>À la remise au client</option>' +
+      '<option value="les deux"' +
+        (f.moment === 'les deux' ? ' selected' : '') +
+        '>Les deux</option>' +
+    '</select></label>' +
+    '<div style="font-size:12px;color:var(--doux);margin:-6px 0 12px;' +
+      'line-height:1.4">Un emballage se décide à la réception. Une ' +
+      'livraison à domicile se demande au comptoir, le jour du ' +
+      'retrait : choisis « à la remise » pour qu\'elle y apparaisse.</div>' +
     '<label class="champ"><span>Mode</span><select id="f-mode">' +
       '<option value="fixe"' + (f.mode === 'fixe' ? ' selected' : '') +
         '>Montant fixe en dollars</option>' +
@@ -4762,6 +4793,7 @@ function validerFrais() {
     frais_id: document.getElementById('f-id').value,
     nom: document.getElementById('f-nom').value,
     mode: document.getElementById('f-mode').value,
+    moment: document.getElementById('f-moment').value,
     valeur: document.getElementById('f-valeur').value,
     poids_min_lb: document.getElementById('f-pmin').value,
     poids_max_lb: document.getElementById('f-pmax').value,
