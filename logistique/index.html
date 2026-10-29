@@ -3729,7 +3729,7 @@ function envoyerWhatsapp(clientId) {
 // ═══════════════════════════════════════════════════════════════════
 
 var Livr = { client: null, prep: null, coches: {},
-             catalogue: [], frais: [] };
+             catalogue: [], ecartes: [], frais: [] };
 
 function allerLivrer(clientId) {
   Etat.onglet = 'livraison';
@@ -3788,6 +3788,7 @@ function preparerLivraison(clientId) {
     Livr.client = d.client;
     Livr.coches = {};
     Livr.frais = [];
+    Livr.ecartes = [];
     // Tout coché par défaut : le cas courant est « il prend tout »
     d.colis.forEach(function (c) { Livr.coches[c.tracking] = true; });
     rendreLivraison();
@@ -3798,14 +3799,22 @@ function preparerLivraison(clientId) {
        ne se présente pas à chaque livraison. */
     var poids = (d.colis || []).reduce(function (t, c) {
       return t + Number(c.poids_lb || 0); }, 0);
-    api('frais_applicables', { poids_lb: poids,
-                               agence_id: (d.client || {}).agence_id || '',
+    /* La succursale de REMISE — celle du colis, pas celle où le
+       client s'est inscrit. Elle arrivait vide, et tout frais
+       restreint à une succursale était donc écarté : le comptoir
+       annonçait qu'aucun frais n'était réglé alors qu'il l'était. */
+    var ag = d.agence_id ||
+             ((d.colis || [])[0] || {}).agence_destination ||
+             (d.client || {}).agence_id || '';
+
+    api('frais_applicables', { poids_lb: poids, agence_id: ag,
                                moment: 'livraison' })
       .then(function (r) {
         Livr.catalogue = (r && r.frais) || [];
+        Livr.ecartes = (r && r.ecartes) || [];
         majZoneFrais();
       })
-      .catch(function () { Livr.catalogue = []; });
+      .catch(function () { Livr.catalogue = []; Livr.ecartes = []; });
   }).catch(function (err) {
     if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
   });
@@ -3919,13 +3928,26 @@ function zoneFrais() {
      n'avait pas le droit d'ajouter un frais. Il l'avait. */
   if (!dispo.length && !Livr.frais.length) {
     h += '<div style="font-size:12px;color:var(--doux);line-height:1.45">' +
-      'Aucun frais de comptoir n\'est réglé pour cette succursale. ' +
-      (peutLibre
-        ? 'Pour qu\'un frais apparaisse ici, ouvre ⚙️ → Tarifs et frais et ' +
-          'passe son moment à « à la remise ».'
-        : 'Ce n\'est pas une question de droit : tu peux facturer un frais ' +
-          'dès qu\'il est au catalogue. Demande à la direction de l\'y ' +
-          'ajouter.') + '</div>';
+      'Aucun frais de comptoir ne s\'applique ici. ' +
+      (peutLibre ? '' : 'Ce n\'est pas une question de droit : tu peux ' +
+        'facturer un frais dès qu\'il s\'applique. ') + '</div>';
+
+    /* Et surtout : CE QUI A ÉTÉ ÉCARTÉ, et pourquoi.
+       Un frais réglé dans les paramètres mais absent du comptoir fait
+       chercher pendant une heure — le réglage paraît bon, l'écran dit
+       le contraire, et rien ne relie les deux. */
+    if (Livr.ecartes.length) {
+      h += '<div style="font-size:12px;color:var(--doux);margin-top:7px;' +
+        'line-height:1.5"><b>Écartés pour cette remise :</b>' +
+        Livr.ecartes.map(function (x) {
+          return '<br>· ' + e(x.nom) + ' — ' + e(x.raison);
+        }).join('') + '</div>';
+    } else if (peutLibre) {
+      h += '<div style="font-size:12px;color:var(--doux);margin-top:7px;' +
+        'line-height:1.45">Aucun frais n\'est réglé pour la remise. ' +
+        'Ouvre ⚙️ → Tarifs et frais et passe le moment d\'un frais à ' +
+        '« à la remise ».</div>';
+    }
   }
 
   return h;
@@ -4136,7 +4158,7 @@ function validerLivraison() {
     methode: document.getElementById('lv-methode').value
   }).then(function (f) {
     bip();
-    Livr = { client: null, prep: null, coches: {}, catalogue: [], frais: [] };
+    Livr = { client: null, prep: null, coches: {}, catalogue: [], ecartes: [], frais: [] };
     afficherFacture(f);
   }).catch(function (err) {
     b.disabled = false;
@@ -4536,7 +4558,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-29.1';
+var VERSION_ATTENDUE = '2026-10-29.2';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
