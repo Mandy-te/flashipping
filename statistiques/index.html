@@ -362,6 +362,10 @@ var APP = 'statistiques';
 
 var CLE_URL   = 'fls_api_url';
 var CLE_TOKEN = 'fls_sta_token';
+/* L'identifiant saisi, retenu par l'appareil : la liste des
+   comptes ayant disparu, c'est lui qui évite de le retaper
+   chaque matin. Il ne donne aucun accès sans le code. */
+var CLE_IDENT = 'fls_sta_ident';
 var CLE_USER  = 'fls_sta_user';
 var CLE_CACHE = 'fls_sta_cache';
 
@@ -613,7 +617,7 @@ var Nav = { modaleOuverte: false };
 function dessiner() {
   var app = document.getElementById('app');
   if (!Etat.url)   { app.innerHTML = ecranReglage(); return; }
-  if (!Etat.token) { app.innerHTML = ecranConnexion(); chargerUtilisateurs(); return; }
+  if (!Etat.token) { app.innerHTML = ecranConnexion(); preparerConnexion(); return; }
 
   if (!Etat.user || !Etat.user.droits || !Etat.user.droits.voir_stats) {
     app.innerHTML =
@@ -739,57 +743,85 @@ function validerUrl() {
 function ecranConnexion() {
   return '<header class="entete"><h1>Flashipping<span class="sous">Statistiques' +
     '</span></h1></header><main><div class="carte">' +
-    '<div id="liste-users">' + chargement('Chargement des comptes…') + '</div></div>' +
+    '<div id="liste-users"></div></div>' +
     '<button class="btn vide petit" onclick="changerUrl()">Changer l\'URL de l\'API</button>' +
     '</main>';
 }
 
-function chargerUtilisateurs() {
-  api('utilisateurs_publics', { app: APP }).then(function (liste) {
-    var z = document.getElementById('liste-users');
-    if (!z) return;
-    /* Le serveur n'a renvoyé que les comptes autorisés dans cette app.
-       Un second filtre ici ne protégerait rien et finirait par oublier
-       un rôle ajouté plus tard. */
-    if (!liste.length) {
-      z.innerHTML = bloc('Aucun compte autorisé à lire les statistiques.',
-                         'attention', '⚠️');
-      return;
-    }
-    z.innerHTML =
-      '<label class="champ"><span>Qui es-tu ?</span><select id="in-user">' +
-      liste.map(function (u) {
-        return '<option value="' + e(u.user_id) + '">' + e(u.nom) + ' — ' +
-               e(u.role_libelle || u.role) + '</option>';
-      }).join('') + '</select></label>' +
-      '<label class="champ"><span>Code à 6 chiffres</span>' +
+/**
+ * L'écran de connexion ne demande plus « qui es-tu » à une liste.
+ *
+ * Avant, il affichait tous les comptes actifs avec leur rôle et leur
+ * succursale — l'organigramme de l'entreprise, visible sans jeton par
+ * qui connaissait l'adresse. Et il offrait de quoi nuire : choisir un
+ * collègue, taper cinq codes faux, et le compte était fermé jusqu'à
+ * l'intervention de l'administrateur.
+ *
+ * Maintenant on tape son identifiant. L'appareil le retient, donc au
+ * quotidien il ne reste que les six chiffres à saisir — le geste est
+ * le même qu'avant, sans l'annuaire.
+ */
+function formulaireConnexion() {
+  var dernier = S.lire(CLE_IDENT, '');
+
+  return '<label class="champ"><span>Ton identifiant</span>' +
+      '<input type="text" id="in-ident" value="' + e(dernier) + '" ' +
+      'placeholder="Numéro de téléphone" autocomplete="username" ' +
+      'autocapitalize="off" spellcheck="false"></label>' +
+    '<label class="champ"><span>Code à 6 chiffres</span>' +
       '<input type="password" id="in-code" inputmode="numeric" maxlength="6" ' +
       'autocomplete="current-password" style="text-align:center;font-size:25px;' +
       'letter-spacing:9px;font-weight:700"></label>' +
-      '<button class="btn" id="btn-login" onclick="connecter()">Entrer</button>' +
-      '<div id="res-login"></div>';
+    '<button class="btn" id="btn-login" onclick="connecter()">Entrer</button>' +
+    '<div style="font-size:12px;color:var(--doux);margin-top:10px;' +
+      'line-height:1.45">Ton numéro de téléphone, ou l\'identifiant que ' +
+      't\'a donné l\'administrateur. Cet appareil s\'en souviendra.</div>' +
+    '<div id="res-login"></div>';
+}
 
-    var ic = document.getElementById('in-code');
-    ic.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') connecter(); });
-    ic.addEventListener('input', function () { if (ic.value.length === 6) connecter(); });
-  }).catch(function (err) {
-    var z = document.getElementById('liste-users');
-    if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
-  });
+function preparerConnexion() {
+  var z = document.getElementById('liste-users');
+  if (!z) return;
+  z.innerHTML = formulaireConnexion();
+
+  var ic = document.getElementById('in-code');
+  var ident = document.getElementById('in-ident');
+  if (!ic) return;
+
+  ic.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') connecter(); });
+  ic.addEventListener('input', function () { if (ic.value.length === 6) connecter(); });
+  if (ident) {
+    ident.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') ic.focus();
+    });
+  }
+
+  /* L'identifiant est déjà connu de l'appareil : on place le curseur
+     sur le code, pour que le geste quotidien reste d'une seule main. */
+  try { (ident && !ident.value ? ident : ic).focus(); } catch (e2) {}
 }
 
 function connecter() {
-  var uid = document.getElementById('in-user').value;
+  var ident = (document.getElementById('in-ident').value || '').trim();
   var code = document.getElementById('in-code').value;
   var b = document.getElementById('btn-login');
   var res = document.getElementById('res-login');
 
-  if (!/^\d{6}$/.test(code)) { res.innerHTML = bloc('Six chiffres.', 'ko', '⚠️'); return; }
+  if (!ident) {
+    res.innerHTML = bloc('Entre ton identifiant.', 'ko', '⚠️');
+    return;
+  }
+  if (!/^\d{6}$/.test(code)) {
+    res.innerHTML = bloc('Six chiffres.', 'ko', '⚠️'); return;
+  }
   b.disabled = true; b.textContent = 'Connexion…'; res.innerHTML = '';
 
-  api('login', { user_id: uid, code: code, app: APP }).then(function (d) {
+  api('login', { identifiant: ident, code: code, app: APP }).then(function (d) {
     Etat.token = d.token; Etat.user = d.utilisateur;
     S.ecrire(CLE_TOKEN, d.token); S.ecrireJson(CLE_USER, d.utilisateur);
+    /* On retient ce que la personne a TAPÉ, pas son user_id : c'est
+       ce qu'elle retapera, et c'est ce qu'elle reconnaîtra. */
+    S.ecrire(CLE_IDENT, ident);
     verifierVersion();
     return chargerReferentiels();
   }).then(function () {
@@ -815,6 +847,9 @@ function chargerReferentiels() {
 }
 
 function deconnecter() {
+  /* CLE_IDENT survit volontairement : se déconnecter n'est pas
+     changer de personne, et retaper son numéro chaque soir
+     n'ajoute aucune sécurité — le code, lui, est redemandé. */
   S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
   Etat.token = ''; Etat.user = null; Etat.onglet = 'tableau';
   Per.data = null; Evo.data = null;
@@ -824,6 +859,7 @@ function deconnecter() {
 function changerUrl() {
   if (!confirm('Changer l\'URL de l\'API ? Tu devras te reconnecter.')) return;
   S.effacer(CLE_URL); S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  S.effacer(CLE_IDENT);
   Etat.url = ''; Etat.token = ''; Etat.user = null;
   dessiner();
 }
@@ -1789,7 +1825,7 @@ function imprimerComplet() {
  * incompréhensibles — une action « inconnue », un écran vide. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-28.3';
+var VERSION_ATTENDUE = '2026-10-29.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
