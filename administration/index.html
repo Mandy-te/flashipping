@@ -1000,10 +1000,19 @@ function peutCreerClient() {
   return !!d.creer_client;
 }
 
+function peutExporterContacts() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  return !!d.exporter_contacts;
+}
+
 function ongletClients() {
   poser(
     (peutCreerClient()
       ? '<button class="btn" onclick="ouvrirNouveauClient()">➕ Nouveau client</button>'
+      : '') +
+    (peutExporterContacts()
+      ? '<button class="btn vide" onclick="ouvrirExportContacts()">' +
+        '📇 Mettre les contacts dans mon téléphone</button>'
       : '') +
     '<div id="cli-doublons"></div>' +
     '<div class="filtres">' +
@@ -1017,6 +1026,120 @@ function ongletClients() {
   );
   if (Cli.q) rendreResultats(); else listerClients();
   chercherDoublons();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  CARNET D'ADRESSES — vers le téléphone
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Pourquoi un avertissement avant un simple téléchargement.
+ *
+ * Ce bouton fait sortir le carnet clients du système. Une fois dans un
+ * téléphone, la copie se synchronise sur un compte Google ou iCloud
+ * personnel, et aucune suppression côté Flashipping ne la rattrape :
+ * elle reste après le départ de la personne. C'est le seul geste de
+ * cette application qui crée une copie que l'entreprise ne contrôle
+ * plus — il mérite d'être posé en conscience, pas par curiosité.
+ *
+ * Alors on l'écrit, on dit que c'est journalisé, et on marque chaque
+ * contact « Flashipping » pour que la suppression en bloc reste
+ * possible le jour où quelqu'un s'en va.
+ */
+function ouvrirExportContacts() {
+  var agences = (Etat.ref && Etat.ref.agences) || [];
+  var toutes = !!(Etat.user && Etat.user.droits &&
+                  Etat.user.droits.voir_toutes_agences);
+
+  modale('Contacts dans le téléphone',
+    bloc('Un fichier .vcf se télécharge, puis le téléphone propose ' +
+         '« Ajouter les contacts ». Chaque fiche porte l\'organisation ' +
+         '« Flashipping » : tu pourras tout retrouver et tout supprimer ' +
+         'en bloc.', 'info', '📇') +
+
+    bloc('Cette copie sort du système. Elle se synchronisera sur ton compte ' +
+         'Google ou iCloud et nous ne pourrons plus l\'effacer à distance. ' +
+         'L\'export est inscrit au journal avec ton nom, la date et le ' +
+         'nombre de contacts. Si tu changes de téléphone ou que tu quittes ' +
+         'l\'entreprise, c\'est à toi de la supprimer.',
+         'attention', '⚠️') +
+
+    (toutes
+      ? '<label class="champ"><span>Succursale</span><select id="vcf-agence">' +
+        '<option value="">Tout le réseau</option>' +
+        agences.map(function (a) {
+          return '<option value="' + e(a.agence_id) + '">' + e(a.ville) +
+                 ' (' + e(a.agence_id) + ')</option>';
+        }).join('') + '</select></label>'
+      : '<div class="aide">Ton périmètre : ta succursale.</div>') +
+
+    '<label class="champ"><span>Qui</span><select id="vcf-statut">' +
+      '<option value="actif">Clients actifs seulement</option>' +
+      '<option value="">Tous, y compris les fiches fermées</option>' +
+    '</select></label>' +
+
+    '<div id="vcf-res"></div>' +
+    '<button class="btn" style="margin-top:12px" id="vcf-btn" ' +
+      'onclick="lancerExportContacts()">📇 Préparer le fichier</button>');
+}
+
+function lancerExportContacts() {
+  var ag = document.getElementById('vcf-agence');
+  var st = document.getElementById('vcf-statut');
+  var res = document.getElementById('vcf-res');
+  var b = document.getElementById('vcf-btn');
+
+  b.disabled = true; b.textContent = 'Préparation…';
+  res.innerHTML = '';
+
+  api('contacts_vcard', {
+    agence_id: ag ? ag.value : '',
+    statut: st ? st.value : 'actif'
+  }).then(function (d) {
+    b.disabled = false; b.textContent = '📇 Préparer le fichier';
+
+    if (!d.nb) {
+      res.innerHTML = bloc('Aucun contact à exporter avec ces critères : ' +
+        d.sans_numero + ' fiche(s) sans numéro de téléphone.', 'attention', '📭');
+      return;
+    }
+
+    /* Le fichier se fabrique dans le navigateur à partir du texte reçu :
+       pas d'URL à partager, rien qui reste sur un serveur. */
+    var blob = new Blob([d.vcf], { type: 'text/vcard;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+
+    res.innerHTML =
+      '<div class="total"><span class="l">Contacts</span><b>' + n0(d.nb) +
+        '</b></div>' +
+      (d.agence_ville
+        ? '<div class="total"><span class="l">Succursale</span><b>' +
+          e(d.agence_ville) + '</b></div>' : '') +
+      (d.sans_numero
+        ? '<div class="total"><span class="l">Sans numéro, ignorées</span><b>' +
+          n0(d.sans_numero) + '</b></div>' : '') +
+      (d.tronque
+        ? bloc('Liste coupée à ' + n0(d.plafond) + ' contacts — au-delà, ' +
+               'l\'import du téléphone s\'arrête en silence à mi-chemin. ' +
+               'Exporte par succursale pour avoir tout le monde.',
+               'attention', '✂️')
+        : '') +
+      '<a class="btn vert" style="margin-top:12px;text-decoration:none" ' +
+        'href="' + url + '" download="' + e(d.nom_fichier) + '">' +
+        '⬇️ Télécharger ' + e(d.nom_fichier) + '</a>' +
+      '<div class="aide" style="margin-top:8px">' +
+        'Sur iPhone : le fichier arrive dans Fichiers, appuie dessus, ' +
+        'puis « Ajouter tous les contacts ». Sur Android : « Ouvrir avec » ' +
+        '→ Contacts.</div>';
+
+    /* On libère l'objet au prochain écran, pas tout de suite : révoqué
+       trop tôt, le lien de téléchargement ne mène plus à rien. */
+    setTimeout(function () { URL.revokeObjectURL(url); }, 5 * 60 * 1000);
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = '📇 Préparer le fichier';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
 }
 
 
@@ -1276,6 +1399,17 @@ function rendreDossier(d) {
       ' — ' + usd(r.du_maintenant_usd) + ' à régler au retrait.', 'ok', '📦');
   }
 
+  /* Prévenir le client, là où on vient de lire qu'il a un colis qui
+     l'attend. Le bouton n'apparaît que s'il y a quelque chose à
+     annoncer : un bouton toujours visible qui répond « aucun colis
+     disponible » une fois sur deux cesse vite d'être cliqué. */
+  if (d.peut_notifier && r.nb_disponibles > 0 && (c.whatsapp || c.telephone)) {
+    h += '<button class="btn vert" style="margin-bottom:12px" ' +
+      'onclick="preparerNotif(\'' + e(c.client_id) + '\')">' +
+      '💬 Prévenir ' + e((c.nom_complet || '').split(' ')[0]) + ' sur WhatsApp' +
+      '</button>';
+  }
+
   // ── Les colis ──
   h += '<div class="titre-section">Colis (' + n0(r.nb_colis) + ')</div>';
   if (!d.colis.length) h += vide('📭', 'Aucun colis.');
@@ -1355,6 +1489,67 @@ function rendreDossier(d) {
   }
 
   return h;
+}
+
+/**
+ * Annoncer à un client que son colis est arrivé.
+ *
+ * Rien n'est envoyé automatiquement : on compose le message, on le
+ * montre tel que le client le lira, et c'est la personne qui appuie.
+ * Un envoi automatique écrirait un jour « 0 colis » ou le nom d'une
+ * autre succursale à cent clients d'un coup, et personne ne l'aurait
+ * vu passer.
+ *
+ * Le lien est un vrai <a> : un window.open dans un .then() arrive
+ * après le geste du doigt, et le navigateur du téléphone le bloque
+ * comme une publicité.
+ */
+function preparerNotif(clientId) {
+  api('notif_whatsapp', { client_id: clientId }).then(function (d) {
+    modale('Prévenir ' + d.client_nom,
+      '<div class="carte serree" style="background:#F0F7F2;white-space:pre-wrap;' +
+        'font-size:14px;margin-bottom:12px">' + e(d.message) + '</div>' +
+      '<div class="total"><span class="l">Colis</span><b>' + d.nb_colis + '</b></div>' +
+      '<div class="total"><span class="l">Poids</span><b>' + n2(d.poids_lb) +
+        ' lb</b></div>' +
+      '<div class="total"><span class="l">À payer</span><b>' + usd(d.montant_usd) +
+        ' / ' + htg(d.montant_htg) + '</b></div>' +
+      '<a class="btn vert" style="margin-top:14px;text-decoration:none" ' +
+        'href="' + e(d.lien) + '" target="_blank" rel="noopener" ' +
+        'onclick="setTimeout(fermerModale,600)">💬 Ouvrir WhatsApp (+' +
+        e(d.numero) + ')</a>' +
+      /* Tous les clients n'ont pas WhatsApp. Copier permet d'envoyer le
+         même texte par SMS sans le retaper — et sans le réécrire de
+         mémoire, ce qui finit toujours par un montant faux. */
+      '<button class="btn vide" style="margin-top:8px" ' +
+        'onclick="copierTexte(this, ' +
+        e(JSON.stringify(d.message)).replace(/'/g, '&#39;') +
+        ')">📋 Copier le message</button>');
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function copierTexte(bouton, texte) {
+  var fini = function (ok) {
+    bouton.textContent = ok ? '✅ Copié' : '❌ Copie refusée par le navigateur';
+    setTimeout(function () { bouton.textContent = '📋 Copier le message'; }, 2200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texte).then(function () { fini(true); },
+                                              function () { fini(false); });
+    return;
+  }
+  /* Safari refuse clipboard.writeText hors HTTPS et dans certains
+     contextes : on retombe sur la vieille méthode plutôt que de ne
+     rien faire. */
+  try {
+    var z = document.createElement('textarea');
+    z.value = texte;
+    z.style.position = 'fixed'; z.style.opacity = '0';
+    document.body.appendChild(z);
+    z.select();
+    fini(document.execCommand('copy'));
+    z.remove();
+  } catch (err) { fini(false); }
 }
 
 function ouvrirStatutCompteWeb(c) {
@@ -2408,7 +2603,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-29.2';
+var VERSION_ATTENDUE = '2026-10-31.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {

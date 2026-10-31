@@ -3047,11 +3047,46 @@ function preparerCloture() {
   z.innerHTML = chargement('Préparation…');
 
   api('preparer_cloture', { debut: debut, fin: fin }).then(function (d) {
+    /* Les trois soustractions, pas deux.
+       Le bénéfice vaut revenus − dépenses − coût des colis livrés.
+       L'écran n'affichait que les deux premières lignes puis le
+       résultat : 38 916 − 0 donnait 2 243, et les 36 673 manquants
+       n'étaient nulle part. On ne signe pas une répartition qu'on ne
+       peut pas refaire de tête. */
+    /* Le backend se redéploie à la main, les apps se poussent sur
+       GitHub : les deux ne sont jamais à jour à la même seconde. Si le
+       serveur ne connaît pas encore cette ligne, on ne l'invente pas à
+       zéro — un « Coût des colis livrés −0 HTG » affiché avec aplomb
+       serait plus trompeur que l'écran qu'on est en train de corriger. */
+    var cv = d.cout_ventes || {};
+    var aCout = d.cout_ventes_gdes !== undefined && d.cout_ventes_gdes !== null;
+
     var h = '<div class="carte">' +
       '<div class="total"><span class="l">Revenus</span><span>' +
         htg(d.revenus_gdes) + '</span></div>' +
+      (aCout
+        ? '<div class="total"><span class="l">Coût des colis livrés</span><span>−' +
+          htg(d.cout_ventes_gdes) + '</span></div>' +
+          '<div class="aide" style="margin:-4px 0 6px">' +
+          'Stock d\'ouverture ' + htg(cv.stock_ouverture_gdes || 0) +
+          ' + achats de lots ' + htg(cv.achats_gdes || 0) +
+          ' − stock restant ' + htg(cv.stock_cloture_gdes || 0) +
+          (cv.date_inventaire
+            ? '. Dernier inventaire : ' + e(dateCourte(cv.date_inventaire)) + '.'
+            : '. Aucun inventaire.') + '</div>'
+        : bloc('Le coût des colis livrés est déduit du bénéfice mais ce ' +
+               'déploiement ne sait pas encore le détailler. Colle Finance.gs ' +
+               'et redéploie avant de clôturer : sans cette ligne, le chiffre ' +
+               'du bas ne se vérifie pas.', 'attention', '⚠️')) +
       '<div class="total"><span class="l">Dépenses</span><span>−' +
         htg(d.depenses_gdes) + '</span></div>' +
+      (Number(d.depenses_gdes) === 0
+        ? '<div class="aide" style="margin:-4px 0 6px">Zéro parce que tout ' +
+          'ce qui a été payé ce mois-ci est entré en stock : ces montants ' +
+          'sont comptés dans la ligne du dessus, pas ici. Si une charge ' +
+          'du mois (loyer, salaire, carburant) n\'a pas été saisie, le ' +
+          'bénéfice ci-dessous est trop haut.</div>'
+        : '') +
       '<div class="total gros"><span class="l">Bénéfice à répartir</span>' +
         '<span style="color:' + (d.profit_gdes < 0 ? 'var(--rouge)' : '#0E4429') +
         '">' + htg(d.profit_gdes) + '</span></div>';
@@ -3068,7 +3103,11 @@ function preparerCloture() {
     }
 
     h += d.pret
-      ? '<button class="btn" style="margin-top:14px" onclick="executerCloture()">' +
+      ? '<div class="aide" style="margin-top:14px">Clôturer fige ces soldes et ' +
+        'les reporte en ouverture du mois suivant. Ça se défait tant ' +
+        'qu\'aucune clôture plus récente n\'existe — mais chaque associé ' +
+        'aura déjà lu son chiffre.</div>' +
+        '<button class="btn" style="margin-top:8px" onclick="executerCloture()">' +
         '🔒 Clôturer définitivement</button>'
       : bloc('Corrige les alertes avant de clôturer.', 'ko', '⛔');
 
@@ -3392,7 +3431,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-29.2';
+var VERSION_ATTENDUE = '2026-10-31.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
