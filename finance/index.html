@@ -1184,17 +1184,28 @@ function formulaireStock() {
         'Jamais ce que les clients paieront : cette marge-là n\'est gagnée ' +
         'qu\'à la livraison.', 'info', '💰');
 
-      h += bloc('Le chiffre proposé est le stock théorique : dernier ' +
-        'inventaire plus les lots achetés depuis. S\'il ne correspond pas à ' +
-        'ce que tu vois, c\'est l\'écart qui t\'apprend quelque chose.',
-        'info', 'ℹ️');
+      /* Le théorique n'est plus proposé dans le champ.
+         Il vaut « dernier inventaire + lots entrés depuis », c'est-à-dire
+         ce que tu aurais SI TU N'AVAIS RIEN LIVRÉ. Pour une entreprise
+         qui livre tous les jours, c'est par construction le mauvais
+         chiffre : le 31 octobre 2026 il proposait 73 756,50 là où le
+         comptage réel disait 4 027, avec un ✅ « conforme ». Enregistré,
+         il aurait transformé 2 243 Gdes de bénéfice en 38 916 à
+         distribuer, avec 16 754 en caisse.
+
+         Le champ part donc vide. On compte, puis on tape. */
+      h += bloc('Le plafond ci-dessous, c\'est ce que vaudrait ton stock si ' +
+        'tu n\'avais RIEN livré depuis le dernier comptage. Tu as livré : ' +
+        'ton chiffre sera donc plus bas, et c\'est normal. Compte, puis ' +
+        'saisis ce que tu as compté — ne recopie pas le plafond.',
+        'attention', '⚠️');
 
       h += '<div class="stats" style="margin-bottom:14px">' +
         '<div class="stat"><div class="v">' + court(theo) + '</div>' +
-          '<div class="l">stock théorique</div></div>' +
+          '<div class="l">plafond (si rien livré)</div></div>' +
         '<div class="stat"><div class="v">' +
           court(d.entrees_periode_gdes) + '</div>' +
-          '<div class="l">lots achetés</div></div>' +
+          '<div class="l">lots entrés depuis</div></div>' +
         '</div>';
 
       if (dernier) {
@@ -1209,10 +1220,10 @@ function formulaireStock() {
       }
 
       h += '<div class="duo">' +
-        '<label class="champ"><span>Coût du stock (Gdes)</span>' +
+        '<label class="champ"><span>Coût du stock compté (Gdes)</span>' +
           '<input type="number" id="stk-valeur" step="1" min="0" ' +
-            'inputmode="decimal" value="' + e(theo ? theo.toFixed(2) : '') +
-            '" oninput="majEcartStock(' + theo + ')"></label>' +
+            'inputmode="decimal" placeholder="ce que tu as compté" ' +
+            'oninput="majEcartStock(' + theo + ')"></label>' +
         '<label class="champ"><span>Nombre de colis</span>' +
           '<input type="number" id="stk-colis" step="1" min="0" ' +
             'inputmode="numeric" placeholder="facultatif"></label>' +
@@ -1245,17 +1256,27 @@ function majEcartStock(theorique) {
   if (v === '') { z.innerHTML = ''; return; }
 
   var ecart = (Number(v) || 0) - Number(theorique || 0);
+
+  /* Un stock ÉGAL au plafond n'est pas une conformité, c'est une
+     anomalie : ça veut dire qu'aucun colis n'est sorti depuis le
+     dernier comptage. Le ✅ vert qu'on affichait là encourageait
+     précisément le geste le plus coûteux de l'application — recopier
+     le plafond et distribuer un bénéfice qui n'existe pas. */
   if (Math.abs(ecart) < 1) {
-    z.innerHTML = bloc('Conforme au stock théorique.', 'ok', '✅');
+    z.innerHTML = bloc('Ton comptage égale le plafond : cela voudrait dire ' +
+      'qu\'aucun colis n\'est sorti depuis le dernier inventaire. Si tu as ' +
+      'livré ne serait-ce qu\'un colis, ce chiffre est trop haut — et il ' +
+      'gonflera le bénéfice à partager.', 'ko', '⛔');
     return;
   }
-  z.innerHTML = bloc(
-    (ecart < 0 ? 'Il manque ' + htg(-ecart) + ' par rapport au théorique. '
-               + 'Des colis ont été livrés sans que leur sortie soit saisie, '
-               + 'ou il en manque physiquement.'
-               : 'Il y a ' + htg(ecart) + ' de plus que le théorique. '
-               + 'Des coûts d\'entrée n\'ont pas été saisis en dépense.'),
-    'attention', '⚠️');
+  z.innerHTML = ecart < 0
+    ? bloc('Soit ' + htg(-ecart) + ' de colis sortis depuis le dernier ' +
+           'comptage. C\'est le cas normal : leur coût devient une charge ' +
+           'du mois. Vérifie seulement que l\'ordre de grandeur te parle.',
+           'ok', '✅')
+    : bloc('Il y a ' + htg(ecart) + ' de plus que le plafond : tu aurais ' +
+           'plus de stock que tout ce qui est jamais entré. Un achat de lot ' +
+           'n\'a pas été saisi en dépense.', 'attention', '⚠️');
 }
 
 function validerStock() {
