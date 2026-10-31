@@ -3145,7 +3145,12 @@ function executerCloture() {
                'Le bénéfice sera réparti et porté au solde de chaque associé. ' +
                'Les calculs suivants repartiront de ce point.')) return;
 
-  api('cloturer', { type_periode: 'mensuel', debut: debut, fin: fin })
+  /* « Mensuelle », pas « mensuel » : la colonne type_periode porte une
+     liste de validation au féminin capitalisé, et Google refuse tout
+     le reste. Le serveur traduit désormais de toute façon — mais
+     envoyer directement le bon mot évite de dépendre d'une traduction
+     pour une clôture. */
+  api('cloturer', { type_periode: 'Mensuelle', debut: debut, fin: fin })
     .then(function (d) {
       toast(d.message || 'Période clôturée.', 'ok');
       ongletCloture();
