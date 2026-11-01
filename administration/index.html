@@ -2949,6 +2949,29 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js').catch(function () {});
   });
+
+  /* ── Une mise à jour ne doit pas attendre la visite suivante ──
+   *
+   * Le service worker sert la page depuis le cache puis la rafraîchit
+   * en arrière-plan : l'application s'ouvre hors ligne, mais le code
+   * neuf n'apparaît qu'à l'ouverture d'APRÈS. Personne ne le sait.
+   * Le 1er novembre 2026, un bouton livré la veille restait invisible
+   * pour cette seule raison, et on a cherché le défaut dans les droits.
+   *
+   * Le nouveau worker prend la main tout de suite (skipWaiting puis
+   * clients.claim) : quand il la prend, la page affichée est périmée
+   * et on la recharge. Pas à la première installation — là, il n'y a
+   * rien de périmé à remplacer, et recharger ferait clignoter un
+   * premier lancement sans raison.
+   */
+  var avaitUnWorker = !!navigator.serviceWorker.controller;
+  var rechargeFaite = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (!avaitUnWorker || rechargeFaite) return;
+    rechargeFaite = true;
+    location.reload();
+  });
 }
 
 (function demarrer() {
