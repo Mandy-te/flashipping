@@ -2659,9 +2659,20 @@ function ouvrirReglages() {
     '<div class="carte serree" style="margin-bottom:12px">' +
       '<div style="font-weight:800;font-size:16px">' + e(u.nom) + '</div>' +
       '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
-        e(u.user_id) + ' · ' + e(u.role_libelle || u.role) + '</div>' +
+        e(u.user_id) + ' · ' + e(u.role_libelle || u.role) +
+        ' <span style="opacity:.7">(' + e(u.role || '?') + ')</span></div>' +
       '<div style="color:var(--doux);font-size:12px;margin-top:6px">' +
-        'Applications ouvertes : ' + e(appsDuRole()) + '</div></div>' +
+        'Applications ouvertes : ' + e(appsDuRole()) + '</div>' +
+
+      /* ── À quoi sert cette ligne ──
+         Le 1er novembre 2026, un droit accordé côté serveur n'arrivait
+         pas jusqu'au service client. Rien à l'écran ne permettait de
+         distinguer les trois causes possibles : mauvais rôle écrit dans
+         la feuille, droits mémorisés depuis une vieille connexion, ou
+         code pas encore déployé. Il a fallu trois allers-retours pour
+         l'apprendre. Maintenant ça se lit. */
+      '<div style="color:var(--doux);font-size:12px;margin-top:6px">' +
+        'Droits reçus : ' + droitsActifs() + '</div></div>' +
 
     (peutReglages()
       ? '<button class="btn vide" onclick="ouvrirParametres()">' +
@@ -2674,6 +2685,27 @@ function ouvrirReglages() {
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
     '<button class="btn rouge" onclick="fermerModale();deconnecter()">Se déconnecter</button>' +
     blocVersion());
+}
+
+/**
+ * Le décompte des droits reçus, et les deux qui font parler.
+ *
+ * Un total seul ne dit rien ; deux noms seuls ne disent pas si la
+ * liste est fraîche. Les deux ensemble répondent à la vraie question :
+ * « mon application a-t-elle les droits d'aujourd'hui ? »
+ */
+function droitsActifs() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  var n = 0;
+  for (var k in d) { if (k !== 'apps' && d[k] === true) n++; }
+
+  var repere = [];
+  if (d.notifier_client)   repere.push('notifier');
+  if (d.exporter_contacts) repere.push('contacts');
+
+  return n + ' droit' + (n > 1 ? 's' : '') +
+    (repere.length ? ' · ' + repere.join(', ')
+                   : ' · ni notifier ni contacts — reconnecte-toi');
 }
 
 /** Les applications ouvertes au rôle connecté, en toutes lettres. */
