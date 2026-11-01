@@ -691,6 +691,10 @@ function tauxUsd() {
  * une porte fermée.
  */
 var TOUS_ONGLETS = [
+  /* En premier, et c'est voulu : c'est le seul onglet qui porte un
+     travail à faire aujourd'hui. Les autres répondent à une question
+     qu'on se pose ; celui-ci pose la question à notre place. */
+  { id: 'prevenir', ic: '📣', nom: 'À prévenir', droit: 'notifier_client' },
   { id: 'clients',  ic: '🧑', nom: 'Clients',  droit: 'dossier_client' },
   /* Approuver un rattachement ouvre à un compte web l'historique
      complet d'un client. On le range sur modifier_client — le
@@ -787,6 +791,7 @@ function poser(h) { var c = document.getElementById('contenu'); if (c) c.innerHT
 
 function rendreOnglet() {
   switch (Etat.onglet) {
+    case 'prevenir': return ongletPrevenir();
     case 'clients': return ongletClients();
     case 'rattach': return ongletRattachements();
     case 'comptes': return ongletComptes();
@@ -1046,6 +1051,157 @@ function ongletClients() {
   );
   if (Cli.q) rendreResultats(); else listerClients();
   chercherDoublons();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  À PRÉVENIR — la file du matin
+// ═══════════════════════════════════════════════════════════════════
+
+var Prev = { data: null, agence: '' };
+
+/**
+ * Ouvrir un dossier depuis un autre onglet que « Clients ».
+ *
+ * `ouvrirDossier` écrit dans #cli-corps, qui n'existe que sur l'onglet
+ * Clients : appelé d'ailleurs, il chargeait le dossier et ne
+ * l'affichait nulle part. On change d'abord d'onglet, puis on ouvre —
+ * et le « ← Retour » du dossier ramène à la liste des clients, ce qui
+ * est le comportement attendu une fois qu'on est là-bas.
+ */
+function allerAuDossier(id) {
+  if (Etat.onglet !== 'clients') {
+    allerA('clients');
+    setTimeout(function () { ouvrirDossier(id); }, 30);
+    return;
+  }
+  ouvrirDossier(id);
+}
+
+/**
+ * Une liste faite pour être VIDÉE, pas consultée.
+ *
+ * D'où trois partis pris :
+ *
+ *   — l'ordre décide du travail : jamais relancés d'abord, les plus
+ *     anciens en tête. On descend, on ne choisit pas ;
+ *   — un client déjà relancé reste visible mais s'efface visuellement.
+ *     Le faire disparaître mentirait : son colis est toujours là, et
+ *     c'est au bout de quelques jours que ça devient un problème ;
+ *   — ceux qui n'ont pas de numéro sont groupés à part. Les laisser
+ *     dans la file donnerait des lignes sur lesquelles on ne peut rien
+ *     faire, et une file qu'on ne peut pas finir est une file qu'on
+ *     abandonne.
+ */
+function ongletPrevenir() {
+  var agences = (Etat.ref && Etat.ref.agences) || [];
+  var toutes = !!(Etat.user && Etat.user.droits &&
+                  Etat.user.droits.voir_toutes_agences);
+
+  poser(
+    (toutes && agences.length
+      ? '<div class="filtres">' +
+          '<select id="pv-agence" onchange="chargerPrevenir()">' +
+            '<option value="">Toutes les succursales</option>' +
+            agences.map(function (a) {
+              return '<option value="' + e(a.agence_id) + '"' +
+                (Prev.agence === a.agence_id ? ' selected' : '') + '>' +
+                e(a.ville) + '</option>';
+            }).join('') +
+          '</select>' +
+        '</div>'
+      : '') +
+    '<div id="pv-corps">' + chargement('Recherche des colis qui attendent…') + '</div>'
+  );
+  chargerPrevenir();
+}
+
+function chargerPrevenir() {
+  var sel = document.getElementById('pv-agence');
+  Prev.agence = sel ? sel.value : '';
+
+  var z = function (h) {
+    var el = document.getElementById('pv-corps');
+    if (el) el.innerHTML = h;
+  };
+  z(chargement('Recherche des colis qui attendent…'));
+
+  api('clients_a_prevenir', { agence_id: Prev.agence }).then(function (d) {
+    Prev.data = d;
+    z(rendrePrevenir(d));
+  }).catch(function (err) { z(bloc(err.message, 'ko', '⚠️')); });
+}
+
+function rendrePrevenir(d) {
+  if (!d.total) {
+    return vide('🎉', 'Personne n\'attend. Tous les colis disponibles ont été remis.');
+  }
+
+  var h = '<div class="stats" style="margin-bottom:12px">' +
+    '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+      n0(d.a_relancer) + '</div><div class="l">à relancer</div></div>' +
+    '<div class="stat"><div class="v">' + n0(d.nb_colis) +
+      '</div><div class="l">colis en attente</div></div>' +
+    '<div class="stat"><div class="v">' + usd(d.montant_usd) +
+      '</div><div class="l">à encaisser</div></div>' +
+    '</div>';
+
+  if (!d.a_relancer && d.total) {
+    h += bloc('Tout le monde a été relancé. Ceux qui restent ci-dessous ' +
+              'n\'ont pas encore retiré leur colis — c\'est une question de ' +
+              'passage en succursale, plus d\'information.', 'ok', '✅');
+  }
+
+  var avec = d.clients.filter(function (c) { return c.a_un_numero; });
+  var sans = d.clients.filter(function (c) { return !c.a_un_numero; });
+
+  avec.forEach(function (c) { h += ligneAPrevenir(c); });
+
+  if (sans.length) {
+    h += '<div class="titre-section">Sans numéro de téléphone (' +
+         n0(sans.length) + ')</div>' +
+      '<div class="aide">Impossible de les prévenir d\'ici. Ajoute un ' +
+      'numéro sur la fiche, ou préviens-les au comptoir.</div>';
+    sans.forEach(function (c) { h += ligneAPrevenir(c); });
+  }
+
+  return h;
+}
+
+function ligneAPrevenir(c) {
+  /* L'ancienneté est l'information qui fait agir, donc elle est colorée
+     et pas enfouie : trois jours c'est normal, deux semaines c'est un
+     colis qu'on va finir par nous réclamer. */
+  var couleur = c.jours === null ? 'var(--doux)'
+              : c.jours >= 14 ? 'var(--rouge)'
+              : c.jours >= 7  ? '#B26A00' : 'var(--doux)';
+
+  var age = c.jours === null ? ''
+          : c.jours === 0 ? 'aujourd\'hui'
+          : c.jours === 1 ? 'depuis hier'
+          : 'depuis ' + c.jours + ' jours';
+
+  return '<div class="ligne serree"' +
+      (c.relance_faite ? ' style="opacity:.55"' : '') + '>' +
+    '<div class="corps" onclick="allerAuDossier(\'' + e(c.client_id) + '\')">' +
+      '<div class="t1">' + e(c.nom_complet) +
+        ' <span style="color:var(--doux);font-weight:500">' +
+        e(c.code_client) + '</span></div>' +
+      '<div class="t2">' + n0(c.nb_colis) + ' colis · ' + n2(c.poids_lb) +
+        ' lb · <b>' + usd(c.montant_usd) + '</b> · ' +
+        e(c.agence_ville || c.agence_id) + '</div>' +
+      '<div class="t2" style="color:' + couleur + '">' + e(age) +
+        (c.relance_faite
+          ? ' · relancé le ' + e(dateCourte(c.derniere_relance))
+          : '') + '</div>' +
+    '</div>' +
+    (c.a_un_numero
+      ? '<button class="btn petit ' + (c.relance_faite ? 'vide' : 'vert') + '" ' +
+        'style="width:auto;padding:9px 13px;margin:0" ' +
+        'onclick="preparerNotif(\'' + e(c.client_id) + '\')">' +
+        (c.relance_faite ? '↻' : '💬') + '</button>'
+      : '') +
+    '</div>';
 }
 
 
@@ -1536,7 +1692,7 @@ function preparerNotif(clientId) {
         ' / ' + htg(d.montant_htg) + '</b></div>' +
       '<a class="btn vert" style="margin-top:14px;text-decoration:none" ' +
         'href="' + e(d.lien) + '" target="_blank" rel="noopener" ' +
-        'onclick="setTimeout(fermerModale,600)">💬 Ouvrir WhatsApp (+' +
+        'onclick="setTimeout(apresNotif,600)">💬 Ouvrir WhatsApp (+' +
         e(d.numero) + ')</a>' +
       /* Tous les clients n'ont pas WhatsApp. Copier permet d'envoyer le
          même texte par SMS sans le retaper — et sans le réécrire de
@@ -1546,6 +1702,15 @@ function preparerNotif(clientId) {
         e(JSON.stringify(d.message)).replace(/'/g, '&#39;') +
         ')">📋 Copier le message</button>');
   }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+/* La relance est déjà inscrite au journal au moment où le lien a été
+   préparé. On recharge donc la file pour que la ligne s'efface tout de
+   suite : voir le travail disparaître est ce qui donne envie de
+   descendre la liste jusqu'au bout. */
+function apresNotif() {
+  fermerModale();
+  if (Etat.onglet === 'prevenir') chargerPrevenir();
 }
 
 function copierTexte(bouton, texte) {
@@ -2623,7 +2788,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-10-31.1';
+var VERSION_ATTENDUE = '2026-11-01.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
