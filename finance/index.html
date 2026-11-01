@@ -941,6 +941,17 @@ function chargerReferentiels() {
   return api('referentiels').then(function (r) {
     Etat.ref = r;
     S.ecrireJson(CLE_CACHE, { ref: r, date: Date.now() });
+
+    /* Les droits se rafraîchissent, ils ne se figent pas.
+       `Etat.user` était écrit à la connexion puis relu du stockage à
+       chaque ouverture, pour toujours : un droit ajouté côté serveur
+       n'atteignait jamais quelqu'un de déjà connecté. Le serveur
+       recalcule les droits depuis le rôle à chaque requête, donc cette
+       réponse porte déjà une session fraîche. On la jetait. */
+    if (r && r.session && r.session.droits) {
+      Etat.user = r.session;
+      S.ecrireJson(CLE_USER, r.session);
+    }
     return r;
   }).catch(function (err) {
     var c = S.lireJson(CLE_CACHE, null);

@@ -955,6 +955,26 @@ function chargerReferentiels() {
   return api('referentiels').then(function (r) {
     Etat.ref = r;
     S.ecrireJson(CLE_CACHE, { ref: r, date: Date.now() });
+
+    /* ── Les droits se rafraîchissent, ils ne se figent pas ──
+     *
+     * `Etat.user` était écrit au moment de la connexion puis relu du
+     * stockage à chaque ouverture, pour toujours. Résultat : un droit
+     * ajouté côté serveur n'atteignait jamais quelqu'un qui était déjà
+     * connecté — son écran restait identique, sans bouton et sans
+     * explication, jusqu'à ce qu'il pense tout seul à se déconnecter.
+     *
+     * Le serveur, lui, recalcule les droits depuis le rôle à CHAQUE
+     * requête : la réponse de `referentiels` porte donc déjà une
+     * session fraîche. On la jetait. On la garde.
+     *
+     * Ça vaut pour tout ce qui vient après : changement de rôle,
+     * d'agence, de nom. L'app cesse d'être en retard d'une connexion.
+     */
+    if (r && r.session && r.session.droits) {
+      Etat.user = r.session;
+      S.ecrireJson(CLE_USER, r.session);
+    }
     return r;
   }).catch(function (err) {
     var c = S.lireJson(CLE_CACHE, null);
