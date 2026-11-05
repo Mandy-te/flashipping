@@ -3472,11 +3472,20 @@ function recuPaiement(v) {
     '<div class="rec-l"><span>Facture</span><span>' + e(v.facture_id) + '</span></div>' +
     '<div class="rec-sep"></div>' +
 
-    '<div class="rec-tot"><span>REÇU</span><span>' + usd(v.versement_usd) + '</span></div>' +
-    (Number(v.taux) > 0
-      ? '<div class="rec-l"><span>Au taux ' + n0(v.taux) + '</span><b>' +
-        htg(Number(v.versement_usd) * Number(v.taux)) + '</b></div>'
-      : '') +
+    /* En gros, la devise réellement remise — c'est elle que le client
+       recompte en sortant. L'équivalent passe en dessous, en petit :
+       utile pour nos comptes, secondaire pour lui. */
+    (v.devise_recue === 'Gourdes'
+      ? '<div class="rec-tot"><span>REÇU</span><span>' +
+          htg(v.versement_saisi) + '</span></div>' +
+        (Number(v.taux) > 0
+          ? '<div class="rec-l"><span>Au taux ' + n0(v.taux) + '</span><b>' +
+            usd(v.versement_usd) + '</b></div>' : '')
+      : '<div class="rec-tot"><span>REÇU</span><span>' +
+          usd(v.versement_usd) + '</span></div>' +
+        (Number(v.taux) > 0
+          ? '<div class="rec-l"><span>Au taux ' + n0(v.taux) + '</span><b>' +
+            htg(Number(v.versement_usd) * Number(v.taux)) + '</b></div>' : '')) +
     '<div class="rec-l"><span>Mode</span><span>' + e(v.methode || 'cash') + '</span></div>' +
     '<div class="rec-sep"></div>' +
 
@@ -3547,10 +3556,20 @@ function ouvrirPaiement(factureId) {
       ? '<div class="total"><span class="l">soit au taux ' + n0(f.taux) +
         '</span><b>' + htg(reste * Number(f.taux)) + '</b></div>' : '') +
 
-    '<label class="champ" style="margin-top:12px"><span>Montant reçu ($ US)</span>' +
-      '<input type="number" id="pay-montant" inputmode="decimal" step="0.01" ' +
-      'min="0.01" max="' + reste.toFixed(2) + '" value="' + reste.toFixed(2) +
-      '"></label>' +
+    /* La devise d'abord, le montant ensuite — et les gourdes par
+       défaut, parce que c'est ce que le client sort de sa poche neuf
+       fois sur dix. Tant qu'on ne demandait que des dollars, l'agent
+       convertissait de tête et le tiroir s'écartait du journal de cinq
+       gourdes par dollar. */
+    '<label class="champ" style="margin-top:12px"><span>Le client paie en</span>' +
+      '<select id="pay-devise" onchange="basculerDevisePaiement()">' +
+        '<option value="Gourdes" selected>Gourdes (HTG)</option>' +
+        '<option value="USD">Dollars (USD)</option>' +
+      '</select></label>' +
+
+    '<label class="champ"><span id="pay-libelle">Montant reçu (Gdes)</span>' +
+      '<input type="number" id="pay-montant" inputmode="decimal" step="1" ' +
+      'min="1"></label>' +
 
     '<label class="champ"><span>Mode de paiement</span><select id="pay-mode">' +
       modes.map(function (m) {
@@ -3564,17 +3583,77 @@ function ouvrirPaiement(factureId) {
       '💵 Encaisser et imprimer le reçu</button>');
 
   var champ = document.getElementById('pay-montant');
-  function apercu() {
-    var v = Number(champ.value) || 0;
-    var r = Math.round((reste - v) * 100) / 100;
-    document.getElementById('pay-apercu').innerHTML = r > 0.009
-      ? 'Paiement partiel — il restera <b>' + usd(r) + '</b> à payer.'
-      : (v > 0 ? 'La facture sera soldée.' : '');
+  champ.addEventListener('input', apercuPaiement);
+  basculerDevisePaiement();
+}
+
+/** Le taux du moment, tel que la facture l'a figé. */
+function tauxPaiement() {
+  var f = Fact.courante || {};
+  return Number(f.taux) > 0 ? Number(f.taux) : 0;
+}
+
+function paiementEnGourdes() {
+  var s = document.getElementById('pay-devise');
+  return !s || s.value === 'Gourdes';
+}
+
+/**
+ * Changer de devise reremplit le champ avec le solde EXACT dans cette
+ * devise. Laisser un montant en dollars sous une étiquette « Gdes »
+ * serait le genre de détail qu'on ne remarque qu'au moment de compter
+ * la caisse, le soir.
+ */
+function basculerDevisePaiement() {
+  var f = Fact.courante || {};
+  var reste = Number(f.reste_du_usd) || 0;
+  var taux = tauxPaiement();
+  var gdes = paiementEnGourdes();
+  var champ = document.getElementById('pay-montant');
+  var lib = document.getElementById('pay-libelle');
+
+  if (gdes && !taux) {
+    /* Sans taux connu, on ne devine pas : convertir au hasard, c'est
+       fabriquer l'écart qu'on essaie justement de supprimer. */
+    lib.textContent = 'Montant reçu ($ US)';
+    champ.step = '0.01'; champ.value = reste.toFixed(2);
+    document.getElementById('pay-devise').value = 'USD';
+    toast('Taux du jour inconnu — saisie en dollars.', 'ko');
+  } else if (gdes) {
+    lib.textContent = 'Montant reçu (Gdes) — taux ' + n0(taux);
+    champ.step = '1'; champ.value = String(Math.round(reste * taux));
+  } else {
+    lib.textContent = 'Montant reçu ($ US)';
+    champ.step = '0.01'; champ.value = reste.toFixed(2);
   }
-  champ.addEventListener('input', apercu);
-  apercu();
+
+  apercuPaiement();
   champ.focus();
   champ.select();
+}
+
+function apercuPaiement() {
+  var f = Fact.courante || {};
+  var reste = Number(f.reste_du_usd) || 0;
+  var taux = tauxPaiement();
+  var gdes = paiementEnGourdes() && taux > 0;
+
+  var v = Number(document.getElementById('pay-montant').value) || 0;
+  var enUsd = gdes ? v / taux : v;
+  var r = Math.round((reste - enUsd) * 100) / 100;
+  var marge = gdes ? (1 / taux) : 0.009;
+
+  var z = document.getElementById('pay-apercu');
+  if (v <= 0) { z.innerHTML = ''; return; }
+
+  /* L'équivalent s'affiche toujours : c'est le seul moyen pour l'agent
+     de vérifier qu'il n'a pas tapé 270 au lieu de 2 700. */
+  var equiv = gdes ? 'soit ' + usd(enUsd) : 'soit ' + htg(v * (taux || 0));
+
+  z.innerHTML = (taux ? equiv + ' · ' : '') + (r > marge
+    ? 'paiement partiel, il restera <b>' +
+      (gdes ? htg(r * taux) : usd(r)) + '</b>'
+    : 'la facture sera soldée.');
 }
 
 
@@ -3582,13 +3661,19 @@ function enregistrerPaiement() {
   var f = Fact.courante;
   if (!f) return;
 
-  var montant = Number(document.getElementById('pay-montant').value) || 0;
+  var saisi = Number(document.getElementById('pay-montant').value) || 0;
   var mode = document.getElementById('pay-mode').value;
   var reste = Number(f.reste_du_usd) || 0;
+  var taux = tauxPaiement();
+  var gdes = paiementEnGourdes() && taux > 0;
 
-  if (montant <= 0) { toast('Entre un montant.', 'ko'); return; }
-  if (montant > reste + 0.009) {
-    toast('Plus que le reste dû (' + usd(reste) + ').', 'ko');
+  if (saisi <= 0) { toast('Entre un montant.', 'ko'); return; }
+
+  var enUsd = gdes ? saisi / taux : saisi;
+  var marge = gdes ? (1 / taux) : 0.009;
+  if (enUsd > reste + marge) {
+    toast('Plus que le reste dû (' +
+          (gdes ? htg(reste * taux) : usd(reste)) + ').', 'ko');
     return;
   }
 
@@ -3598,7 +3683,9 @@ function enregistrerPaiement() {
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
 
   api('facture_payer', { facture_id: f.facture_id,
-                         montant_usd: montant, methode: mode })
+                         montant_saisi: saisi,
+                         devise: gdes ? 'Gourdes' : 'USD',
+                         methode: mode })
   .then(function (d) {
     fermerModaleDom();
     Nav.modaleOuverte = false;
@@ -3607,18 +3694,24 @@ function enregistrerPaiement() {
       facture_id: d.facture_id,
       revenu_id: d.revenu_id,
       client_nom: f.client_nom,
-      versement_usd: montant,
+      versement_usd: Number(d.versement_usd) || enUsd,
+      /* Le reçu porte ce que le client a tendu. « Reçu 2 700 Gdes » se
+         vérifie en recomptant les billets ; « reçu 20,00 $ » oblige le
+         client à nous croire sur parole pour le taux. */
+      versement_saisi: Number(d.versement_saisi) || saisi,
+      devise_recue: d.devise_recue || (gdes ? 'Gourdes' : 'USD'),
       methode: mode,
-      taux: f.taux,
+      taux: Number(d.taux_applique) || f.taux,
       montant_usd: d.montant_usd,
       montant_paye_usd: d.montant_paye_usd,
       reste_du_usd: d.reste_du_usd,
       solde_client_usd: d.solde_client_usd
     }), 'ticket');
 
+    var recu = gdes ? htg(saisi) : usd(enUsd);
     toast(Number(d.reste_du_usd) > 0.009
-      ? 'Encaissé ' + usd(montant) + ' · reste ' + usd(d.reste_du_usd)
-      : 'Facture soldée.');
+      ? 'Encaissé ' + recu + ' · reste ' + usd(d.reste_du_usd)
+      : 'Facture soldée — ' + recu + ' reçus.');
 
     if (d.avertissement) toast(d.avertissement, 'ko');
   })
@@ -4625,7 +4718,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-11-05.1';
+var VERSION_ATTENDUE = '2026-11-05.2';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
