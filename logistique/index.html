@@ -1418,6 +1418,7 @@ function changerUrl() {
 
 var Cam = { flux: null, detecteur: null, boucle: null, dernier: '', quand: 0,
             pause: false, enCours: false,
+            msLecture: null, msServeur: null,
             torche: false, torcheDispo: false,
             zoom: 1, zoomDispo: false, zoomMin: 1, zoomMax: 1 };
 var ModeRafale = false;
@@ -1722,17 +1723,60 @@ function lancerScan(valeur) {
     return;
   }
 
-  document.getElementById('res-scan').innerHTML = chargement('Lecture…');
+  /* Le numéro s'affiche AVANT l'aller-retour. Pendant la seconde où le
+     serveur répond, l'agent voyait un écran de chargement anonyme et
+     ne savait pas si son code avait été lu. Le voir, c'est déjà savoir
+     que le scan a marché. */
+  document.getElementById('res-scan').innerHTML =
+    '<div class="carte"><div class="mono" style="font-size:15px;font-weight:700">' +
+    e(t) + '</div>' + chargement('Lecture de la fiche…') + '</div>';
   pauserCamera();
+
+  var tDebut = Date.now();
   api('colis_scanner', { tracking: t }).then(function (d) {
+    Cam.msServeur = Date.now() - tDebut;
     bip();
-    document.getElementById('res-scan').innerHTML = carteScan(d) + boutonReprise();
+    document.getElementById('res-scan').innerHTML =
+      carteScan(d) + chronoScan() + boutonReprise();
     redonnerFocus();
   }).catch(function (err) {
+    Cam.msServeur = Date.now() - tDebut;
     document.getElementById('res-scan').innerHTML =
       bloc(err.message, 'ko', '❌') + boutonReprise();
     redonnerFocus();
   });
+}
+
+/**
+ * Où part vraiment le temps d'un scan.
+ *
+ * « Le scanner est lent en mode simple, rapide en rafale » est une
+ * observation juste, mais elle désigne mal la cause : le chemin de
+ * lecture est le MÊME dans les deux modes — même boucle, même
+ * intervalle, même décodeur. Ce qui diffère, c'est ce qui vient
+ * après. La rafale ne fait qu'ajouter le code à une liste, sans
+ * toucher au réseau ; le mode simple interroge le serveur pour savoir
+ * quoi proposer, puis l'interroge encore pour l'enregistrer.
+ *
+ * Cette ligne sépare les deux coûts pour qu'on cesse d'optimiser au
+ * hasard. Si « lecture » est à 30 ms et « fiche » à 1 800 ms, ce n'est
+ * pas la caméra qu'il faut accélérer — c'est Apps Script, et aucun
+ * réglage de scanner n'y changera rien.
+ *
+ * Réservée à la direction : un agent au comptoir n'a rien à faire
+ * d'une milliseconde, et une interface qui affiche des chiffres qu'on
+ * ne peut pas utiliser apprend à ne plus rien lire.
+ */
+function chronoScan() {
+  var d = (Etat.user && Etat.user.droits) || {};
+  if (!d.gerer_parametres_metier) return '';
+  if (Cam.msServeur === null) return '';
+
+  var lect = Cam.msLecture === null ? '—' : Math.round(Cam.msLecture) + ' ms';
+  return '<div style="font-size:11.5px;color:var(--doux);text-align:center;' +
+    'margin-top:-4px;margin-bottom:8px">' +
+    'lecture ' + lect + ' · fiche ' + Math.round(Cam.msServeur) + ' ms' +
+    '</div>';
 }
 
 function avancerHorsLigne(t) {
@@ -2187,8 +2231,20 @@ function demarrerBoucle_(v) {
     if (!Cam.flux || Cam.pause || Cam.enCours || v.readyState < 2) return;
 
     Cam.enCours = true;
+    var t0 = Date.now();
     detecterCodes_(v).then(function (codes) {
       Cam.enCours = false;
+
+      /* Combien coûte UN passage de lecture, en moyenne glissante.
+         Sans ce chiffre, « le scanner est lent » reste une impression :
+         on ne sait pas si le temps part dans la caméra, dans le
+         décodage ou dans l'aller-retour serveur — et on optimise au
+         hasard l'un des trois. Moyenne sur les vingt derniers passages,
+         pour que le chiffre soit stable sans retenir tout l'historique. */
+      var dt = Date.now() - t0;
+      Cam.msLecture = Cam.msLecture === null ? dt
+                    : Cam.msLecture + (dt - Cam.msLecture) / 20;
+
       if (!codes || !codes.length) return;
 
       /* On garde le code le plus long : sur une étiquette Amazon, le
@@ -4569,7 +4625,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-11-01.1';
+var VERSION_ATTENDUE = '2026-11-05.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {

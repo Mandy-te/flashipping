@@ -1558,12 +1558,18 @@ function rendreDossier(d) {
               'Il ne se modifie pas.', 'info', '🏷️');
   }
 
-  // ── Ce que le client demande en premier ──
+  /* ── Ce que le client demande en premier ──
+     Quatre cases, pas trois. « Livrés » manquait, et son absence
+     poussait les colis remis à se ranger ailleurs : les trois chiffres
+     affichés ne couvraient pas tout l'historique du client, donc rien
+     à l'écran ne trahissait qu'un colis était mal classé. */
   h += '<div class="stats" style="margin-bottom:12px">' +
     '<div class="stat"><div class="v">' + n0(r.nb_en_cours) +
       '</div><div class="l">en route</div></div>' +
     '<div class="stat"><div class="v" style="color:var(--vert)">' + n0(r.nb_disponibles) +
       '</div><div class="l">à retirer</div></div>' +
+    '<div class="stat"><div class="v" style="color:var(--doux)">' +
+      n0(r.nb_livres) + '</div><div class="l">livrés</div></div>' +
     '<div class="stat"><div class="v" style="color:' +
       (r.impaye_usd > 0 ? 'var(--rouge)' : 'var(--doux)') + '">' +
       usd(r.impaye_usd) + '</div><div class="l">impayé</div></div>' +
@@ -2788,7 +2794,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-11-01.1';
+var VERSION_ATTENDUE = '2026-11-05.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
