@@ -1951,6 +1951,7 @@ function ouvrirEditionClient() {
        c.taux_commission_defaut === undefined
          ? '' : e(Number(c.taux_commission_defaut) * 100)) + '" ' +
       'placeholder="vide = taux général"></label>' +
+    selectSource('ec-source', c.source) +
     '<label class="champ"><span>Note</span><textarea id="ec-note">' +
       e(c.note) + '</textarea></label>' +
     '<button class="btn" id="ec-btn" onclick="enregistrerClient()">Enregistrer</button>');
@@ -1987,8 +1988,37 @@ function ouvrirNouveauClient() {
     '<label class="champ"><span>Taux fidèle (%)</span>' +
       '<input type="number" id="ncl-taux" step="0.5" inputmode="decimal" ' +
       'placeholder="vide = taux général"></label>' +
+
+    /* Une question de plus au guichet, posée une seule fois, et qui
+       répondra dans six mois à « lequel de nos canaux amène vraiment
+       des clients ». Non obligatoire : un agent pressé passe outre, et
+       « non renseigné » reste une réponse honnête — plus honnête qu'un
+       canal choisi au hasard pour vider le formulaire. */
+    selectSource('ncl-source', '') +
     '<label class="champ"><span>Note</span><textarea id="ncl-note"></textarea></label>' +
     '<button class="btn" id="ncl-btn" onclick="creerClient()">Créer le client</button>');
+}
+
+/**
+ * Le menu des canaux d'acquisition, écrit une fois.
+ *
+ * La liste vient des référentiels, donc du serveur : si on la tapait
+ * à la main dans chaque formulaire, « facebook » finirait par
+ * cohabiter avec « Facebook » et le jour où l'on compare les canaux,
+ * le plus gros serait une faute de frappe.
+ */
+function selectSource(id, valeur) {
+  var liste = (Etat.ref && Etat.ref.sources_client) || [];
+  if (!liste.length) return '';     // déploiement serveur pas encore à jour
+
+  return '<label class="champ"><span>Comment nous a-t-il connus ?</span>' +
+    '<select id="' + id + '">' +
+      liste.map(function (s) {
+        return '<option value="' + e(s.code) + '"' +
+          (s.code === (valeur || 'inconnu') ? ' selected' : '') + '>' +
+          e(s.libelle) + '</option>';
+      }).join('') +
+    '</select></label>';
 }
 
 function creerClient() {
@@ -2005,7 +2035,8 @@ function creerClient() {
     nom: v('ncl-nom').trim(), prenom: v('ncl-prenom').trim(),
     telephone: v('ncl-tel').trim(), whatsapp: v('ncl-wa').trim(),
     email: v('ncl-email').trim(), ville: v('ncl-ville').trim(),
-    agence_id: v('ncl-agence'), note: v('ncl-note')
+    agence_id: v('ncl-agence'), source: v('ncl-source'),
+    note: v('ncl-note')
   };
   if (taux !== '') p.taux_commission_defaut = Number(taux) / 100;
 
@@ -2041,7 +2072,7 @@ function enregistrerClient() {
     telephone: v('ec-tel'), whatsapp: v('ec-wa'),
     email: v('ec-email'), ville: v('ec-ville'),
     agence_id: v('ec-agence'), statut: v('ec-statut'),
-    note: v('ec-note'),
+    source: v('ec-source'), note: v('ec-note'),
     taux_commission_defaut: taux === '' ? '' : (Number(taux) / 100)
   }).then(function () {
     toast('Fiche mise à jour.', 'ok');
@@ -2794,7 +2825,7 @@ function validerCode() {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-11-05.2';
+var VERSION_ATTENDUE = '2026-11-05.3';
 
 function verifierVersion() {
   return api('diag').then(function (d) {

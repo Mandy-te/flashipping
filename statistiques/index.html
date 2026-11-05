@@ -114,6 +114,16 @@ input:focus,select:focus{
 }
 .puce.actif{background:var(--marine);color:#fff;border-color:var(--marine)}
 
+/* Lignes de liste — l'onglet Marketing est le premier écran de cette
+   application à présenter des personnes plutôt que des chiffres
+   agrégés. Les trois autres onglets n'avaient besoin que de cartes. */
+.ligne{display:flex;align-items:center;gap:10px;background:#fff;
+  border:1px solid var(--bord);border-radius:11px;padding:11px 12px;
+  margin-bottom:7px}
+.ligne .corps{min-width:0;flex:1}
+.ligne .t1{font-weight:750;font-size:14.5px;line-height:1.25}
+.ligne .t2{font-size:12px;color:var(--doux);margin-top:2px;line-height:1.35}
+
 .mono{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px}
 
 .msg{padding:12px 13px;border-radius:11px;margin-bottom:12px;font-size:14px;
@@ -598,7 +608,13 @@ var TOUS_ONGLETS = [
   /* La simulation tarifaire touche au prix : elle n'est proposée
      qu'à ceux qui peuvent le fixer. Un responsable qui la verrait
      sans pouvoir rien en faire y lirait une promesse. */
-  { id: 'tarif',     ic: '🧮', nom: 'Tarif',     droit: 'fixer_prix' }
+  { id: 'tarif',     ic: '🧮', nom: 'Tarif',     droit: 'fixer_prix' },
+  /* Le marketing vit ici plutôt que dans une sixième application.
+     Ce qu'il lui faut n'est pas un outil pour produire du contenu —
+     ça se fait mieux ailleurs — mais la réponse à deux questions que
+     seule cette base peut donner : qui s'en va, et par où ils
+     arrivent. */
+  { id: 'marketing', ic: '📣', nom: 'Marketing', droit: 'voir_stats' }
 ];
 
 var ONGLETS = TOUS_ONGLETS;
@@ -680,6 +696,7 @@ function rendreOnglet() {
     case 'evolution': return ongletEvolution();
     case 'rapport':   return ongletRapport();
     case 'tarif':     return ongletTarif();
+    case 'marketing': return ongletMarketing();
   }
 }
 
@@ -1357,6 +1374,183 @@ function corpsRapport() {
  */
 var Tarif = { prix: 5, frais: 0, data: null, err: null, enCours: false };
 
+// ═══════════════════════════════════════════════════════════════════
+//  MARKETING
+// ═══════════════════════════════════════════════════════════════════
+
+var Mkt = { data: null, err: '', charge: false, vue: 'dormants' };
+
+/**
+ * Deux questions, et seulement deux.
+ *
+ * Qui s'en va, et par où ils arrivent. Le reste — visuels, légendes,
+ * calendrier de publication — se fait mieux hors de ce système, et
+ * l'y mettre n'aurait créé qu'un endroit de plus où chercher un
+ * fichier.
+ *
+ * Pas de sélecteur de période ici, contrairement aux autres onglets :
+ * un client dormant l'est aujourd'hui, pas « au troisième trimestre ».
+ */
+function ongletMarketing() {
+  poser('<div id="zone-mkt">' +
+        (Mkt.charge ? corpsMarketing() : chargement('Lecture des clients…')) +
+        '</div>');
+  if (!Mkt.charge) chargerMarketing();
+}
+
+function chargerMarketing() {
+  api('marketing', {}).then(function (d) {
+    Mkt.data = d; Mkt.err = ''; Mkt.charge = true;
+    peindreMarketing();
+  }).catch(function (err) {
+    Mkt.err = err.message; Mkt.charge = true;
+    peindreMarketing();
+  });
+}
+
+function peindreMarketing() {
+  var z = document.getElementById('zone-mkt');
+  if (z) z.innerHTML = corpsMarketing();
+}
+
+function voirMarketing(v) { Mkt.vue = v; peindreMarketing(); }
+
+function corpsMarketing() {
+  if (Mkt.err) return bloc(Mkt.err, 'ko', '❌');
+  var d = Mkt.data;
+  if (!d) return chargement('Lecture des clients…');
+
+  var h = '<div class="stats" style="margin-bottom:12px">' +
+    '<div class="stat"><div class="v">' + n0(d.total_clients) +
+      '</div><div class="l">clients</div></div>' +
+    '<div class="stat"><div class="v" style="color:var(--vert)">' +
+      n0(d.actifs_30j) + '</div><div class="l">actifs 30 j</div></div>' +
+    '<div class="stat"><div class="v" style="color:var(--rouge)">' +
+      n0(d.nb_dormants) + '</div><div class="l">dormants</div></div>' +
+    '</div>';
+
+  h += '<div class="puces" style="margin-bottom:10px">' +
+    [['dormants', '😴 Qui s\'en va (' + n0(d.nb_dormants) + ')'],
+     ['essais',   '🌱 Un seul envoi (' + n0(d.nb_essais) + ')'],
+     ['sources',  '📍 D\'où ils viennent']].map(function (x) {
+      return '<button class="puce' + (Mkt.vue === x[0] ? ' actif' : '') +
+        '" onclick="voirMarketing(\'' + x[0] + '\')">' + e(x[1]) + '</button>';
+    }).join('') + '</div>';
+
+  if (Mkt.vue === 'sources')     return h + vueSources(d);
+  if (Mkt.vue === 'essais')      return h + vueEssais(d);
+  return h + vueDormants(d);
+}
+
+function vueDormants(d) {
+  if (!d.dormants.length) {
+    return vide('🎉', 'Personne ne décroche. Chaque client qui expédiait ' +
+                'régulièrement est encore dans son rythme habituel.');
+  }
+
+  /* On explique la règle à l'écran. Une liste de noms sans critère
+     visible se fait contester au premier désaccord — et on ne peut
+     pas défendre un seuil qu'on ne connaît pas. */
+  var h = bloc('Chaque client est comparé à SON propre rythme, pas à un ' +
+    'délai fixe : quelqu\'un qui expédie tous les quinze jours est ' +
+    'signalé après un mois, un client de deux fois par an ne l\'est ' +
+    'qu\'après un an. Apparaissent ici ceux qui ont dépassé le double ' +
+    'de leur intervalle habituel.', 'info', '⏱️');
+
+  d.dormants.forEach(function (c) {
+    var couleur = c.retard >= 4 ? 'var(--rouge)' : '#B26A00';
+    h += '<div class="ligne"><div class="corps">' +
+      '<div class="t1">' + e(c.nom_complet) +
+        ' <span style="color:var(--doux);font-weight:500">' +
+        e(c.code_client) + '</span></div>' +
+      '<div class="t2">' + n0(c.nb_envois) + ' envois · ' + n0(c.nb_colis) +
+        ' colis · ' + e(c.agence_ville) +
+        (c.source && c.source !== 'inconnu' ? ' · ' + e(c.source) : '') +
+        '</div>' +
+      '<div class="t2" style="color:' + couleur + '">silencieux depuis ' +
+        n0(c.silence_jours) + ' jours — il expédiait tous les ' +
+        n0(c.rythme_jours) + ' jours</div>' +
+      (c.a_un_numero ? '' :
+        '<div class="t2" style="color:var(--doux)">pas de numéro au dossier</div>') +
+      '</div></div>';
+  });
+  return h;
+}
+
+function vueEssais(d) {
+  if (!d.essais.length) {
+    return vide('🌱', 'Aucun client resté à un seul envoi depuis plus ' +
+                'd\'un mois et demi.');
+  }
+  var h = bloc('Ils ont essayé une fois et ne sont pas revenus. Pas de ' +
+    'rythme à comparer : c\'est une population à part, et le message à ' +
+    'leur adresser n\'est pas celui d\'une relance — c\'est celui d\'une ' +
+    'première impression à rattraper.', 'info', '🌱');
+
+  d.essais.forEach(function (c) {
+    h += '<div class="ligne"><div class="corps">' +
+      '<div class="t1">' + e(c.nom_complet) +
+        ' <span style="color:var(--doux);font-weight:500">' +
+        e(c.code_client) + '</span></div>' +
+      '<div class="t2">' + e(c.agence_ville) + ' · un envoi le ' +
+        e(dateCourte(c.dernier_envoi)) + ', il y a ' +
+        n0(c.silence_jours) + ' jours</div>' +
+      '</div></div>';
+  });
+  return h;
+}
+
+function vueSources(d) {
+  var h = '';
+
+  /* La part renseignée d'abord : un camembert bâti sur 8 % des fiches
+     ne décrit pas la clientèle, il décrit les huit pour cent. Tant que
+     ce chiffre est bas, tout ce qui suit est indicatif, et il vaut
+     mieux que ce soit écrit que sous-entendu. */
+  if (d.part_renseignee < 60) {
+    h += bloc('Seulement ' + n1(d.part_renseignee) + ' % des fiches portent ' +
+      'une origine (' + n0(d.sources_renseignees) + ' sur ' +
+      n0(d.total_clients) + '). La répartition ci-dessous décrit ces ' +
+      'fiches-là, pas ta clientèle. Elle deviendra lisible à mesure que ' +
+      'la question sera posée à chaque inscription — compte quelques mois.',
+      'attention', '📭');
+  }
+
+  var max = d.sources.reduce(function (m, s) {
+    return s.code === 'inconnu' ? m : Math.max(m, s.nb);
+  }, 0);
+
+  d.sources.forEach(function (s) {
+    var gris = s.code === 'inconnu';
+    var largeur = max ? Math.round((gris ? 0 : s.nb) / max * 100) : 0;
+    h += '<div class="carte serree" style="margin-bottom:6px' +
+        (gris ? ';opacity:.6' : '') + '">' +
+      '<div class="total"><span class="l">' + e(s.libelle) + '</span>' +
+        '<b>' + n0(s.nb) + ' · ' + n1(s.part) + ' %</b></div>' +
+      (gris ? '' :
+        '<div style="height:6px;background:#E8EFEA;border-radius:4px;margin-top:5px">' +
+        '<div style="height:6px;width:' + largeur + '%;background:var(--vert);' +
+        'border-radius:4px"></div></div>') +
+    '</div>';
+  });
+
+  if (d.nouveaux_par_mois.length > 1) {
+    h += '<div class="titre-section">Nouveaux clients par mois</div>';
+    var hx = d.nouveaux_par_mois.reduce(function (m, x) {
+      return Math.max(m, x.total); }, 0) || 1;
+    d.nouveaux_par_mois.forEach(function (x) {
+      h += '<div class="total"><span class="l">' + e(x.mois) + '</span>' +
+        '<span style="flex:1;margin:0 10px">' +
+          '<span style="display:inline-block;height:8px;border-radius:4px;' +
+          'background:var(--vert);width:' + Math.round(x.total / hx * 100) +
+          '%"></span></span><b>' + n0(x.total) + '</b></div>';
+    });
+  }
+
+  return h;
+}
+
+
 function ongletTarif() {
   poser(selecteurPeriode() + '<div id="zone-stats">' + corpsTarif() + '</div>');
 }
@@ -1836,7 +2030,7 @@ function imprimerComplet() {
  * incompréhensibles — une action « inconnue », un écran vide. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-11-05.2';
+var VERSION_ATTENDUE = '2026-11-05.3';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
