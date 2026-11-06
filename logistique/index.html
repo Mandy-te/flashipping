@@ -1029,6 +1029,9 @@ function factureA4(f) {
       (Number(f.remise_usd) > 0
         ? '<div><span>Remise accordée</span><span>− ' + usd(f.remise_usd) +
           '</span></div>' : '') +
+      (Number(f.parrainage_usd) > 0
+        ? '<div><span>' + e(f.parrainage_detail || 'Parrainage') +
+          '</span><span>− ' + usd(f.parrainage_usd) + '</span></div>' : '') +
       '<div class="grand"><span>TOTAL</span><span>' + usd(f.montant_usd) + '</span></div>' +
       '<div class="gdes"><span>Au taux de ' + n0(f.taux) + ' HTG/$</span><span>' +
         htg(f.montant_htg) + '</span></div>' +
@@ -1074,6 +1077,18 @@ function recuFacture(f) {
   if (Number(f.remise_usd) > 0) {
     h += '<div class="rec-l"><span>Remise</span><span>-' + usd(f.remise_usd) + '</span></div>';
   }
+
+  /* Le parrainage porte son nom et celui du filleul. « Remise 2 $ »
+     sans explication, c'est une faveur qu'on croit négociable et
+     qu'on redemandera la fois suivante ; « Parrainage — filleul
+     Mikerline » dit au client POURQUOI il paie moins, et donc quoi
+     refaire pour payer moins encore. */
+  if (Number(f.parrainage_usd) > 0) {
+    h += '<div class="rec-l"><span>' +
+         e(f.parrainage_detail || 'Parrainage') + '</span><span>-' +
+         usd(f.parrainage_usd) + '</span></div>';
+  }
+
   h += '<div class="rec-tot"><span>TOTAL</span><span>' + usd(f.montant_usd) + '</span></div>' +
     '<div class="rec-l"><span>Taux ' + n0(f.taux) + '</span><b>' + htg(f.montant_htg) + '</b></div>' +
     '<div class="rec-l"><span>Payé</span><b>' + usd(f.montant_paye_usd) + '</b></div>';
@@ -1081,8 +1096,25 @@ function recuFacture(f) {
     h += '<div class="rec-l"><span>Reste dû</span><b>' + usd(f.reste_du_usd) + '</b></div>';
   }
   h += '<div class="rec-sep"></div><div class="rec-tk">' +
-       (f.trackings || []).map(e).join('<br>') + '</div>' +
-       '<div class="et-pied">Merci de votre confiance</div>' +
+       (f.trackings || []).map(e).join('<br>') + '</div>';
+
+  /* Le code de parrainage, en bas, en gros.
+     Le reçu est le seul support qui parte systématiquement avec le
+     client sans rien coûter. Pas d'envoi en masse, pas de SMS : le
+     code circule par ce bout de papier, l'espace client et le message
+     « colis disponible ». */
+  if (f.code_parrainage) {
+    h += '<div class="rec-sep"></div>' +
+      '<div style="text-align:center;margin:4px 0 2px">' +
+        '<div style="font-size:9px;letter-spacing:.4px">TON CODE DE PARRAINAGE</div>' +
+        '<div style="font-size:17px;font-weight:800;letter-spacing:1.5px;' +
+          'margin:2px 0">' + e(f.code_parrainage) + '</div>' +
+        '<div style="font-size:8.5px;line-height:1.3">Donne-le à un ami : ' +
+          'il économise sur son premier colis, et toi sur le suivant.</div>' +
+      '</div>';
+  }
+
+  h += '<div class="et-pied">Merci de votre confiance</div>' +
        CODE128.svg(f.facture_id, 10) +
     '</div>';
   return h;
@@ -4718,7 +4750,7 @@ function sectionStock(titre, bloc2, icone) {
  * « inconnue », un écran vide, un champ qui ne s'enregistre pas. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-11-05.3';
+var VERSION_ATTENDUE = '2026-11-06.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {
