@@ -212,6 +212,26 @@ input:focus,select:focus{
 .ag-pied{font-size:12px;color:var(--doux);margin-top:9px;line-height:1.5}
 
 /* ── Série d'évolution ────────────────────────────────────────── */
+/* ── Le graphe ──
+   `preserveAspectRatio="none"` étire le dessin à la largeur
+   disponible : sur un téléphone on veut toute la place, et une courbe
+   un peu étirée se lit sans peine. Les textes, eux, sont posés par le
+   navigateur et gardent leur taille. */
+.gr{width:100%;height:230px;display:block;overflow:visible}
+.gr-ax{font-size:11px;fill:var(--doux);font-family:inherit}
+.gr-max{font-size:11.5px;font-weight:700;fill:var(--texte);font-family:inherit}
+.gr-zero{font-size:11px;font-weight:700;fill:#44616A;font-family:inherit}
+
+/* Deux champs côte à côte : les bornes d'une période se lisent
+   ensemble ou ne se lisent pas. */
+.filtres{display:flex;gap:8px;margin-bottom:10px}
+.filtres label.champ.serre{flex:1;margin-bottom:0;min-width:0}
+.filtres label.champ.serre input{width:100%}
+
+@media print{
+  .gr{height:200px}
+}
+
 .serie-l{margin-bottom:11px}
 .serie-tete{display:flex;justify-content:space-between;align-items:baseline;
   font-size:12.5px;margin-bottom:4px}
@@ -415,15 +435,25 @@ var Per = { type: 'mensuel', ref: '', agence: '',
             data: null, err: null, enCours: false };
 
 var METRIQUES = [
-  { id: 'revenus_gdes',     nom: 'Revenus',   fmt: 'htg' },
-  { id: 'resultat_gdes',    nom: 'Résultat',  fmt: 'htg' },
-  { id: 'colis_traites',    nom: 'Colis',     fmt: 'nb'  },
-  { id: 'livres_lb',        nom: 'Livres',    fmt: 'lb'  },
-  { id: 'clients_nouveaux', nom: 'Nouveaux clients', fmt: 'nb' },
-  { id: 'commandes',        nom: 'Commandes', fmt: 'nb'  }
+  { id: 'colis_livres',     nom: 'Colis livrés',  fmt: 'nb',  couleur: 'var(--or)' },
+  { id: 'colis_recus',      nom: 'Colis reçus',   fmt: 'nb',  couleur: 'var(--bleu)' },
+  { id: 'livres_lb',        nom: 'Livres',        fmt: 'lb',  couleur: 'var(--or-fonce)' },
+  { id: 'revenus_gdes',     nom: 'Revenus',       fmt: 'htg', couleur: 'var(--vert)' },
+  { id: 'resultat_gdes',    nom: 'Résultat',      fmt: 'htg', couleur: 'var(--marine)' },
+  { id: 'clients_actifs',   nom: 'Clients servis', fmt: 'nb', couleur: 'var(--orange)' },
+  { id: 'clients_nouveaux', nom: 'Nouvelles fiches', fmt: 'nb', couleur: 'var(--or)' }
 ];
 
-var Evo = { metrique: 'revenus_gdes', nb: 6, data: null, err: null };
+var GRANULARITES = [
+  { id: '',        nom: 'Auto' },
+  { id: 'jour',    nom: 'Jour' },
+  { id: 'semaine', nom: 'Semaine' },
+  { id: 'mois',    nom: 'Mois' },
+  { id: 'annee',   nom: 'Année' }
+];
+
+var Evo = { metrique: 'colis_livres', gran: '', debut: '', fin: '',
+            data: null, err: null };
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1003,16 +1033,31 @@ function corpsTableau() {
       'chargerait de tout.', 'info', '🏢');
   }
 
-  // ── Les volumes : des faits ──
+  /* ── Les volumes : des faits, chacun à sa date ──
+   *
+   * « Colis traités / dont livrés » suggérait que les seconds sont un
+   * sous-ensemble des premiers. Ils ne le sont pas : un colis reçu en
+   * octobre et remis en novembre appartient aux deux mois, par deux
+   * portes différentes. Le mot « dont » mentait sur la nature même du
+   * chiffre, et c'est lui qui rendait le 2 incompréhensible.
+   *
+   * Trois étapes, trois tuiles, aucune inclusion sous-entendue. */
   h += '<div class="titre-section">Volumes de la période</div>' +
     '<div class="stats">' +
-    tuile(n0(t.colis_traites), 'Colis traités') +
-    tuile(n0(t.colis_livres), 'Dont livrés') +
-    tuile(n1(t.livres_lb), 'Livres') +
+    tuile(n0(t.colis_recus), 'Reçus à Miami') +
+    tuile(n0(t.colis_disponibles), 'Arrivés au comptoir') +
+    tuile(n0(t.colis_livres), 'Livrés') +
+    tuile(n1(t.livres_lb), 'Livres remises') +
     tuile(n0(t.clients_actifs), 'Clients servis') +
-    tuile(n0(t.clients_nouveaux), 'Nouveaux') +
-    tuile(n0(t.commandes), 'Commandes') +
-    '</div>';
+    tuile(n0(t.clients_nouveaux), 'Nouvelles fiches') +
+    '</div>' +
+    '<div class="aide" style="margin-top:-4px">Chaque colis est compté à ' +
+    'la date de chaque étape. Un colis reçu en octobre et remis en ' +
+    'novembre compte dans les deux mois : il a demandé du travail aux ' +
+    'deux. Seules les <b>livraisons</b> produisent une facture — c\'est ' +
+    'donc elles qui répondent aux revenus ci-dessous.</div>' +
+    (t.commandes > 0 ? '<div class="stats" style="margin-top:8px">' +
+      tuile(n0(t.commandes), 'Commandes') + '</div>' : '');
 
   if (t.commandes > 0) {
     h += '<div class="carte serree" style="margin-top:12px">' +
@@ -1112,9 +1157,10 @@ function carteAgence(a, rang, d) {
     '</div>';
 
   var pied = [];
-  pied.push(n0(a.colis_traites) + ' colis traités');
-  if (a.colis_livres !== a.colis_traites) pied.push(n0(a.colis_livres) + ' livrés');
-  pied.push(lb(a.livres_lb));
+  pied.push(n0(a.colis_livres) + ' livrés');
+  if (a.colis_recus) pied.push(n0(a.colis_recus) + ' reçus');
+  if (a.colis_disponibles) pied.push(n0(a.colis_disponibles) + ' au comptoir');
+  pied.push(lb(a.livres_lb) + ' remises');
   if (a.revenu_par_lb_gdes > 0) pied.push(n0(a.revenu_par_lb_gdes) + ' HTG la livre');
   pied.push(n0(a.clients_actifs) + ' clients servis');
   if (a.clients_nouveaux) pied.push(n0(a.clients_nouveaux) + ' nouveaux');
@@ -1144,24 +1190,173 @@ function cascadeL(libelle, valeur, aide, classe) {
  * démarre d'une succursale qui décline — la seule chose qu'on puisse
  * honnêtement appeler une évaluation.
  */
+// ═══════════════════════════════════════════════════════════════════
+//  GRAPHE — dessiné à la main, en SVG
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Pourquoi un SVG écrit ici plutôt qu'une bibliothèque de graphes.
+ *
+ * Une bibliothèque se charge depuis un CDN. Le jour où le réseau
+ * d'une succursale fléchit, le graphe disparaît — et l'application
+ * entière passe pour cassée alors que seule une image manque. On a
+ * déjà payé cette leçon avec le lecteur de codes-barres.
+ *
+ * Un SVG tracé à la main pèse quelques lignes, s'imprime proprement,
+ * et marche hors ligne comme le reste de l'application.
+ *
+ * Deux partis pris de lecture :
+ *
+ *   — l'axe part de ZÉRO quand toutes les valeurs sont positives.
+ *     Tronquer l'échelle fait d'une hausse de 3 % une falaise, et
+ *     c'est la façon la plus courante de mentir avec un graphe ;
+ *   — le point le plus haut est marqué et nommé. « Quel jour on a le
+ *     plus livré » est la question qu'on pose à ce graphe, et elle ne
+ *     devrait pas demander de plisser les yeux.
+ */
+function grapheSvg(serie, metrique, couleur, formater) {
+  if (!serie.length) return '';
+
+  var L = 760, H = 260;                 // repère interne, mis à l'échelle
+  var gG = 56, gD = 14, gH = 18, gB = 34;
+  var larg = L - gG - gD, haut = H - gH - gB;
+
+  var vals = serie.map(function (x) { return Number(x[metrique]) || 0; });
+  var vMax = Math.max.apply(null, vals);
+  var vMin = Math.min.apply(null, vals);
+
+  /* Zéro reste dans le cadre dès qu'il y a du négatif, sinon la
+     courbe flotterait sans qu'on voie de quel côté elle est. */
+  var hautEch = vMax > 0 ? vMax : 0;
+  var basEch  = vMin < 0 ? vMin : 0;
+  if (hautEch === basEch) hautEch = basEch + 1;
+
+  /* ── Les repères s'alignent sur ZÉRO, pas sur le minimum ──
+   *
+   * Répartir quatre repères entre le plus bas et le plus haut donne
+   * des valeurs arbitraires — « 775 », « 7 488 » — et surtout : zéro
+   * n'en fait presque jamais partie. Sur une courbe de résultat qui
+   * passe du bénéfice à la perte, la frontière n'était donc marquée
+   * nulle part, et un repère à 775 collé contre elle se lisait comme
+   * la ligne de zéro.
+   *
+   * On choisit donc un pas « rond » (1, 2, 2,5 ou 5 fois une puissance
+   * de dix), et on pose les repères sur ses multiples. Zéro tombe
+   * alors forcément dessus dès que la courbe le traverse, et chaque
+   * graduation est un nombre qu'on peut dire à voix haute. */
+  var brut = (hautEch - basEch) / 4;
+  var dix = Math.pow(10, Math.floor(Math.log(brut) / Math.LN10));
+  var pasEch = dix;
+  [1, 2, 2.5, 5, 10].some(function (f) {
+    if (dix * f >= brut) { pasEch = dix * f; return true; }
+    return false;
+  });
+
+  hautEch = Math.ceil(hautEch / pasEch) * pasEch;
+  basEch  = Math.floor(basEch / pasEch) * pasEch;
+  if (hautEch === basEch) hautEch = basEch + pasEch;
+
+  var etendue = hautEch - basEch;
+  var x = function (i) {
+    return gG + (serie.length === 1 ? larg / 2
+               : i * larg / (serie.length - 1));
+  };
+  var y = function (v) { return gH + haut - (v - basEch) / etendue * haut; };
+
+  var svg = '<svg viewBox="0 0 ' + L + ' ' + H + '" class="gr" ' +
+            'preserveAspectRatio="none" role="img">';
+
+  // ── Lignes de repère, posées sur les multiples du pas ──
+  //
+  // Zéro, lui, est tracé plus marqué : c'est la seule graduation de ce
+  // graphe qui veuille dire quelque chose par elle-même, et sur une
+  // courbe de résultat c'est la frontière entre gagner et perdre.
+  for (var v = basEch; v <= hautEch + pasEch / 2; v += pasEch) {
+    var nul = Math.abs(v) < pasEch / 1000;
+    var yy = y(nul ? 0 : v);
+    svg += '<line x1="' + gG + '" y1="' + yy.toFixed(1) + '" x2="' + (L - gD) +
+           '" y2="' + yy.toFixed(1) + '" stroke="' +
+           (nul ? '#7E969B' : '#D5E3E6') + '" stroke-width="' +
+           (nul ? '1.5' : '1') + '"/>' +
+           '<text x="' + (gG - 7) + '" y="' + (yy + 3.5).toFixed(1) +
+           '" text-anchor="end" class="' + (nul ? 'gr-zero' : 'gr-ax') + '">' +
+           e(nul ? '0' : formater(v, true)) + '</text>';
+  }
+
+  // ── L'aire sous la courbe, puis la courbe ──
+  var pts = vals.map(function (v, i) {
+    return x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(' ');
+
+  var zero = y(basEch < 0 ? 0 : basEch);
+  svg += '<polygon points="' + x(0).toFixed(1) + ',' + zero.toFixed(1) + ' ' +
+         pts + ' ' + x(serie.length - 1).toFixed(1) + ',' + zero.toFixed(1) +
+         '" fill="' + couleur + '" opacity="0.12"/>';
+  svg += '<polyline points="' + pts + '" fill="none" stroke="' + couleur +
+         '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+
+  /* Les points ne se dessinent qu'en petit nombre : au-delà, ils se
+     touchent et transforment la courbe en chenille. */
+  if (serie.length <= 40) {
+    vals.forEach(function (v, i) {
+      svg += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(v).toFixed(1) +
+             '" r="2.6" fill="' + couleur + '"/>';
+    });
+  }
+
+  // ── Le sommet, marqué et nommé ──
+  var iMax = vals.indexOf(vMax);
+  if (vMax > 0) {
+    var xm = x(iMax), ym = y(vMax);
+    svg += '<circle cx="' + xm.toFixed(1) + '" cy="' + ym.toFixed(1) +
+           '" r="5" fill="#fff" stroke="' + couleur + '" stroke-width="2.5"/>';
+    var ancre = iMax < serie.length / 3 ? 'start'
+              : iMax > serie.length * 2 / 3 ? 'end' : 'middle';
+    svg += '<text x="' + xm.toFixed(1) + '" y="' + Math.max(12, ym - 11).toFixed(1) +
+           '" text-anchor="' + ancre + '" class="gr-max">' +
+           e(formater(vMax, true)) + '</text>';
+  }
+
+  // ── L'axe du temps, allégé ──
+  //
+  // Six repères au plus. Tous les afficher les ferait se chevaucher
+  // jusqu'à l'illisible — et un axe illisible vaut moins qu'un axe
+  // clairsemé, parce qu'on cesse de le lire du tout.
+  var pas = Math.max(1, Math.ceil(serie.length / 6));
+  serie.forEach(function (s, i) {
+    if (i % pas !== 0 && i !== serie.length - 1) return;
+    svg += '<text x="' + x(i).toFixed(1) + '" y="' + (H - 12) +
+           '" text-anchor="middle" class="gr-ax">' + e(s.libelle) + '</text>';
+  });
+
+  return svg + '</svg>';
+}
+
+
 function ongletEvolution() {
-  var h = '<div class="puces">' + PERIODES.map(function (p) {
-    return '<button class="puce' + (Per.type === p.id ? ' actif' : '') +
-      '" onclick="choisirPeriodeEvo(\'' + p.id + '\')">' + e(p.nom) + '</button>';
+  /* Trois mois par défaut, ce qui donne un point par semaine : assez
+     long pour qu'une tendance se voie, assez court pour que chaque
+     point reste une semaine de travail identifiable. */
+  if (!Evo.fin)   Evo.fin = aujourdhui();
+  if (!Evo.debut) Evo.debut = ilYaMois(3);
+
+  var h = '<div class="filtres">' +
+    '<label class="champ serre"><span>Du</span>' +
+      '<input type="date" id="evo-d1" value="' + e(Evo.debut) +
+      '" onchange="changerBornesEvo()"></label>' +
+    '<label class="champ serre"><span>Au</span>' +
+      '<input type="date" id="evo-d2" value="' + e(Evo.fin) +
+      '" onchange="changerBornesEvo()"></label>' +
+    '</div>';
+
+  h += '<div class="puces">' + GRANULARITES.map(function (g) {
+    return '<button class="puce' + (Evo.gran === g.id ? ' actif' : '') +
+      '" onclick="choisirGran(\'' + g.id + '\')">' + e(g.nom) + '</button>';
   }).join('') + '</div>';
 
   h += '<div class="puces">' + METRIQUES.map(function (m) {
     return '<button class="puce' + (Evo.metrique === m.id ? ' actif' : '') +
       '" onclick="choisirMetrique(\'' + m.id + '\')">' + e(m.nom) + '</button>';
   }).join('') + '</div>';
-
-  h += '<label class="champ"><span>Nombre de périodes</span>' +
-    '<select onchange="choisirNb(this.value)">' +
-    [3, 6, 12, 18, 24].map(function (n) {
-      return '<option value="' + n + '"' + (Evo.nb === n ? ' selected' : '') +
-        '>' + n + ' ' + nomPeriode(Per.type).toLowerCase() +
-        (Per.type === 'mensuel' ? ' derniers' : '') + '</option>';
-    }).join('') + '</select></label>';
 
   if (Per.agence) {
     var ag = ((Etat.ref && Etat.ref.agences) || []).filter(function (a) {
@@ -1176,28 +1371,39 @@ function ongletEvolution() {
   if (Evo.data) majEvo(); else chargerEvolution();
 }
 
-function choisirPeriodeEvo(id) {
-  if (Per.type === id) return;
-  Per.type = id; Per.data = null; Evo.data = null;
+/* `aujourdhui` et `ymdLocal_` existent déjà plus haut : une seconde
+   version aurait silencieusement remplacé la première, et c'est ainsi
+   qu'une application se met à afficher deux dates différentes pour le
+   même jour. */
+function ilYaMois(n) {
+  var d = new Date();
+  d.setMonth(d.getMonth() - n);
+  return ymdLocal_(d);
+}
+
+function changerBornesEvo() {
+  var a = document.getElementById('evo-d1').value;
+  var b = document.getElementById('evo-d2').value;
+  if (!a || !b) return;
+  Evo.debut = a; Evo.fin = b; Evo.data = null;
+  ongletEvolution();
+}
+function choisirGran(id) {
+  if (Evo.gran === id) return;
+  Evo.gran = id; Evo.data = null;
   ongletEvolution();
 }
 function choisirMetrique(id) {
   Evo.metrique = id;
-  if (Evo.data) { ongletEvolution(); } else { chargerEvolution(); }
-}
-function choisirNb(v) {
-  Evo.nb = Number(v) || 6; Evo.data = null;
-  ongletEvolution();
+  if (Evo.data) ongletEvolution(); else chargerEvolution();
 }
 
 function chargerEvolution() {
   Evo.err = null;
-  return api('stats_evolution', { type_periode: Per.type, nb: Evo.nb,
-                                  ref: Per.ref, agence_id: Per.agence })
+  return api('stats_serie', { debut: Evo.debut, fin: Evo.fin,
+                              granularite: Evo.gran, agence_id: Per.agence })
     .then(function (d) { Evo.data = d; majEvo(); return d; })
-    .catch(function (err) {
-      Evo.err = err.message; majEvo();
-    });
+    .catch(function (err) { Evo.err = err.message; majEvo(); });
 }
 
 function majEvo() {
@@ -1208,74 +1414,104 @@ function majEvo() {
   z.innerHTML = corpsEvolution();
 }
 
+/** Le nom d'un pas de temps, au singulier et au pluriel. */
+function nomGran(g, pluriel) {
+  var n = { jour: 'jour', semaine: 'semaine', mois: 'mois', annee: 'année' }[g] || 'période';
+  return pluriel && n !== 'mois' ? n + 's' : n;
+}
+
 function corpsEvolution() {
-  var serie = (Evo.data && Evo.data.serie) || [];
+  var d = Evo.data;
+  var serie = (d && d.serie) || [];
   if (!serie.length) return vide('📈', 'Aucune période à montrer.');
 
   var m = METRIQUES.filter(function (x) { return x.id === Evo.metrique; })[0]
           || METRIQUES[0];
-  var fmt = function (v) {
-    return m.fmt === 'htg' ? htg(v) : m.fmt === 'lb' ? lb(v) : n0(v);
+
+  /* Deux formats : l'axe veut du court (« 12 k »), le texte veut du
+     juste (« 12 450 HTG »). Les confondre donne soit un axe illisible,
+     soit un total approximatif qu'on prendra pour exact. */
+  var fmt = function (v, court) {
+    if (m.fmt === 'htg') return court ? court(v) : htg(v);
+    if (m.fmt === 'lb')  return court ? court(v) : lb(v);
+    return court ? court(v) : n0(v);
   };
 
-  /* L'échelle se prend sur la plus grande valeur absolue : un résultat
-     négatif doit se voir à sa taille, pas écrasé contre zéro. */
-  var max = 0;
-  serie.forEach(function (s) {
-    var v = Math.abs(Number(s[m.id]) || 0);
-    if (v > max) max = v;
-  });
-  if (!max) max = 1;
+  var vals = serie.map(function (x) { return Number(x[m.id]) || 0; });
+  var somme = vals.reduce(function (a, b) { return a + b; }, 0);
+  var moy = somme / serie.length;
+  var vides = vals.filter(function (v) { return v === 0; }).length;
 
   var h = '';
-  serie.forEach(function (s, i) {
-    var v = Number(s[m.id]) || 0;
-    var l = Math.max(2, Math.abs(v) / max * 100);
-    var derniere = i === serie.length - 1;
-    h += '<div class="serie-l"><div class="serie-tete">' +
-      '<span class="n">' + e(s.libelle) + '</span>' +
-      '<span class="v' + (v < 0 ? ' neg' : '') + '">' +
-        (m.fmt === 'htg' && v > 0 ? '+' : '') + e(fmt(v)) + '</span></div>' +
-      '<div class="barre"><div class="' +
-        (v < 0 ? 'neg' : derniere ? 'cour' : '') + '" style="width:' +
-        l.toFixed(1) + '%"></div></div></div>';
-  });
 
-  // ── Ce que la série dit, en une phrase ──
-  var prem = Number(serie[0][m.id]) || 0;
-  var dern = Number(serie[serie.length - 1][m.id]) || 0;
-  var somme = 0;
-  serie.forEach(function (s) { somme += Number(s[m.id]) || 0; });
-  var moy = somme / serie.length;
-
-  var tendance;
-  if (prem === 0 && dern === 0) {
-    tendance = 'Rien sur toute la série.';
-  } else if (prem === 0) {
-    tendance = 'Parti de zéro à ' + fmt(dern) + '.';
-  } else {
-    var var_pct = (dern - prem) / Math.abs(prem) * 100;
-    tendance = (var_pct >= 0 ? 'En hausse de ' : 'En baisse de ') +
-      pct(Math.abs(var_pct)) + ' entre la première et la dernière période.';
+  if (d.granularite_auto) {
+    h += '<div class="aide" style="margin-bottom:8px">Un point par ' +
+      e(nomGran(d.granularite)) + ', choisi d\'après la durée. ' +
+      'Change-le avec les boutons ci-dessus.</div>';
   }
 
-  h = '<div class="carte serree" style="margin-bottom:14px">' +
-    '<div class="total"><span class="l">Moyenne par ' +
-      e(nomPeriode(Per.type).toLowerCase()) + '</span><b>' + fmt(moy) + '</b></div>' +
-    '<div class="total"><span class="l">Total de la série</span><b>' +
+  h += '<div class="carte" style="padding:10px 8px 4px">' +
+       grapheSvg(serie, m.id, m.couleur, fmt) + '</div>';
+
+  // ── Ce que le graphe dit, en chiffres ──
+  var sommet = (d.sommets || {})[m.id];
+  h += '<div class="carte serree" style="margin-top:10px">' +
+    '<div class="total"><span class="l">Total sur la période</span><b>' +
       fmt(somme) + '</b></div>' +
-    '<div style="font-size:12.5px;color:var(--doux);margin-top:7px;' +
-      'line-height:1.45">' + e(tendance) + '</div></div>' + h;
+    '<div class="total"><span class="l">Moyenne par ' +
+      e(nomGran(d.granularite)) + '</span><b>' + fmt(moy) + '</b></div>' +
+    (sommet
+      ? '<div class="total"><span class="l">Meilleur' +
+        (d.granularite === 'annee' ? 'e ' : ' ') + e(nomGran(d.granularite)) +
+        '</span><b>' + e(sommet.libelle) + ' · ' + fmt(sommet.valeur) +
+        '</b></div>'
+      : '') +
+    (vides
+      ? '<div class="total"><span class="l">Sans aucune activité</span><b>' +
+        n0(vides) + ' ' + e(nomGran(d.granularite, vides > 1)) + '</b></div>'
+      : '') +
+    '<div class="total"><span class="l">Points tracés</span><b>' +
+      n0(serie.length) + '</b></div>' +
+    '</div>';
+
+  // ── La tendance : première moitié contre seconde ──
+  //
+  // Comparer le premier point au dernier lit du bruit : un jour creux
+  // au départ ou un pic à l'arrivée suffit à inverser le verdict. On
+  // compare donc les deux moitiés de la série, qui lissent l'accident.
+  if (serie.length >= 4) {
+    var mi = Math.floor(serie.length / 2);
+    var s1 = vals.slice(0, mi).reduce(function (a, b) { return a + b; }, 0) / mi;
+    var s2 = vals.slice(mi).reduce(function (a, b) { return a + b; }, 0) /
+             (serie.length - mi);
+
+    var phrase;
+    if (s1 === 0 && s2 === 0) phrase = 'Rien sur toute la période.';
+    else if (s1 === 0) phrase = 'Parti de zéro, la seconde moitié tourne à ' +
+                                fmt(s2) + ' par ' + nomGran(d.granularite) + '.';
+    else {
+      var ev = (s2 - s1) / Math.abs(s1) * 100;
+      phrase = Math.abs(ev) < 5
+        ? 'Stable : les deux moitiés de la période se tiennent à ' +
+          pct(Math.abs(ev)) + ' près.'
+        : (ev > 0 ? 'En hausse de ' : 'En baisse de ') + pct(Math.abs(ev)) +
+          ' — la seconde moitié fait ' + fmt(s2) + ' par ' +
+          nomGran(d.granularite) + ' contre ' + fmt(s1) + ' pour la première.';
+    }
+    h += '<div class="carte serree" style="margin-top:8px;font-size:13px;' +
+         'line-height:1.5;color:var(--texte)">' + e(phrase) + '</div>';
+  }
 
   if (Evo.metrique === 'resultat_gdes') {
-    h += bloc('Le résultat inclut une quote-part des coûts partagés, répartie ' +
-      'par convention. Une variation peut donc venir du réseau entier plutôt ' +
-      'que de la succursale. Les revenus et les volumes, eux, sont des faits.',
-      'info', '⚖️');
+    h += bloc('Ici le résultat vaut revenus moins TOUTES les charges du ' +
+      'réseau, sans répartition par succursale : une série dans le temps ' +
+      'n\'a personne à qui imputer une quote-part. Le chiffre peut donc ' +
+      'différer de celui de l\'onglet Période, qui lui compare des ' +
+      'succursales entre elles.', 'info', '⚖️');
   }
 
-  h += '<button class="btn sombre" onclick="imprimerSerie()">' +
-    '🖨️ Imprimer la série</button>';
+  h += '<button class="btn sombre" style="margin-top:12px" ' +
+       'onclick="imprimerSerie()">🖨️ Imprimer la série</button>';
 
   return h;
 }
@@ -1850,27 +2086,28 @@ function docPeriode(d) {
   // ── Volumes ──
   h += '<div class="doc-h2">Volumes traités</div>' +
     '<table class="doc-t"><thead><tr>' +
-      '<th>Succursale</th><th class="num">Colis</th><th class="num">Livrés</th>' +
+      '<th>Succursale</th><th class="num">Reçus</th>' +
+      '<th class="num">Au comptoir</th><th class="num">Livrés</th>' +
       '<th class="num">Livres</th><th class="num">Clients</th>' +
-      '<th class="num">Nouveaux</th><th class="num">Cmd.</th>' +
+      '<th class="num">Nouveaux</th>' +
     '</tr></thead><tbody>' +
     d.agences.map(function (a) {
       return '<tr><td><b>' + e(a.ville) + '</b><br>' +
         '<span class="ref">' + e(a.agence_id) + '</span></td>' +
-        '<td class="num">' + n0(a.colis_traites) + '</td>' +
+        '<td class="num">' + n0(a.colis_recus) + '</td>' +
+        '<td class="num">' + n0(a.colis_disponibles) + '</td>' +
         '<td class="num">' + n0(a.colis_livres) + '</td>' +
         '<td class="num">' + n1(a.livres_lb) + '</td>' +
         '<td class="num">' + n0(a.clients_actifs) + '</td>' +
-        '<td class="num">' + n0(a.clients_nouveaux) + '</td>' +
-        '<td class="num">' + n0(a.commandes) + '</td></tr>';
+        '<td class="num">' + n0(a.clients_nouveaux) + '</td></tr>';
     }).join('') +
     '</tbody><tfoot><tr><td>Réseau</td>' +
-      '<td class="num">' + n0(t.colis_traites) + '</td>' +
+      '<td class="num">' + n0(t.colis_recus) + '</td>' +
+      '<td class="num">' + n0(t.colis_disponibles) + '</td>' +
       '<td class="num">' + n0(t.colis_livres) + '</td>' +
       '<td class="num">' + n1(t.livres_lb) + '</td>' +
       '<td class="num">' + n0(t.clients_actifs) + '</td>' +
-      '<td class="num">' + n0(t.clients_nouveaux) + '</td>' +
-      '<td class="num">' + n0(t.commandes) + '</td></tr></tfoot></table>';
+      '<td class="num">' + n0(t.clients_nouveaux) + '</td></tr></tfoot></table>';
 
   // ── Rentabilité, trois niveaux côte à côte ──
   h += '<div class="doc-h2">Contribution, quote-part et résultat</div>' +
@@ -1948,20 +2185,30 @@ function docSerie(ev) {
     return String(a.agence_id) === Per.agence; })[0];
 
   var h = '<div class="doc">' +
-    enteteDoc('ÉVOLUTION SUR ' + serie.length + ' ' +
-              nomPeriode(Per.type).toUpperCase() + (serie.length > 1 ? 'S' : ''),
+    enteteDoc('ÉVOLUTION DU ' + dateCourte(ev.debut) + ' AU ' + dateCourte(ev.fin) +
+              ' · PAR ' + nomGran(ev.granularite).toUpperCase(),
               Per.agence ? ((ag && ag.ville) || Per.agence) : 'Réseau entier');
 
-  var som = { revenus_gdes: 0, resultat_gdes: 0, colis_traites: 0,
-              livres_lb: 0, clients_nouveaux: 0, commandes: 0 };
+  /* Le graphe suit le tableau : sur papier, la courbe donne la forme
+     et les chiffres donnent la preuve. L'un sans l'autre laisse
+     toujours le lecteur sur sa faim. */
+  var mImp = METRIQUES.filter(function (x) { return x.id === Evo.metrique; })[0]
+             || METRIQUES[0];
+  h += '<div class="doc-h2">' + e(mImp.nom) + '</div>' +
+       '<div style="margin-bottom:3mm">' +
+       grapheSvg(serie, mImp.id, '#0B3C4A', function (v, c) {
+         return c ? court(v) : n0(v); }) + '</div>';
+
+  var som = { revenus_gdes: 0, resultat_gdes: 0, colis_recus: 0,
+              colis_livres: 0, livres_lb: 0, clients_nouveaux: 0 };
   serie.forEach(function (s) {
     Object.keys(som).forEach(function (k) { som[k] += Number(s[k]) || 0; });
   });
 
   h += '<table class="doc-t"><thead><tr><th>Période</th>' +
     '<th class="num">Revenus</th><th class="num">Résultat</th>' +
-    '<th class="num">Colis</th><th class="num">Livres</th>' +
-    '<th class="num">Nouv. clients</th><th class="num">Cmd.</th>' +
+    '<th class="num">Reçus</th><th class="num">Livrés</th>' +
+    '<th class="num">Livres</th><th class="num">Nouv. fiches</th>' +
     '</tr></thead><tbody>' +
     serie.map(function (s) {
       var r = Number(s.resultat_gdes) || 0;
@@ -1969,28 +2216,28 @@ function docSerie(ev) {
         '<td class="num">' + n0(s.revenus_gdes) + '</td>' +
         '<td class="num ' + (r > 0 ? 'pos' : r < 0 ? 'neg' : '') + '">' +
           signe(r) + n0(r) + '</td>' +
-        '<td class="num">' + n0(s.colis_traites) + '</td>' +
+        '<td class="num">' + n0(s.colis_recus) + '</td>' +
+        '<td class="num">' + n0(s.colis_livres) + '</td>' +
         '<td class="num">' + n1(s.livres_lb) + '</td>' +
-        '<td class="num">' + n0(s.clients_nouveaux) + '</td>' +
-        '<td class="num">' + n0(s.commandes) + '</td></tr>';
+        '<td class="num">' + n0(s.clients_nouveaux) + '</td></tr>';
     }).join('') +
     '</tbody><tfoot><tr><td>Total · moyenne</td>' +
       '<td class="num">' + n0(som.revenus_gdes) + '<br>' +
         '<span class="ref">' + n0(som.revenus_gdes / serie.length) + '</span></td>' +
       '<td class="num">' + signe(som.resultat_gdes) + n0(som.resultat_gdes) + '<br>' +
         '<span class="ref">' + n0(som.resultat_gdes / serie.length) + '</span></td>' +
-      '<td class="num">' + n0(som.colis_traites) + '<br>' +
-        '<span class="ref">' + n0(som.colis_traites / serie.length) + '</span></td>' +
+      '<td class="num">' + n0(som.colis_recus) + '<br>' +
+        '<span class="ref">' + n0(som.colis_recus / serie.length) + '</span></td>' +
+      '<td class="num">' + n0(som.colis_livres) + '<br>' +
+        '<span class="ref">' + n0(som.colis_livres / serie.length) + '</span></td>' +
       '<td class="num">' + n1(som.livres_lb) + '<br>' +
         '<span class="ref">' + n1(som.livres_lb / serie.length) + '</span></td>' +
       '<td class="num">' + n0(som.clients_nouveaux) + '<br>' +
         '<span class="ref">' + n0(som.clients_nouveaux / serie.length) + '</span></td>' +
-      '<td class="num">' + n0(som.commandes) + '<br>' +
-        '<span class="ref">' + n0(som.commandes / serie.length) + '</span></td>' +
     '</tr></tfoot></table>' +
     '<div style="font-size:8pt;color:#5F7183;margin-top:-2mm">' +
       'Montants en gourdes. Deuxième ligne du total : la moyenne par ' +
-      e(nomPeriode(Per.type).toLowerCase()) + '.</div>';
+      e(nomGran(ev.granularite)) + '.</div>';
 
   h += (Per.data ? noteMethode(Per.data)
                  : '<div class="doc-note"><b>Comment lire ce rapport</b>' +
@@ -2030,7 +2277,7 @@ function imprimerComplet() {
  * incompréhensibles — une action « inconnue », un écran vide. Cette
  * vérification transforme tout ça en une phrase claire.
  */
-var VERSION_ATTENDUE = '2026-11-07.2';
+var VERSION_ATTENDUE = '2026-11-17.1';
 
 function verifierVersion() {
   return api('diag').then(function (d) {

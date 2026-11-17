@@ -13,7 +13,7 @@
       l'appel échoue franchement et l'écran le dit.
    ═══════════════════════════════════════════════════════════════════ */
 
-var VERSION = 'fls-stats-v7';
+var VERSION = 'fls-stats-v8';
 var COQUILLE = [
   './',
   './index.html',
