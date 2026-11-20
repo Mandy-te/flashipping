@@ -3651,12 +3651,42 @@ function enregistrerMode() {
 function modale(titre, html) {
   var dejaOuverte = Nav.modaleOuverte;
   fermerModaleDom();
+
+  /* Le clavier doit disparaître AVANT que la fiche s'ouvre.
+
+     Un élément en position:fixed se cale sur la fenêtre de mise en
+     page, pas sur ce qu'il reste de visible. Clavier ouvert, le
+     panneau — collé en bas — se range donc DERRIÈRE le clavier : rien
+     ne bouge à l'écran, et le bouton passe pour mort. L'onglet Clients
+     donne le focus au champ de recherche en arrivant, donc le clavier
+     est ouvert précisément là où on va chercher l'engrenage. */
+  try {
+    var actif = document.activeElement;
+    if (actif && actif !== document.body && typeof actif.blur === 'function') {
+      actif.blur();
+    }
+  } catch (eb) {}
   var v = document.createElement('div');
   v.className = 'voile'; v.id = 'voile';
   v.innerHTML = '<div class="modale" onclick="event.stopPropagation()">' +
     '<div class="poignee"></div><h3>' + e(titre) + '</h3>' +
     '<div id="corps-modale">' + html + '</div></div>';
-  v.onclick = fermerModale;
+  /* Le geste qui OUVRE ne doit pas refermer.
+
+     Sur mobile, le clic de synthèse qui suit le doigt est remis à
+     l'élément présent sous le point touché AU MOMENT où il part —
+     c'est-à-dire au voile qu'on vient d'insérer. Et comme le panneau
+     est collé en bas, tout le haut de l'écran est du voile : un bouton
+     d'en-tête refermait donc la fiche dans la même fraction de
+     seconde. Symptôme vu par l'agent : « je clique, rien ne se passe ».
+
+     On ignore les clics sur le voile le temps que ce fantôme puisse
+     encore arriver. Fermer au doigt reste possible juste après. */
+  var ouvertA = Date.now();
+  v.onclick = function () {
+    if (Date.now() - ouvertA < 400) return;
+    fermerModale();
+  };
   document.body.appendChild(v);
   document.body.style.overflow = 'hidden';
   Nav.modaleOuverte = true;
