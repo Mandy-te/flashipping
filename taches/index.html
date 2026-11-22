@@ -749,6 +749,9 @@ window.addEventListener('offline', () => S.d && rendre());
 /* ── Ligne de tâche ──────────────────────────────────────────── */
 /** Une tâche de groupe : chacun sa copie, que l'on retrouve sous elle. */
 const estGroupe = t => !!t && t.forme === 'groupe';
+/** Le serveur sait-il confier à plusieurs ? (Code.gs taches-1.2 et plus) */
+const serveurPlusieurs = () => { const v = String((S.d.serveur || {}).version || '').match(/(\d+)\.(\d+)/); return !!v && (+v[1] > 1 || +v[2] >= 2); };
+const exigerServeurPlusieurs = () => { if (serveurPlusieurs()) return true; toast('Le serveur doit être mis à jour (Code.gs taches-1.2) pour confier une tâche à plusieurs personnes.', { erreur: true, duree: 6000 }); return false; };
 const copiesDe = t => S.d.taches.filter(x => x.parent_id === t.tache_id && x.statut !== 'annulee').sort((a, b) => a.ordre - b.ordre);
 const finies = l => l.filter(x => x.statut === 'terminee');
 function pile(ids, faits = [], max = 4) {
@@ -1786,6 +1789,7 @@ function ouvrirCreation(opts = {}) {
       if (etat.mode === 'circuit') {
         lireEtapes();
         const manque = etat.etapes.findIndex(s => !s.titre.trim() || !(s.responsable_id || aPlusieurs(s)));
+        if (etat.etapes.some(aPlusieurs) && !exigerServeurPlusieurs()) { btn.disabled = false; return; }
         if (manque >= 0) { btn.disabled = false; return toast(`Étape ${manque + 1} : il manque ${!etat.etapes[manque].titre.trim() ? 'le titre' : 'la personne'}.`, { erreur: true }); }
         const r = await agir('circuit_creer', { circuit: { titre: v('titre'), description: v('description'), projet_id: v('projet_id'), pilote_id: v('pilote_id'),
           etapes: etat.etapes.map(s => ({ titre: s.titre.trim(), type: s.type, responsable_id: s.responsable_id,
@@ -1808,6 +1812,7 @@ function ouvrirCreation(opts = {}) {
         const qui = personnesChoisies(zr);
         if (!qui.length) { btn.disabled = false; return toast('Choisis au moins une personne.', { erreur: true }); }
         nb = qui.length;
+        if (nb > 1 && !exigerServeurPlusieurs()) { btn.disabled = false; return; }
         if (nb > 1) { champs.responsables = qui; delete champs.responsable_id; } else champs.responsable_id = qui[0];
       }
       if (m) {
