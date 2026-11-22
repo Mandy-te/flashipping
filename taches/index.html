@@ -152,6 +152,20 @@ a{color:var(--bleu)}
 .trajet i.ok{background:var(--vert)}
 .trajet b.ici{background:var(--jaune);box-shadow:0 0 0 3px #fff3c4}
 .trajet small{margin-left:8px;font-size:12px;color:var(--gris)}
+.pile{display:inline-flex;align-items:center;flex:none;padding-left:5px}
+.pile .av{margin-left:-5px;box-shadow:0 0 0 2px #fff;position:relative}
+.pile .av.fait::after{content:"";position:absolute;left:-3px;bottom:-3px;width:9px;height:9px;border-radius:50%;background:var(--vert);box-shadow:0 0 0 2px #fff}
+.pile .plus{margin-left:4px;font-size:11.5px;font-weight:700;color:var(--gris)}
+.avance-g{display:flex;align-items:center;gap:8px;margin-top:7px}
+.avance-g span{flex:1;max-width:140px;height:5px;border-radius:3px;background:#d5dde8;overflow:hidden}
+.avance-g span i{display:block;height:100%;background:var(--vert);border-radius:3px}
+.avance-g small{font-size:12px;color:var(--gris)}
+.puce.perso{padding:4px 12px 4px 4px}
+.raccourcis{display:flex;flex-wrap:wrap;gap:2px 16px;margin-top:8px}
+.raccourcis button{font-size:13px;font-weight:600;color:var(--bleu);padding:4px 0;min-height:30px}
+.membres-etape{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12.5px;color:var(--gris)}
+.carte.groupe .etape .pt::after{display:none}
+.aide:empty{display:none}
 
 /* ── Feuilles (détail, formulaires) ────────────────────── */
 .voile{position:fixed;inset:0;background:rgba(5,20,40,.45);z-index:50;opacity:0;transition:opacity .2s}
@@ -396,6 +410,7 @@ a{color:var(--bleu)}
   <symbol id="i-trombone" viewBox="0 0 24 24"><path d="M20 11.5l-8 8a5 5 0 01-7-7l8.5-8.5a3.3 3.3 0 014.7 4.7L9.7 17.2a1.7 1.7 0 01-2.4-2.4L15 7"/></symbol>
   <symbol id="i-repete" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 017.5 6H19l-3-3M20 13v1.5a3.5 3.5 0 01-3.5 3.5H5l3 3"/></symbol>
   <symbol id="i-drapeau" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+  <symbol id="i-copier" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.2"/><path d="M15.5 8.5V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7.5a2 2 0 002 2h2.5"/></symbol>
   <symbol id="i-lien" viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3.2-3.2a4 4 0 00-5.7-5.7l-1.2 1.2"/><path d="M14 10a4 4 0 00-5.7 0l-3.2 3.2a4 4 0 005.7 5.7l1.2-1.2"/></symbol>
   <symbol id="i-photo" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 015.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0120 8.5v9a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 17.5z"/><circle cx="12" cy="13" r="3.5"/></symbol>
   <symbol id="i-fichier" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
@@ -437,7 +452,7 @@ a{color:var(--bleu)}
    « Flashipping_Taches » est saisie au premier lancement, ou arrive
    par un lien d'invitation : …/taches/?api=IDENTIFIANT_DU_DEPLOIEMENT
    ═══════════════════════════════════════════════════════════════ */
-const VERSION_APP = '1.2.1';
+const VERSION_APP = '1.3.0';
 const MOTIF_API = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/;
 
 const CLE = { jeton: 'fst_jeton', cache: 'fst_cache', dernier: 'fst_dernier', moi: 'fst_moi', api: 'fst_api_url' };
@@ -562,7 +577,7 @@ async function charger(silencieux) {
 
 /** Applique le retour d'une action tout de suite, puis resynchronise en fond. */
 function integrer(r) {
-  const ts = [].concat(r && r.tache ? [r.tache] : [], (r && r.etapes) || [], (r && r.renvoyees) || []);
+  const ts = [].concat(r && r.tache ? [r.tache] : [], (r && r.etapes) || [], (r && r.taches) || [], (r && r.renvoyees) || []);
   ts.forEach(t => {
     const i = S.d.taches.findIndex(x => x.tache_id === t.tache_id);
     if (i >= 0) S.d.taches[i] = t; else S.d.taches.push(t);
@@ -732,13 +747,37 @@ window.addEventListener('online', () => S.d && rendre());
 window.addEventListener('offline', () => S.d && rendre());
 
 /* ── Ligne de tâche ──────────────────────────────────────────── */
+/** Une tâche de groupe : chacun sa copie, que l'on retrouve sous elle. */
+const estGroupe = t => !!t && t.forme === 'groupe';
+const copiesDe = t => S.d.taches.filter(x => x.parent_id === t.tache_id && x.statut !== 'annulee').sort((a, b) => a.ordre - b.ordre);
+const finies = l => l.filter(x => x.statut === 'terminee');
+function pile(ids, faits = [], max = 4) {
+  return `<span class="pile">${ids.slice(0, max).map(id => avatar(id, faits.includes(id) ? 'p fait' : 'p')).join('')}${ids.length > max ? `<span class="plus">+${ids.length - max}</span>` : ''}</span>`;
+}
+function pileGroupe(t) { const c = copiesDe(t); return pile(c.map(x => x.responsable_id), finies(c).map(x => x.responsable_id)); }
+function jaugeGroupe(t) {
+  const c = copiesDe(t), n = c.length, f = finies(c).length;
+  if (!n) return '';
+  return `<div class="avance-g"><span><i style="width:${Math.round(f / n * 100)}%"></i></span><small>${f === n ? 'Tout le monde a fini' : f + ' sur ' + n + ' ont fini'}</small></div>`;
+}
+/** Prénom, ou nom complet si deux membres partagent le prénom. */
+function nomCourt(id) {
+  const p = prenom(id);
+  return S.d.equipe.filter(m => m.actif && prenom(m.user_id) === p).length > 1 ? nomDe(id) : p;
+}
+function resumePersonnes(ids) {
+  return ids.length <= 2 ? ids.map(nomCourt).join(' et ') : nomCourt(ids[0]) + ', ' + nomCourt(ids[1]) + ' et ' + (ids.length - 2) + ' autre' + (ids.length > 3 ? 's' : '');
+}
+
 function trajetMini(t) {
   const etapes = S.d.taches.filter(x => x.parent_id === t.tache_id && x.statut !== 'annulee').sort((a, b) => a.ordre - b.ordre);
   if (!etapes.length) return '';
   const iCour = etapes.findIndex(x => x.statut !== 'terminee');
   return `<div class="trajet" aria-label="${t.nb_sous_terminees} étape(s) sur ${t.nb_sous_taches}">` + etapes.map((x, i) =>
     (i ? `<i class="${x.statut === 'terminee' ? 'ok' : ''}"></i>` : '') + `<b class="${x.statut === 'terminee' ? 'ok' : (i === iCour ? 'ici' : '')}"></b>`).join('')
-    + `<small>${iCour < 0 ? 'Toutes les étapes faites' : 'Étape ' + (iCour + 1) + ' : ' + e(prenom(etapes[iCour].responsable_id))}</small></div>`;
+    + `<small>${iCour < 0 ? 'Toutes les étapes faites' : 'Étape ' + (iCour + 1) + ' : ' + (estGroupe(etapes[iCour])
+      ? finies(copiesDe(etapes[iCour])).length + ' sur ' + copiesDe(etapes[iCour]).length + ' ont fini'
+      : e(prenom(etapes[iCour].responsable_id)))}</small></div>`;
 }
 
 function ligneTache(t, opts = {}) {
@@ -753,7 +792,13 @@ function ligneTache(t, opts = {}) {
   const m = [];
   if (t.echeance) m.push(`<span class="${t.en_retard ? 'retard' : ''}">${ic('cal')}${e(dateCourte(t.echeance))}</span>`);
   if (p && !opts.sansProjet) m.push(`<span class="proj"><i style="background:${e(p.couleur)}"></i>${e(p.nom)}</span>`);
-  if (t.parent_id && tache(t.parent_id) && !opts.sansParent) m.push(`<span>${ic('circuit')}${e(tache(t.parent_id).titre)}</span>`);
+  const par = t.parent_id && tache(t.parent_id);
+  if (estGroupe(par)) {
+    const circ = par.parent_id && tache(par.parent_id);
+    if (circ && !opts.sansParent) m.push(`<span>${ic('circuit')}${e(circ.titre)}</span>`);
+    const n = copiesDe(par).length;
+    if (n > 1) m.push(`<span>${ic('equipe')}avec ${n - 1} autre${n > 2 ? 's' : ''}</span>`);
+  } else if (par && !opts.sansParent) m.push(`<span>${ic('circuit')}${e(par.titre)}</span>`);
   if (t.recurrence_id) m.push(`<span title="${e(libelleRep(recurrence(t.recurrence_id)))}">${ic('repete')}</span>`);
   if (t.nb_preuves) m.push(`<span>${ic('trombone')}${t.nb_preuves}</span>`);
   if (t.priorite === 'haute' || t.priorite === 'urgente') m.push(`<span class="${t.priorite}">${ic('drapeau')}${PRIO[t.priorite]}</span>`);
@@ -765,9 +810,9 @@ function ligneTache(t, opts = {}) {
     <button class="${cls}" data-coche="${e(t.tache_id)}" aria-label="${t.statut === 'terminee' ? 'Terminée' : 'Terminer'} : ${e(t.titre)}">${contenu}</button>
     <div class="corps"><div class="titre">${e(t.titre)}</div>
       ${m.length ? `<div class="meta">${m.join('')}</div>` : ''}
-      ${t.nb_sous_taches ? trajetMini(t) : ''}
+      ${estGroupe(t) ? jaugeGroupe(t) : t.nb_sous_taches ? trajetMini(t) : ''}
     </div>
-    ${montrerAv ? avatar(t.responsable_id) : ''}
+    ${estGroupe(t) ? pileGroupe(t) : montrerAv ? avatar(t.responsable_id) : ''}
   </div>`;
 }
 
@@ -799,8 +844,9 @@ function vueAccueil() {
   let corps = '';
   if (V.perimetre === 'confiees') {
     const parPers = {};
-    confiees.sort(triEcheance).forEach(t => (parPers[t.responsable_id] = parPers[t.responsable_id] || []).push(t));
-    corps = Object.keys(parPers).length ? Object.keys(parPers).map(uid => groupe(e(nomDe(uid)), parPers[uid], { avatar: true })).join('')
+    confiees.filter(t => !estGroupe(t)).sort(triEcheance).forEach(t => (parPers[t.responsable_id] = parPers[t.responsable_id] || []).push(t));
+    corps = confiees.length ? groupe('À plusieurs', confiees.filter(estGroupe).sort(triEcheance))
+      + Object.keys(parPers).map(uid => groupe(e(nomDe(uid)), parPers[uid], { avatar: true })).join('')
       : `<div class="vide">${ic('equipe')}<b>Rien de confié en cours</b>Les tâches et circuits que tu crées pour les autres apparaissent ici, avec leur avancement.</div>`;
   } else {
     const filtre = V.filtre;
@@ -1213,12 +1259,12 @@ function corpsTache(t, fil) {
   const champ = (cle, lib, val, muet) => `<button class="champ ${ed ? 'edit' : ''}" ${ed ? `data-act="editer-champ" data-champ="${cle}" data-id="${e(t.tache_id)}"` : 'disabled style="cursor:default"'}>
     <span class="lib">${lib}</span><span class="val ${muet ? 'muet' : ''}">${val}</span>${ed ? ic('crayon', 'crayon') : ''}</button>`;
   const champs = `<div class="champs">
-    ${champ('responsable_id', 'Responsable', `${avatar(t.responsable_id, 'p')} ${e(nomDe(t.responsable_id))}`)}
+    ${champ('responsable_id', estGroupe(t) ? 'Pilote' : 'Responsable', `${avatar(t.responsable_id, 'p')} ${e(nomDe(t.responsable_id))}`)}
     ${champ('echeance', 'Échéance', t.echeance ? `<span style="${t.en_retard ? 'color:var(--rouge)' : ''}">${e(dateLongue(t.echeance))}</span>` : 'Aucune', !t.echeance)}
     ${champ('projet_id', 'Projet', p ? `<span class="meta" style="margin:0"><span class="proj"><i style="background:${e(p.couleur)}"></i></span></span>${e(p.nom)}` : 'Aucun', !p)}
     ${champ('priorite', 'Priorité', PRIO[t.priorite])}
     ${o || ed ? champ('objectif_id', 'Objectif', o ? e(o.titre) : 'Aucun', !o) : ''}
-    ${champ('preuve_requise', 'Preuve', t.preuve_requise ? 'Demandée pour terminer' : 'Facultative', !t.preuve_requise)}
+    ${(pr => champ('preuve_requise', 'Preuve', pr ? (estGroupe(t) ? 'Demandée à chacun' : 'Demandée pour terminer') : 'Facultative', !pr))(estGroupe(t) ? !!(copiesDe(t)[0] || t).preuve_requise : t.preuve_requise)}
     ${t.depend_de.length || ed ? champ('depend_de', 'Après', t.depend_de.length ? t.depend_de.map(d => e((tache(d) || { titre: d }).titre)).join(', ') : 'Rien', !t.depend_de.length) : ''}
     ${champ('suiveurs', 'Suiveurs', t.suiveurs.length ? t.suiveurs.map(s => avatar(s, 'p')).join('') : 'Personne', !t.suiveurs.length)}
     ${r ? `<div class="champ"><span class="lib">Répétition</span><span class="val">${ic('repete')} ${e(libelleRep(r))}</span></div>` : ''}
@@ -1229,8 +1275,10 @@ function corpsTache(t, fil) {
   const fam = fil ? fil.famille : S.d.taches.filter(x => x.tache_id === t.tache_id || x.parent_id === t.tache_id || (t.parent_id && (x.parent_id === t.parent_id || x.tache_id === t.parent_id)));
   const mereId = t.nb_sous_taches ? t.tache_id : t.parent_id;
   const enfants = fam.filter(x => x.parent_id === mereId).sort((x, y) => x.ordre - y.ordre);
-  if (mereId && enfants.length) {
-    const mere = fam.find(x => x.tache_id === mereId) || tache(mereId);
+  const mereG = mereId && (fam.find(x => x.tache_id === mereId) || tache(mereId));
+  if (mereId && enfants.length && estGroupe(mereG)) etapes = sectionGroupe(t, mereG, enfants.filter(x => x.statut !== 'annulee'), droits, fam);
+  else if (mereId && enfants.length) {
+    const mere = mereG;
     const iCour = enfants.findIndex(x => ouverte(x) && !x.bloquee);
     etapes = `<div class="section"><h4>${ic('circuit')} ${t.nb_sous_taches ? 'Étapes' : 'Circuit « ' + e(mere ? mere.titre : '') + ' »'} <span class="nb">${enfants.filter(x => x.statut === 'terminee').length}/${enfants.length}</span>
       ${droits.gerer && t.nb_sous_taches && ouverte(t) ? `<button class="btn discret" data-act="sous-tache" data-id="${e(t.tache_id)}">${ic('plus')}Ajouter</button>` : ''}
@@ -1238,8 +1286,8 @@ function corpsTache(t, fil) {
       <div class="carte etapes">
       ${enfants.map((x, i) => `<button class="etape ${x.statut === 'terminee' ? 'ok' : x.statut === 'annulee' ? 'annulee' : i === iCour ? 'ici' : ''} ${x.tache_id === t.tache_id ? 'courante' : ''}" data-tache="${e(x.tache_id)}">
         <span class="pt"><b></b></span><span style="flex:1;min-width:0"><div class="t">${e(x.titre)}${x.type === 'validation' ? ' <span class="pil a_risque">validation</span>' : ''}</div>
-        <div class="s">${e(nomDe(x.responsable_id))}${x.echeance ? ' — ' + e(dateCourte(x.echeance)) : ''}${x.statut === 'terminee' ? ' — fait' : x.statut === 'annulee' ? ' — annulée' : x.bloquee ? ' — en attente' : ' — en main'}${x.renvois ? ' — renvoyée ' + x.renvois + ' fois' : ''}</div></span>
-        ${avatar(x.responsable_id, 'p')}</button>`).join('')}
+        <div class="s">${estGroupe(x) ? (c => c.length + ' personnes, ' + finies(c).length + ' ont fini')(fam.filter(y => y.parent_id === x.tache_id && y.statut !== 'annulee')) : e(nomDe(x.responsable_id))}${x.echeance ? ' — ' + e(dateCourte(x.echeance)) : ''}${x.statut === 'terminee' ? ' — fait' : x.statut === 'annulee' ? ' — annulée' : x.bloquee ? ' — en attente' : ' — en main'}${x.renvois ? ' — renvoyée ' + x.renvois + ' fois' : ''}</div></span>
+        ${estGroupe(x) ? (c => pile(c.map(y => y.responsable_id), finies(c).map(y => y.responsable_id), 3))(fam.filter(y => y.parent_id === x.tache_id && y.statut !== 'annulee')) : avatar(x.responsable_id, 'p')}</button>`).join('')}
       ${!t.nb_sous_taches && mere ? `<button class="btn discret" data-tache="${e(mere.tache_id)}" style="margin:2px 8px 6px">${ic('circuit')}Ouvrir le circuit</button>` : ''}</div></div>`;
   }
 
@@ -1275,7 +1323,7 @@ function corpsTache(t, fil) {
   }).join('') : '';
 
   return `<div class="etiquette">
-      <div class="haut"><span class="code">${e(t.tache_id)}</span>${t.type === 'validation' ? '<span>Validation</span>' : t.type === 'jalon' ? '<span>Jalon</span>' : t.nb_sous_taches ? '<span>Circuit</span>' : ''}
+      <div class="haut"><span class="code">${e(t.tache_id)}</span>${t.type === 'validation' ? '<span>Validation</span>' : t.type === 'jalon' ? '<span>Jalon</span>' : estGroupe(t) ? '<span>À plusieurs</span>' : t.nb_sous_taches ? '<span>Circuit</span>' : ''}
         ${t.recurrence_id ? `<span>${ic('repete')}</span>` : ''}<span class="etat ${cls}">${etat}</span></div>
       <h3>${e(t.titre)}</h3>
       <div class="desc ${t.description ? '' : 'vide-desc'}">${t.description ? e(t.description) : (droits.gerer || droits.agir ? 'Pas de description.' : '')}</div>
@@ -1285,6 +1333,91 @@ function corpsTache(t, fil) {
     ${t.type === 'validation' ? aValider + champs : champs + aValider}${etapes}${blocPreuves}${ajoutSous}
     <div class="section"><h4>${ic('bulle')} Activité</h4><div class="carte fil">${fil ? evts || '<p class="aide" style="padding:10px 14px;margin:0">Rien encore.</p>' : '<div class="charge" style="padding:16px"><div class="roue"></div></div>'}</div></div>
     <p class="aide" style="text-align:center;margin:16px">Créée par ${e(nomDe(t.createur_id))}, ${e(quand(t.cree_le))}</p>`;
+}
+
+/** Qui a sa copie, qui a fini : pas d'ordre entre eux, donc pas de fil qui les relie. */
+function sectionGroupe(t, mere, copies, droits, fam) {
+  const f = finies(copies).length, estMere = t.tache_id === mere.tache_id;
+  const circuit = mere.parent_id && (fam.find(x => x.tache_id === mere.parent_id) || tache(mere.parent_id));
+  const etat = x => x.statut === 'terminee' ? (dc => 'a fini ' + (/^\d/.test(dc) ? 'le ' : '') + dc + ' à ' + x.terminee_le.slice(11, 16))(dateCourte(x.terminee_le.slice(0, 10))) : x.statut === 'manquee' ? 'manquée'
+    : x.bloquee ? 'en attente de l\'étape d\'avant' : x.renvois ? 'renvoyée, à refaire' : x.statut === 'en_cours' ? 'en cours' : 'pas encore fait';
+  return `<div class="section"><h4>${ic('equipe')} ${estMere ? 'Co-responsables' : 'Avec ' + (copies.length - 1) + ' autre' + (copies.length > 2 ? 's' : '')} <span class="nb">${f}/${copies.length}</span>
+      ${estMere && droits.gerer && ouverte(t) ? `<button class="btn discret" data-act="ajouter-coresp" data-id="${e(mere.tache_id)}">${ic('plus')}Ajouter</button>` : ''}</h4>
+    <div class="carte etapes groupe">${copies.map(x => `<button class="etape ${x.statut === 'terminee' ? 'ok' : ''} ${x.tache_id === t.tache_id ? 'courante' : ''}" data-tache="${e(x.tache_id)}">
+        <span class="pt"><b></b></span><span style="flex:1;min-width:0"><div class="t">${e(nomDe(x.responsable_id))}${x.responsable_id === moi().user_id ? ' (moi)' : ''}</div>
+        <div class="s">${e(etat(x))}${x.nb_preuves ? ' — ' + x.nb_preuves + ' preuve' + (x.nb_preuves > 1 ? 's' : '') : ''}</div></span>${avatar(x.responsable_id, 'p')}</button>`).join('')}
+      ${!estMere ? `<button class="btn discret" data-tache="${e(mere.tache_id)}" style="margin:2px 8px 6px">${ic('equipe')}Voir la tâche de groupe</button>` : ''}
+      ${circuit ? `<button class="btn discret" data-tache="${e(circuit.tache_id)}" style="margin:2px 8px 6px">${ic('circuit')}Ouvrir le circuit « ${e(circuit.titre)} »</button>` : ''}</div>
+    ${estMere && ouverte(t) ? '<p class="aide" style="margin:6px 4px 0">Chacun coche sa propre copie et y joint sa preuve. Celle-ci se termine toute seule quand tout le monde a fini.</p>' : ''}</div>`;
+}
+
+async function ajouterCoresp(id) {
+  const g = tache(id); if (!g) return;
+  const copies = copiesDe(g), ref = copies[0] || g;
+  const qui = await choisirPersonnes('Ajouter des co-responsables', [], { exclure: copies.map(x => x.responsable_id), ok: 'Ajouter',
+    texte: 'Chaque personne ajoutée reçoit sa copie de « ' + g.titre + ' », avec la même échéance.' });
+  if (!qui) return;
+  try {
+    for (const uid of qui) {
+      integrer(await api('tache_creer', { tache: { titre: g.titre, description: g.description, priorite: g.priorite, echeance: g.echeance,
+        preuve_requise: ref.preuve_requise, projet_id: g.projet_id, objectif_id: g.objectif_id, parent_id: g.tache_id,
+        responsable_id: uid, depend_de: ref.depend_de || [] } }));
+    }
+    toast(qui.length > 1 ? qui.length + ' personnes ajoutées' : nomCourt(qui[0]) + ' est ajouté');
+  } catch (x) { toast(x.message, { erreur: true }); }
+}
+
+/* ── Choisir une ou plusieurs personnes ─────────────────────── */
+function selecteurPersonnes(sel, opts = {}) {
+  const actifs = S.d.equipe.filter(m => m.actif && !(opts.exclure || []).includes(m.user_id));
+  const employes = actifs.some(m => m.niveau === 'employe');
+  return `<div class="puces" data-personnes>${actifs.map(m => `<button type="button" class="puce perso" data-u="${e(m.user_id)}" aria-pressed="${sel.includes(m.user_id)}">${avatar(m.user_id, 'p')}${e(nomCourt(m.user_id))}${m.user_id === moi().user_id ? ' (moi)' : ''}</button>`).join('')}</div>
+    <div class="raccourcis"><button type="button" data-tous="associes">Tous les associés</button>${employes ? '<button type="button" data-tous="equipe">Toute l\'équipe</button>' : ''}<button type="button" data-tous="aucun">Personne</button></div>`;
+}
+function cliquerSelecteur(b, zone) {
+  if (b.closest('[data-personnes]')) { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); return true; }
+  if (!b.dataset.tous) return false;
+  zone.querySelectorAll('[data-personnes] .puce').forEach(p => {
+    const m = membre(p.dataset.u);
+    p.setAttribute('aria-pressed', b.dataset.tous === 'equipe' || (b.dataset.tous === 'associes' && !!m && m.niveau !== 'employe'));
+  });
+  return true;
+}
+const personnesChoisies = zone => [...zone.querySelectorAll('[data-personnes] [aria-pressed=true]')].map(x => x.dataset.u);
+function choisirPersonnes(titre, sel = [], opts = {}) {
+  return new Promise(res => {
+    let fini = false;
+    const c = ouvrirCalque(`${teteCalque(titre)}<div class="feuille-corps"><div class="form" id="cp">
+      ${opts.texte ? `<p style="margin:0;color:var(--gris)">${e(opts.texte)}</p>` : ''}<div>${selecteurPersonnes(sel, opts)}</div></div></div>
+      <div class="feuille-pied"><button class="btn" data-act="fermer" style="flex:1">Annuler</button><button class="btn primaire" id="cp-ok" style="flex:2">${e(opts.ok || 'Valider')}</button></div>`,
+      { etroite: true, apres: () => { if (!fini) res(null); } });
+    const z = $('#cp', c.f);
+    z.onclick = ev => { const b = ev.target.closest('button'); if (b) cliquerSelecteur(b, z); };
+    $('#cp-ok', c.f).onclick = () => {
+      const v = personnesChoisies(z);
+      if (!v.length) return toast('Choisis au moins une personne.', { erreur: true });
+      fini = true; res(v); fermerCalque();
+    };
+  });
+}
+
+/** Repartir d'une tâche existante : même contenu, mêmes personnes, à ajuster avant de créer. */
+function dupliquer(t) {
+  const a = auj(), garde = d => (d && d >= a ? d : '');
+  if (t.forme === 'circuit' && direction()) {
+    const etapes = copiesDe(t).map(x => {
+      const cop = estGroupe(x) ? copiesDe(x) : [];
+      return { titre: x.titre, type: x.type, echeance: garde(x.echeance), preuve_requise: !!(cop[0] || x).preuve_requise,
+        responsable_id: cop.length > 1 ? '' : (cop[0] || x).responsable_id, responsables: cop.length > 1 ? cop.map(y => y.responsable_id) : null };
+    });
+    return ouvrirCreation({ mode: 'circuit', etapes, titreCalque: 'Dupliquer le circuit',
+      copie: { titre: t.titre, description: t.description, projet_id: t.projet_id || '', pilote_id: t.responsable_id } });
+  }
+  const cop = estGroupe(t) ? copiesDe(t) : [];
+  ouvrirCreation({ titreCalque: 'Dupliquer la tâche', copie: {
+    titre: t.titre, description: t.description, priorite: t.priorite, projet_id: t.projet_id || '', objectif_id: t.objectif_id || '',
+    echeance: garde(t.echeance), preuve_requise: !!(cop[0] || t).preuve_requise, suiveurs: t.suiveurs || [], depend_de: [],
+    responsables: cop.length ? cop.map(x => x.responsable_id) : [t.responsable_id] } });
 }
 
 function vignette(p) {
@@ -1417,7 +1550,8 @@ function menuTache(ancre, id) {
   const d = fil ? fil.droits : { gerer: false, agir: false };
   menu(ancre, [
     d.gerer && ouverte(t) && { ic: 'crayon', lib: 'Modifier la tâche', fn: () => ouvrirCreation({ modifier: t }) },
-    d.gerer && ouverte(t) && !t.parent_id && !t.recurrence_id && { ic: 'plus', lib: 'Ajouter une sous-tâche', fn: () => ouvrirCreation({ parent: t }) },
+    d.gerer && ouverte(t) && !t.parent_id && !t.recurrence_id && !estGroupe(t) && { ic: 'plus', lib: 'Ajouter une sous-tâche', fn: () => ouvrirCreation({ parent: t }) },
+    d.gerer && ouverte(t) && estGroupe(t) && { ic: 'equipe', lib: 'Ajouter des co-responsables', fn: () => ajouterCoresp(t.tache_id) },
     t.responsable_id !== moi().user_id && ouverte(t) && { ic: 'whatsapp', lib: 'Relancer sur WhatsApp', fn: () => relancerWhatsapp(t) },
     (d.agir || d.gerer) && ouverte(t) && t.statut === 'en_cours' && { ic: 'pause', lib: 'Remettre à faire', fn: async () => { try { integrer(await agir('tache_statut', { tache_id: id, statut: 'a_faire' })); } catch (x) {} } },
     (d.agir || d.gerer) && (t.statut === 'terminee' || t.statut === 'manquee') && { ic: 'renvoi', lib: 'Rouvrir', fn: () => rouvrir(id) },
@@ -1425,6 +1559,7 @@ function menuTache(ancre, id) {
       const motif = await demander('Annuler la tâche', { champ: true, texte: t.nb_sous_taches ? 'Les étapes encore ouvertes seront annulées aussi. Le travail déjà fait reste enregistré.' : 'Elle reste visible, marquée annulée.', placeholder: 'Pourquoi ?', ok: 'Annuler la tâche', ton: 'rouge-txt', requis: 'Indique pourquoi.' });
       if (motif) try { integrer(await agir('tache_annuler', { tache_id: id, motif }, 'Tâche annulée')); } catch (x) {}
     } },
+    { ic: 'copier', lib: t.forme === 'circuit' && direction() ? 'Dupliquer le circuit' : 'Dupliquer', fn: () => dupliquer(t) },
     { ic: 'lien', lib: 'Copier le code ' + id, fn: () => { try { navigator.clipboard.writeText(id); toast('Code copié'); } catch (x) {} } }
   ]);
 }
@@ -1457,14 +1592,18 @@ function ouvrirCreation(opts = {}) {
   const seulMoi = moi().niveau === 'employe';
   const mode = opts.mode || 'tache';
   const parent = opts.parent;
-  const titreCalque = m ? 'Modifier la tâche' : parent ? 'Sous-tâche de « ' + parent.titre + ' »' : 'Nouvelle tâche';
+  const titreCalque = opts.titreCalque || (m ? 'Modifier la tâche' : parent ? 'Sous-tâche de « ' + parent.titre + ' »' : 'Nouvelle tâche');
+  // Plusieurs responsables à la création ; en modification, une tâche garde son responsable (le pilote pour un groupe).
+  const multi = !m && !seulMoi;
+  const base = m && estGroupe(m) ? Object.assign({}, m, { preuve_requise: !!(copiesDe(m)[0] || m).preuve_requise }) : m;
   const ongletsMode = !m && !parent && direction() ? `<div class="segments" style="margin:12px 14px 0">
       <button type="button" data-mode="tache" aria-pressed="${mode === 'tache'}">Tâche</button>
       <button type="button" data-mode="circuit" aria-pressed="${mode === 'circuit'}">Circuit à étapes</button></div>` : '';
   const c = ouvrirCalque(`${teteCalque(titreCalque)}${ongletsMode}<div class="feuille-corps"><form class="form" id="fc" autocomplete="off"></form></div>
-    <div class="feuille-pied"><button class="btn" data-act="fermer" style="flex:1">Annuler</button><button class="btn primaire" id="fc-ok" style="flex:2">${m ? 'Enregistrer' : 'Créer'}</button></div>`,
+    <div class="feuille-pied"><button class="btn" data-act="fermer" style="flex:1">Annuler</button><button class="btn primaire" id="fc-ok" style="flex:2">${m ? 'Enregistrer' : mode === 'circuit' ? 'Lancer le circuit' : 'Créer'}</button></div>`,
     { pleine: innerWidth < 960 });
-  const etat = { mode, rep: 'non', jours: [1, 2, 3, 4, 5, 6], jourSem: 5, jourMois: '1', etapes: null, modele: '' };
+  const etat = { mode, rep: 'non', jours: [1, 2, 3, 4, 5, 6], jourSem: 5, jourMois: '1', etapes: opts.etapes || null, modele: '',
+    b: opts.copie ? Object.assign({}, opts.copie) : undefined };
   const form = $('#fc', c.f);
 
   /** Garde ce qui a été saisi quand le formulaire se redessine. */
@@ -1477,16 +1616,28 @@ function ouvrirCreation(opts = {}) {
     const sw = form.querySelector('[data-switch=preuve_requise]'); if (sw) b.preuve_requise = sw.getAttribute('aria-checked') === 'true';
     const dep = form.querySelector('[name=depend_de]'); if (dep) b.depend_de = [...dep.selectedOptions].map(o => o.value);
     const su = form.querySelector('[data-suiveurs]'); if (su) b.suiveurs = [...su.querySelectorAll('[aria-pressed=true]')].map(x => x.dataset.u);
+    const zr = form.querySelector('[data-zone-resp]'); if (zr) b.responsables = personnesChoisies(zr);
+  }
+
+  function majAideResp() {
+    const z = form.querySelector('[data-zone-resp]'); if (!z) return;
+    const n = personnesChoisies(z).length;
+    z.querySelector('.l').textContent = n > 1 ? 'Responsables (' + n + ')' : 'Responsable';
+    z.querySelector('[data-aide-resp]').textContent = !n ? 'Choisis au moins une personne.' : n === 1 ? ''
+      : etat.rep !== 'non' ? 'Chacun aura sa propre tâche répétitive, à cocher de son côté.'
+      : 'Chacun reçoit sa propre copie, la coche et y joint sa preuve. Tu vois qui a fini, et la tâche se termine quand tout le monde a fini.';
   }
 
   function dessiner() {
     if (etat.mode === 'circuit') return dessinerCircuit();
-    const t = Object.assign({}, m || {}, etat.b || {});
+    const t = Object.assign({}, base || {}, etat.b || {});
     const rep = etat.rep;
+    const resp = t.responsables || [t.responsable_id || opts.responsable || moi().user_id];
     form.innerHTML = `
       <input class="inp titre" name="titre" placeholder="Ce qu'il faut faire" value="${e(t.titre || '')}" maxlength="200" autofocus>
       <div><label class="l" for="fc-desc">Description</label><textarea id="fc-desc" name="description" placeholder="Détails, consignes, contacts…">${e(t.description || '')}</textarea></div>
-      <div><label class="l" for="fc-resp">Responsable</label><select id="fc-resp" name="responsable_id" ${seulMoi ? 'disabled' : ''}>${optionsMembres(t.responsable_id || opts.responsable || moi().user_id, seulMoi)}</select></div>
+      ${multi ? `<div data-zone-resp><span class="l">Responsable</span>${selecteurPersonnes(resp)}<p class="aide" data-aide-resp></p></div>`
+        : `<div><label class="l" for="fc-resp">${m && estGroupe(m) ? 'Pilote' : 'Responsable'}</label><select id="fc-resp" name="responsable_id" ${seulMoi ? 'disabled' : ''}>${optionsMembres(t.responsable_id || opts.responsable || moi().user_id, seulMoi)}</select></div>`}
       ${rep === 'non' || m ? `<div><span class="l">Échéance</span>${puceDates('echeance', t.echeance || (parent ? parent.echeance : '') || '')}</div>` : ''}
       ${!m && !parent ? `<div><label class="l" for="fc-rep">Répéter</label><select id="fc-rep" name="rep">
         <option value="non" ${rep === 'non' ? 'selected' : ''}>Ne pas répéter</option><option value="jour" ${rep === 'jour' ? 'selected' : ''}>Chaque jour</option>
@@ -1505,7 +1656,8 @@ function ouvrirCreation(opts = {}) {
         ${S.d.taches.filter(x => ouverte(x) && x.tache_id !== t.tache_id && !x.recurrence_id).sort(triEcheance).slice(0, 150).map(x => `<option value="${e(x.tache_id)}" ${(t.depend_de || []).includes(x.tache_id) ? 'selected' : ''}>${e(x.titre)} — ${e(prenom(x.responsable_id))}</option>`).join('')}</select>
         <p class="aide">La tâche reste en attente tant que celles-ci ne sont pas terminées.</p></div>` : ''}
       ${!seulMoi ? `<div><span class="l">Suiveurs (prévenus de l'avancement)</span><div class="puces" data-suiveurs>${S.d.equipe.filter(x => x.actif).map(x => `<button type="button" class="puce" data-u="${e(x.user_id)}" aria-pressed="${(t.suiveurs || []).includes(x.user_id)}">${e(prenom(x.user_id))}</button>`).join('')}</div></div>` : ''}
-      ${m ? `<p class="aide">Chaque changement est inscrit dans l'activité de la tâche.</p>` : ''}`;
+      ${m ? `<p class="aide">${estGroupe(m) ? 'Titre, consignes, échéance, priorité et preuve s\'appliquent aussi aux copies de chacun encore ouvertes. ' : ''}Chaque changement est inscrit dans l'activité de la tâche.</p>` : ''}`;
+    majAideResp();
   }
 
   function dessinerCircuit() {
@@ -1518,7 +1670,7 @@ function ouvrirCreation(opts = {}) {
         <div class="etape-form ${s.type}" data-i="${i}"><span class="num">${i + 1}</span>
           <input class="inp" data-k="titre" value="${e(s.titre)}" placeholder="${i === 0 ? 'Ex. Concevoir le flyer' : s.type === 'validation' ? 'Ex. Valider le flyer' : 'Ex. Publier le flyer'}" style="font-weight:600">
           <div class="rangee" style="margin-top:8px">
-            <select data-k="responsable_id" aria-label="Responsable de l'étape ${i + 1}"><option value="">Qui ?</option>${optionsMembres(s.responsable_id)}</select>
+            <select data-k="responsable_id" aria-label="Responsable de l'étape ${i + 1}">${optionsEtape(s)}</select>
             <input type="date" class="inp" data-k="echeance" value="${e(s.echeance)}" aria-label="Échéance de l'étape ${i + 1}">
           </div>
           <div class="puces" style="margin-top:8px">
@@ -1526,6 +1678,7 @@ function ouvrirCreation(opts = {}) {
             ${i > 0 ? `<button type="button" class="puce" data-type="validation" aria-pressed="${s.type === 'validation'}">${ic('feu')}Validation</button>` : ''}
             ${s.type !== 'validation' ? `<button type="button" class="puce" data-preuve aria-pressed="${!!s.preuve_requise}">${ic('trombone')}Preuve demandée</button>` : ''}
           </div>
+          ${aPlusieurs(s) ? `<div class="membres-etape">${pile(s.responsables, [], 5)}<span>Chacun fait sa part ; l'étape suivante s'ouvre quand tous ont fini.</span></div>` : ''}
           ${s.type === 'validation' ? '<p class="aide">Le validateur voit les preuves de l\'étape d\'avant, donne le feu vert ou renvoie avec un motif.</p>' : ''}
           <div class="outils">
             ${i > 0 ? `<button type="button" class="btn-ic" data-monter="${i}" aria-label="Monter" style="color:var(--gris)">${ic('haut')}</button>` : ''}
@@ -1541,19 +1694,30 @@ function ouvrirCreation(opts = {}) {
       <div><label class="l" for="fc-desc">Consignes générales</label><textarea id="fc-desc" name="description" placeholder="Le brief, les contraintes, les contacts…">${e(b.description || '')}</textarea></div>
       ${interrupteur('enregistrer_modele', etat.sauver, 'Enregistrer comme modèle', 'Pour relancer ce circuit en deux gestes la prochaine fois.')}
       ${etat.sauver ? `<input class="inp" name="nom_modele" placeholder="Nom du modèle (ex. Flyer)" value="${e(etat.nomModele || '')}">` : ''}
-      <p class="aide">Chaque étape s'ouvre quand la précédente est terminée. Le circuit se clôt tout seul à la dernière étape.</p>`;
+      <p class="aide">Chaque étape s'ouvre quand la précédente est terminée. Le circuit se clôt tout seul à la dernière étape. Pour confier une étape à plusieurs personnes, choisis « Plusieurs personnes… ».</p>`;
+  }
+  function aPlusieurs(s) { return !!(s.responsables && s.responsables.length > 1); }
+  function optionsEtape(s) {
+    return `<option value="">Qui ?</option>${aPlusieurs(s) ? `<option value="__groupe" selected>${e(resumePersonnes(s.responsables))}</option>` : ''}`
+      + optionsMembres(aPlusieurs(s) ? '' : s.responsable_id)
+      + (s.type !== 'validation' ? `<option value="__plusieurs">Plusieurs personnes…</option>` : '');
   }
 
   function lireEtapes() {
     capturer();
     form.querySelectorAll('.etape-form').forEach(el => {
       const s = etat.etapes[+el.dataset.i];
-      el.querySelectorAll('[data-k]').forEach(i => { s[i.dataset.k] = i.value; });
+      el.querySelectorAll('[data-k]').forEach(i => {
+        if (i.dataset.k !== 'responsable_id') { s[i.dataset.k] = i.value; return; }
+        if (i.value === '__groupe' || i.value === '__plusieurs') return;
+        s.responsable_id = i.value; s.responsables = null;
+      });
     });
     const nm = form.querySelector('[name=nom_modele]'); if (nm) etat.nomModele = nm.value;
   }
 
   dessiner();
+  if (opts.copie) setTimeout(() => { const ti = form.querySelector('[name=titre]'); if (ti) { ti.focus(); ti.select(); } }, 80);
   const onglets = c.f.querySelector('.segments');
   if (onglets) onglets.onclick = ev => {
     const b = ev.target.closest('[data-mode]'); if (!b) return;
@@ -1564,6 +1728,14 @@ function ouvrirCreation(opts = {}) {
     dessiner();
   };
   form.onchange = ev => {
+    if (ev.target.dataset.k === 'responsable_id' && ev.target.value === '__plusieurs') {
+      lireEtapes();
+      const i = +ev.target.closest('.etape-form').dataset.i, s = etat.etapes[i];
+      const avant = aPlusieurs(s) ? s.responsables : s.responsable_id ? [s.responsable_id] : [];
+      choisirPersonnes('Étape ' + (i + 1) + ' : qui la fait ?', avant, { texte: 'Chacun recevra sa propre copie de l\'étape, à cocher avec sa preuve. L\'étape suivante s\'ouvre quand tout le monde a fini.' })
+        .then(qui => { if (qui) { s.responsables = qui.length > 1 ? qui : null; s.responsable_id = qui.length > 1 ? '' : qui[0]; } dessiner(); });
+      return;
+    }
     const n = ev.target.name;
     if (n === 'rep') { capturer(); etat.rep = ev.target.value; dessiner(); }
     if (n === 'jour_mois') etat.jourMois = ev.target.value;
@@ -1579,6 +1751,7 @@ function ouvrirCreation(opts = {}) {
     }
     if (b.closest('[data-jours]')) { const j = +b.dataset.j; etat.jours = etat.jours.includes(j) ? etat.jours.filter(x => x !== j) : etat.jours.concat(j); b.setAttribute('aria-pressed', etat.jours.includes(j)); return; }
     if (b.closest('[data-jsem]')) { etat.jourSem = +b.dataset.j; b.parentElement.querySelectorAll('.puce').forEach(p => p.setAttribute('aria-pressed', p === b)); return; }
+    if (b.closest('[data-zone-resp]') && cliquerSelecteur(b, b.closest('[data-zone-resp]'))) { majAideResp(); return; }
     if (b.closest('[data-suiveurs]')) { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); return; }
     if (etat.mode !== 'circuit') return;
     lireEtapes();
@@ -1588,12 +1761,13 @@ function ouvrirCreation(opts = {}) {
       const a = auj();
       etat.etapes = md.etapes.map((s, i) => ({ titre: s.titre, type: s.type, preuve_requise: !!s.preuve_requise,
         responsable_id: (etat.etapes[i] && etat.etapes[i].responsable_id) || (s.type === 'validation' ? moi().user_id : ''),
+        responsables: s.type !== 'validation' && etat.etapes[i] && aPlusieurs(etat.etapes[i]) ? etat.etapes[i].responsables : null,
         echeance: s.delai === null || s.delai === undefined ? '' : dj(jn(a) + s.delai) }));
       if (!etat.b.titre) etat.b.titre = md.nom;
       return dessiner();
     }
     const fe = b.closest('.etape-form'); const i = fe ? +fe.dataset.i : -1;
-    if (b.dataset.type) { etat.etapes[i].type = b.dataset.type; if (b.dataset.type === 'validation') etat.etapes[i].preuve_requise = false; return dessiner(); }
+    if (b.dataset.type) { etat.etapes[i].type = b.dataset.type; if (b.dataset.type === 'validation') { etat.etapes[i].preuve_requise = false; etat.etapes[i].responsables = null; } return dessiner(); }
     if ('preuve' in b.dataset) { etat.etapes[i].preuve_requise = !etat.etapes[i].preuve_requise; return dessiner(); }
     if (b.dataset.monter) { const k = +b.dataset.monter; [etat.etapes[k - 1], etat.etapes[k]] = [etat.etapes[k], etat.etapes[k - 1]]; if (etat.etapes[0].type === 'validation') etat.etapes[0].type = 'tache'; return dessiner(); }
     if (b.dataset.descendre) { const k = +b.dataset.descendre; [etat.etapes[k + 1], etat.etapes[k]] = [etat.etapes[k], etat.etapes[k + 1]]; if (etat.etapes[0].type === 'validation') etat.etapes[0].type = 'tache'; return dessiner(); }
@@ -1611,11 +1785,13 @@ function ouvrirCreation(opts = {}) {
     try {
       if (etat.mode === 'circuit') {
         lireEtapes();
-        const manque = etat.etapes.findIndex(s => !s.titre.trim() || !s.responsable_id);
+        const manque = etat.etapes.findIndex(s => !s.titre.trim() || !(s.responsable_id || aPlusieurs(s)));
         if (manque >= 0) { btn.disabled = false; return toast(`Étape ${manque + 1} : il manque ${!etat.etapes[manque].titre.trim() ? 'le titre' : 'la personne'}.`, { erreur: true }); }
         const r = await agir('circuit_creer', { circuit: { titre: v('titre'), description: v('description'), projet_id: v('projet_id'), pilote_id: v('pilote_id'),
-          etapes: etat.etapes.map(s => ({ titre: s.titre.trim(), type: s.type, responsable_id: s.responsable_id, echeance: s.echeance, preuve_requise: s.preuve_requise })),
-          enregistrer_modele: sw('enregistrer_modele'), nom_modele: v('nom_modele') } }, 'Circuit lancé : ' + prenom(etat.etapes[0].responsable_id) + ' est prévenu');
+          etapes: etat.etapes.map(s => ({ titre: s.titre.trim(), type: s.type, responsable_id: s.responsable_id,
+            responsables: aPlusieurs(s) ? s.responsables : undefined, echeance: s.echeance, preuve_requise: s.preuve_requise })),
+          enregistrer_modele: sw('enregistrer_modele'), nom_modele: v('nom_modele') } },
+          'Circuit lancé : ' + (aPlusieurs(etat.etapes[0]) ? etat.etapes[0].responsables.length + ' personnes sont prévenues' : prenom(etat.etapes[0].responsable_id) + ' est prévenu'));
         fermerCalque(); integrer(r);
         return;
       }
@@ -1626,9 +1802,17 @@ function ouvrirCreation(opts = {}) {
       if (form.querySelector('[name=echeance]')) champs.echeance = v('echeance');
       const dep = form.querySelector('[name=depend_de]');
       if (dep) champs.depend_de = [...dep.selectedOptions].map(o => o.value);
+      const zr = form.querySelector('[data-zone-resp]');
+      let nb = 1;
+      if (zr) {
+        const qui = personnesChoisies(zr);
+        if (!qui.length) { btn.disabled = false; return toast('Choisis au moins une personne.', { erreur: true }); }
+        nb = qui.length;
+        if (nb > 1) { champs.responsables = qui; delete champs.responsable_id; } else champs.responsable_id = qui[0];
+      }
       if (m) {
         const diff = {};
-        Object.keys(champs).forEach(k => { if (JSON.stringify(champs[k] ?? '') !== JSON.stringify(m[k] ?? '')) diff[k] = champs[k]; });
+        Object.keys(champs).forEach(k => { if (JSON.stringify(champs[k] ?? '') !== JSON.stringify(base[k] ?? '')) diff[k] = champs[k]; });
         if (!Object.keys(diff).length) { fermerCalque(); return; }
         const r = await agir('tache_modifier', { tache_id: m.tache_id, champs: diff }, 'Enregistré');
         fermerCalque(); integrer(r);
@@ -1640,8 +1824,10 @@ function ouvrirCreation(opts = {}) {
         donnees.repetition = { frequence: etat.rep, jours: etat.rep === 'jour' ? etat.jours : etat.rep === 'semaine' ? etat.jourSem : etat.jourMois };
         delete champs.depend_de;
       }
-      const r = await agir('tache_creer', donnees, etat.rep !== 'non' ? 'Tâche répétitive créée' : 'Tâche créée');
+      const r = await agir('tache_creer', donnees, nb > 1 ? (etat.rep !== 'non' ? nb + ' tâches répétitives créées, une par personne' : 'Confiée à ' + nb + ' personnes')
+        : etat.rep !== 'non' ? 'Tâche répétitive créée' : 'Tâche créée');
       if (r.recurrence) { S.d.recurrences.push(r.recurrence); if (!r.tache) toast('Répétition enregistrée : la première tâche apparaîtra à sa période.', { duree: 4500 }); }
+      if (r.recurrences) { S.d.recurrences.push(...r.recurrences); if (!r.taches.length) toast('Répétitions enregistrées : les premières tâches apparaîtront à leur période.', { duree: 4500 }); }
       fermerCalque(); integrer(r);
     } catch (x) { btn.disabled = false; }
   };
@@ -1912,6 +2098,7 @@ document.addEventListener('click', async ev => {
       case 'menu-tache': return menuTache(a, id);
       case 'editer-champ': return editerChamp(id);
       case 'sous-tache': return ouvrirCreation({ parent: tache(id) });
+      case 'ajouter-coresp': return ajouterCoresp(id);
       case 'preuve-photo': return joindre(id, 'photo');
       case 'preuve-fichier': return joindre(id, 'fichier');
       case 'preuve-lien': return joindre(id, 'lien');

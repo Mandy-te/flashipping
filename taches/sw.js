@@ -9,7 +9,7 @@
    Incrémente VERSION à chaque mise en ligne, sinon les téléphones
    gardent l'ancienne version.
    ═══════════════════════════════════════════════════════════════════ */
-const VERSION = 'taches-1.2.1';
+const VERSION = 'taches-1.3.0';
 const COQUILLE = ['./', './index.html', './manifest.webmanifest', './icone-192.png', './icone-512.png', './icone-masquable-512.png'];
 
 self.addEventListener('install', ev => {
