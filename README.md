@@ -8,6 +8,10 @@ Google Sheets. Chacune colle la même URL `/exec` à son premier lancement.
 | `logistique/` | scan, réception, suivi, livraison, facturation | marine | mouvements mis en file d'attente |
 | `commandes/` | achat par procuration, dépôts, marges | ambre | non — tout touche la caisse |
 | `finance/` | comptabilité, parts des associés, clôtures | vert | non — tout touche la caisse |
+| `taches/` | tâches de l'équipe, circuits de validation, objectifs | marine et jaune | lecture de la dernière version chargée |
+
+`taches/` a **son propre** projet Apps Script (`Flashipping_Taches`) et
+donc sa propre URL `/exec` : voir `taches/README.md`.
 
 ## Mise en ligne
 
