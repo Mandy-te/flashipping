@@ -437,7 +437,7 @@ a{color:var(--bleu)}
    « Flashipping_Taches » est saisie au premier lancement, ou arrive
    par un lien d'invitation : …/taches/?api=IDENTIFIANT_DU_DEPLOIEMENT
    ═══════════════════════════════════════════════════════════════ */
-const VERSION_APP = '1.2';
+const VERSION_APP = '1.2.1';
 const MOTIF_API = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/;
 
 const CLE = { jeton: 'fst_jeton', cache: 'fst_cache', dernier: 'fst_dernier', moi: 'fst_moi', api: 'fst_api_url' };
@@ -933,13 +933,15 @@ function anneau(o) {
   const c = { a_risque: '#e0a400', en_retard: 'var(--rouge)', atteint: 'var(--bleu)', abandonne: '#aaa' }[o.etat] || 'var(--vert)';
   return `<div class="anneau" style="--p:${o.progression};--ca:${c}"><span>${o.progression}%</span></div>`;
 }
+/** Un objectif qui n'a pas commencé n'est ni en bonne voie ni en retard : il est à venir. */
+function aVenir(o) { return !!o.debut && o.debut > auj() && !o.dernier_point; }
 function carteObjectif(o, enfant) {
   const mesure = o.mesure === 'valeur' ? `${e(o.valeur_actuelle || 0)} / ${e(o.cible)} ${e(o.unite || '')}`
     : o.mesure === 'sous_objectifs' ? 'Moyenne des sous-objectifs' : `${o.nb_terminees} / ${o.nb_taches} tâches`;
   return `<button class="obj ${enfant ? 'enfant' : ''}" data-objectif="${e(o.objectif_id)}">
     ${anneau(o)}
     <div style="min-width:0;flex:1"><h3>${e(o.titre)}</h3>
-      <div class="s"><span class="pil ${o.etat}">${ETATS_O[o.etat]}</span><span>${e(mesure)}</span>
+      <div class="s">${aVenir(o) ? `<span class="pil abandonne">À venir, dès ${e(dateCourte(o.debut))}</span>` : `<span class="pil ${o.etat}">${ETATS_O[o.etat]}</span>`}<span>${e(mesure)}</span>
       ${o.fin ? `<span>${ic('cal')} ${e(dateCourte(o.fin))}</span>` : ''}</div>
       <div class="s">${avatar(o.responsable_id, 'p')} ${e(nomDe(o.responsable_id))}</div>
     </div></button>`;
