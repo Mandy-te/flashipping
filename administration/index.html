@@ -2882,6 +2882,9 @@ function ouvrirReglages() {
     (peutTextes()
       ? '<button class="btn vide" onclick="ouvrirTextes()">' +
         '📝 Textes et mentions</button>' : '') +
+    (peutSauvegarder()
+      ? '<button class="btn vide" onclick="ouvrirSauvegardes()">' +
+        '💾 Sauvegarde de la base</button>' : '') +
     '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
@@ -2918,6 +2921,184 @@ function appsDuRole() {
   var out = [];
   Object.keys(noms).forEach(function (k) { if (a[k]) out.push(noms[k]); });
   return out.length ? out.join(' · ') : 'aucune';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  SAUVEGARDE DE LA BASE — le super administrateur seul
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Une copie complète du classeur, d'un bouton.
+ *
+ * La copie existait déjà, mais seulement dans l'éditeur Apps Script :
+ * il fallait un ordinateur, l'éditeur ouvert et le nom exact de la
+ * fonction. Une sauvegarde qui demande tout ça ne se fait pas. Le
+ * serveur vérifie le droit `administrer` de son côté ; ici, on évite
+ * seulement de montrer la porte à ceux qui ne l'ont pas.
+ */
+var Sauv = { enCours: false };
+
+function peutSauvegarder() {
+  return !!(Etat.user && Etat.user.droits && Etat.user.droits.administrer);
+}
+
+function ouvrirSauvegardes() {
+  if (!peutSauvegarder()) { toast('Réservé au super administrateur.', 'ko'); return; }
+  modale('Sauvegarde de la base',
+         '<div id="sauv-zone">' + chargement('Sauvegardes…') + '</div>');
+  chargerSauvegardes(null);
+}
+
+function chargerSauvegardes(resultat) {
+  return api('admin_sauvegardes').then(function (d) {
+    poserSauvegardes(htmlSauvegardes(d, resultat));
+  }).catch(function (err) {
+    poserSauvegardes(blocResultatSauvegarde(resultat) +
+                     bloc(messageSauvegarde(err), 'ko', '❌'));
+  });
+}
+
+/* N'écrit que si la fenêtre est encore ouverte. Une copie prend
+   jusqu'à une minute : si on a fermé entre-temps, le toast suffit, on
+   ne rouvre pas une fenêtre dans le dos de quelqu'un. */
+function poserSauvegardes(h) {
+  var z = document.getElementById('sauv-zone');
+  if (z) z.innerHTML = h;
+}
+
+function messageSauvegarde(err) {
+  var m = (err && err.message) || String(err);
+  if (/Action inconnue/i.test(m)) {
+    return 'Le serveur n\'a pas encore le code de sauvegarde. Colle Production.gs ' +
+           'et Admin.gs dans Apps Script, puis Gérer les déploiements → ✏️ → ' +
+           'Nouvelle version.';
+  }
+  return m;
+}
+
+function ilYa(jours) {
+  if (jours === null || jours === undefined) return 'jamais';
+  if (jours <= 0) return 'aujourd\'hui';
+  if (jours === 1) return 'hier';
+  return 'il y a ' + jours + ' jours';
+}
+
+/** « 24/11/2026 à 14h05 » — une sauvegarde se cherche par sa date. */
+function dateSauvegarde(d) {
+  var x = new Date(d);
+  if (!d || isNaN(x)) return String(d || '');
+  return dateCourte(x) + ' à ' + ('0' + x.getHours()).slice(-2) + 'h' +
+         ('0' + x.getMinutes()).slice(-2);
+}
+
+function blocResultatSauvegarde(r) {
+  if (!r || !r.sauvegarde) return '';
+  return r.deja_faite
+    ? bloc('Une copie vient déjà d\'être faite, le ' +
+           dateSauvegarde(r.sauvegarde.cree_le) + '. Pas de doublon : ' +
+           'c\'est elle qui compte.', 'info', 'ℹ️')
+    : bloc('Sauvegarde faite : « ' + r.sauvegarde.nom + ' ».', 'ok', '✅');
+}
+
+function htmlSauvegardes(d, resultat) {
+  var liste = d.sauvegardes || [];
+
+  var h = blocResultatSauvegarde(resultat);
+
+  if (!d.total) {
+    h += bloc('Aucune sauvegarde dans le dossier de la base. Une suppression, ' +
+              'une panne ou une fausse manipulation ferait tout perdre : fais la ' +
+              'première maintenant.', 'attention', '⚠️');
+  } else if (d.en_retard) {
+    h += bloc('Dernière sauvegarde ' + ilYa(d.age_jours) + '. Au-delà de ' +
+              d.alerte_jours + ' jours, un accident ferait perdre tout ce qui a ' +
+              'été saisi depuis.', 'attention', '⚠️');
+  }
+
+  h += '<div class="carte serree" style="margin-bottom:12px">' +
+    '<div class="total"><span class="l">Dernière sauvegarde</span><b>' +
+      e(ilYa(d.total ? d.age_jours : null)) + '</b></div>' +
+    (d.total ? '<div class="total"><span class="l">Le</span><b>' +
+      e(dateSauvegarde(d.derniere_le)) + '</b></div>' : '') +
+    '<div class="total"><span class="l">Copies dans le dossier</span><b>' +
+      d.total + '</b></div></div>';
+
+  h += '<button class="btn vert" id="btn-sauv" onclick="lancerSauvegarde()"' +
+    (Sauv.enCours ? ' disabled>⏳ Copie en cours…' : '>💾 Sauvegarder maintenant') +
+    '</button>' +
+    '<div style="font-size:12.5px;color:var(--doux);margin:9px 2px 4px;line-height:1.45">' +
+      'Copie complète du classeur Flashipping_DB, rangée à côté de lui dans le ' +
+      'dossier Drive « ' + e(d.dossier_nom) + ' ». La base continue de tourner : ' +
+      'rien n\'est remplacé ni effacé. Compte de dix secondes à une minute.</div>';
+
+  if (liste.length) {
+    h += '<div class="titre-section">Les plus récentes</div>' +
+      liste.map(function (s) {
+        return '<a class="ligne" href="' + e(s.url) + '" target="_blank" ' +
+          'rel="noopener" style="text-decoration:none;color:inherit">' +
+          '<span style="font-size:20px">📄</span>' +
+          '<span class="corps"><span class="t1" style="display:block">' +
+            e(dateSauvegarde(s.cree_le)) + '</span>' +
+          '<span class="t2" style="display:block">' +
+            e(s.note || 'Copie sans origine notée') + '</span></span>' +
+          '<span class="droite" style="font-size:13px;color:var(--doux)">' +
+            'Ouvrir ↗</span></a>';
+      }).join('') +
+      (d.total > liste.length
+        ? '<div style="font-size:12.5px;color:var(--doux);margin:2px 2px 10px">+ ' +
+          (d.total - liste.length) + ' plus ancienne(s) dans le dossier.</div>'
+        : '');
+  }
+
+  if (d.dossier_url) {
+    h += '<a class="btn vide petit" href="' + e(d.dossier_url) + '" target="_blank" ' +
+      'rel="noopener" style="text-decoration:none;margin-top:6px">' +
+      '📁 Ouvrir le dossier Drive</a>';
+  }
+
+  /* La restauration n'a pas de bouton, et c'est voulu : remplacer la
+     base en marche d'un clic sur un téléphone est exactement le genre
+     de geste qu'on regrette. On bascule à la main, à tête reposée, et
+     l'ancienne base reste intacte à côté. */
+  h += '<details class="carte serree" style="margin-top:14px">' +
+    '<summary style="font-weight:700;cursor:pointer">Comment restaurer une ' +
+      'sauvegarde ?</summary>' +
+    '<ol style="font-size:13px;line-height:1.5;padding-left:19px;margin:9px 0 2px">' +
+      '<li>Ne recopie rien à la main dans la base : on bascule sur la copie, ' +
+        'et la base actuelle reste intacte à côté.</li>' +
+      '<li>Dans Drive, renomme la base actuelle « Flashipping_DB — remplacée le ' +
+        '… », puis la sauvegarde voulue « Flashipping_DB ».</li>' +
+      '<li>Note l\'identifiant de la sauvegarde : la partie de son adresse entre ' +
+        '<span class="mono">/d/</span> et <span class="mono">/edit</span>.</li>' +
+      '<li>Apps Script, projet « Flashipping API » → ⚙️ Paramètres du projet → ' +
+        'Propriétés du script → remplace <span class="mono">DB_ID</span> par cet ' +
+        'identifiant.</li>' +
+      '<li>Même chose dans le projet « Flashipping_API_Publique » : c\'est lui ' +
+        'qui sert le site.</li>' +
+      '<li>Tout ce qui a été saisi après la date de la sauvegarde est à ' +
+        'ressaisir.</li>' +
+    '</ol></details>';
+
+  return h;
+}
+
+function lancerSauvegarde() {
+  if (Sauv.enCours) return;
+  Sauv.enCours = true;
+  var b = document.getElementById('btn-sauv');
+  if (b) { b.disabled = true; b.textContent = '⏳ Copie en cours… (jusqu\'à une minute)'; }
+
+  api('admin_sauvegarder').then(function (r) {
+    Sauv.enCours = false;
+    toast(r.deja_faite ? 'Une copie venait déjà d\'être faite.' : 'Sauvegarde faite.', 'ok');
+    if (document.getElementById('sauv-zone')) return chargerSauvegardes(r);
+  }).catch(function (err) {
+    Sauv.enCours = false;
+    var b2 = document.getElementById('btn-sauv');
+    if (b2) { b2.disabled = false; b2.textContent = '💾 Sauvegarder maintenant'; }
+    toast(messageSauvegarde(err), 'ko');
+  });
 }
 
 /**

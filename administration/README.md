@@ -3,8 +3,10 @@
 Deux métiers dans une seule application, séparés par les droits :
 
 **Super administrateur** — les comptes (créer, changer un rôle, régénérer
-un code, débloquer), les agences du réseau, et le journal de tout ce qui
-a été fait sur les pouvoirs.
+un code, débloquer), les agences du réseau, le journal de tout ce qui
+a été fait sur les pouvoirs, et la sauvegarde de la base (⚙️ →
+💾 Sauvegarde de la base : une copie complète du classeur dans le même
+dossier Drive, d'un bouton, avec la liste des copies déjà faites).
 
 **Service client** — le dossier d'un client ouvert en un clic pendant
 qu'il parle au téléphone : ses colis avec le trajet horodaté, ses

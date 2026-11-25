@@ -92,6 +92,8 @@ textarea{min-height:60px;resize:vertical}
 .duo > *{flex:1;min-width:0}
 .trio{display:flex;gap:8px}
 .trio > *{min-width:0}
+.trio > .champ{flex:1}
+textarea.mono{font-size:14px}
 
 .btn{
   display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
@@ -427,10 +429,14 @@ var Etat = {
   user: S.lireJson(CLE_USER, null),
   ref: null,
   onglet: 'nouvelle',
-  vue: null
+  vue: null,
+  /* Une demande à ouvrir dès que l'app est prête : le lien du message
+     Telegram (#demande=CPM-…) mène directement dessus, même s'il faut
+     d'abord se connecter. */
+  demandeAOuvrir: null
 };
 
-var PLATEFORMES = ['Shein', 'Temu', 'Amazon', 'AliExpress', 'eBay', 'Autre'];
+var PLATEFORMES = ['Shein', 'Temu', 'Amazon', 'AliExpress', 'Walmart', 'eBay', 'Autre'];
 
 var CYCLE = [
   { code: 'devis',     libelle: 'Devis',      couleur: '#F2EDE4' },
@@ -751,6 +757,7 @@ function recuCommande(d) {
 
 var ONGLETS = [
   { id: 'nouvelle',  ic: '➕', nom: 'Nouvelle' },
+  { id: 'demandes',  ic: '🌐', nom: 'Demandes' },
   { id: 'commandes', ic: '🛒', nom: 'Commandes' },
   { id: 'depots',    ic: '💳', nom: 'Dépôts' },
   { id: 'marges',    ic: '📊', nom: 'Marges' }
@@ -828,6 +835,7 @@ function poser(h) { var c = document.getElementById('contenu'); if (c) c.innerHT
 function rendreOnglet() {
   switch (Etat.onglet) {
     case 'nouvelle':  return ongletNouvelle();
+    case 'demandes':  return ongletDemandes();
     case 'commandes': return ongletCommandes();
     case 'depots':    return ongletDepots();
     case 'marges':    return ongletMarges();
@@ -2338,6 +2346,7 @@ function ouvrirReglages() {
     (peutTextes()
       ? '<button class="btn vide" onclick="ouvrirTextes()">📝 Textes et mentions</button>'
       : '') +
+    '<button class="btn vide" onclick="ouvrirReglagesCpm()">🌐 Commande pour moi — réglages</button>' +
     '<button class="btn vide" onclick="ouvrirChangerCode()">🔑 Changer mon code</button>' +
     '<button class="btn vide" onclick="rafraichirRef()">🔄 Recharger les référentiels</button>' +
     '<button class="btn vide" onclick="changerUrl()">🔗 Changer l\'URL de l\'API</button>' +
@@ -2675,6 +2684,990 @@ function fermerModale() {
 
 
 // ═══════════════════════════════════════════════════════════════════
+//  DEMANDES WEB — « Commande pour moi »
+//
+//  Les demandes arrivent du site. Ici l'équipe chiffre, envoie la
+//  facture, confirme le paiement — et la demande devient une commande
+//  comme les autres : le paiement passe par commande_payer, l'achat
+//  par commande_acheter, la réception crée le koli. Aucun argent
+//  n'entre ou ne sort par un autre chemin.
+//
+//  Après « reçue aux US », la demande avance toute seule : elle lit
+//  l'état du koli dans la logistique. Personne n'a rien à ressaisir.
+// ═══════════════════════════════════════════════════════════════════
+
+var STATUTS_DEM = [
+  { code: 'nouvelle',         libelle: 'Nouvelle',         couleur: '#FFE0B2' },
+  { code: 'facture_envoyee',  libelle: 'Facture envoyée',  couleur: '#FFF3C4' },
+  { code: 'facture_expiree',  libelle: 'Facture expirée',  couleur: '#FFCDD2' },
+  { code: 'paiement_declare', libelle: 'Paiement déclaré', couleur: '#BBDEFB' },
+  { code: 'payee',            libelle: 'Payée',            couleur: '#C8E6C9' },
+  { code: 'commandee',        libelle: 'Commandée',        couleur: '#FFF8E1' },
+  { code: 'recue_usa',        libelle: 'Reçue aux US',     couleur: '#E3F2FD' },
+  { code: 'en_transit',       libelle: 'En transit',       couleur: '#E1F5FE' },
+  { code: 'disponible',       libelle: 'Disponible',       couleur: '#E8F5E9' },
+  { code: 'livree',           libelle: 'Livrée',           couleur: '#ECEFF1' },
+  { code: 'annulee',          libelle: 'Annulée',          couleur: '#F5F5F5' }
+];
+
+/* Les jalons montrés en haut d'une demande : le parcours principal,
+   sans les statuts annexes. */
+var PARCOURS_DEM = ['nouvelle', 'facture_envoyee', 'paiement_declare', 'payee',
+                    'commandee', 'recue_usa', 'en_transit', 'disponible', 'livree'];
+
+/* Quel message « Prévenir le client » correspond à quel statut. */
+var MESSAGE_DEM = {
+  facture_envoyee: 'facture', facture_expiree: 'facture_expiree', payee: 'payee',
+  commandee: 'commandee', recue_usa: 'recue_usa', en_transit: 'en_transit',
+  disponible: 'disponible', livree: 'livree', annulee: 'annulee'
+};
+
+var FiltreDem = { statut: 'en_cours', q: '', du: '', au: '' };
+var Dem = { detail: null, prix: {}, minuteur: null };
+
+function infoDem(code) {
+  return STATUTS_DEM.filter(function (x) { return x.code === code; })[0] ||
+         { code: code, libelle: code, couleur: '#EEE' };
+}
+function puceDem(code) {
+  var c = infoDem(code);
+  return '<span class="etat" style="background:' + c.couleur + '">' + e(c.libelle) + '</span>';
+}
+function r2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+function jsArg(o) { return e(JSON.stringify(o)).replace(/'/g, '&#39;'); }
+
+/** Le module n'est pas encore collé dans Apps Script : on le dit
+ *  plutôt que d'afficher « Action inconnue ». */
+function erreurDem(err) {
+  if (/Action inconnue\s*:\s*cpm_/i.test(err.message)) {
+    return bloc('Le module « Commande pour moi » n\'est pas encore déployé côté ' +
+      'Apps Script : il manque le fichier CommandePourMoi.gs, ou le déploiement ' +
+      'n\'a pas été refait en « Nouvelle version ».', 'attention', '⚠️');
+  }
+  return bloc(err.message, 'ko', '❌');
+}
+
+
+// ── Liste ──────────────────────────────────────────────────────────
+
+function ongletDemandes() {
+  poser(
+    '<input type="search" id="dm-q" placeholder="🔎 Numéro, nom ou téléphone" ' +
+      'value="' + e(FiltreDem.q) + '" oninput="chercherDem()" style="margin-bottom:9px">' +
+    '<div class="duo" style="margin-bottom:9px">' +
+      '<label class="champ" style="margin:0"><span>Du</span><input type="date" id="dm-du" ' +
+        'value="' + e(FiltreDem.du) + '" onchange="datesDem()"></label>' +
+      '<label class="champ" style="margin:0"><span>Au</span><input type="date" id="dm-au" ' +
+        'value="' + e(FiltreDem.au) + '" onchange="datesDem()"></label>' +
+    '</div>' +
+    '<div class="puces" id="dm-puces"></div>' +
+    '<div id="liste-dem">' + chargement() + '</div>' +
+    '<div class="rangee-btn" style="margin-top:6px">' +
+      '<button class="btn vide petit" onclick="chargerDemandes()">🔄 Actualiser</button>' +
+      '<button class="btn vide petit" onclick="ouvrirReglagesCpm()">⚙️ Réglages</button>' +
+    '</div>'
+  );
+  chargerDemandes();
+
+  if (Etat.demandeAOuvrir) {
+    var id = Etat.demandeAOuvrir;
+    Etat.demandeAOuvrir = null;
+    ouvrirDemande(id);
+  }
+}
+
+function chercherDem() {
+  clearTimeout(Dem.minuteur);
+  Dem.minuteur = setTimeout(function () {
+    var z = document.getElementById('dm-q');
+    FiltreDem.q = z ? z.value.trim() : '';
+    chargerDemandes();
+  }, 350);
+}
+function datesDem() {
+  FiltreDem.du = document.getElementById('dm-du').value;
+  FiltreDem.au = document.getElementById('dm-au').value;
+  chargerDemandes();
+}
+function filtreDem(s) { FiltreDem.statut = s; chargerDemandes(); }
+
+function chargerDemandes() {
+  var z = document.getElementById('liste-dem');
+  if (!z) return;
+  z.innerHTML = chargement();
+
+  api('cpm_lister', { statut: FiltreDem.statut, q: FiltreDem.q, du: FiltreDem.du,
+                      au: FiltreDem.au, limite: 200 }).then(function (d) {
+    var cpt = d.compteurs || {};
+    var enCours = 0;
+    Object.keys(cpt).forEach(function (k) {
+      if (k !== 'livree' && k !== 'annulee') enCours += cpt[k];
+    });
+    var p = document.getElementById('dm-puces');
+    if (p) {
+      p.innerHTML =
+        '<button class="puce ' + (FiltreDem.statut === 'en_cours' ? 'actif' : '') +
+          '" onclick="filtreDem(\'en_cours\')">En cours · ' + enCours + '</button>' +
+        '<button class="puce ' + (FiltreDem.statut === '' ? 'actif' : '') +
+          '" onclick="filtreDem(\'\')">Toutes</button>' +
+        STATUTS_DEM.map(function (s) {
+          var n = cpt[s.code] || 0;
+          if (!n && FiltreDem.statut !== s.code) return '';
+          return '<button class="puce ' + (FiltreDem.statut === s.code ? 'actif' : '') +
+            '" onclick="filtreDem(\'' + s.code + '\')">' + e(s.libelle) + ' · ' + n + '</button>';
+        }).join('');
+    }
+
+    if (!d.demandes.length) { z.innerHTML = vide('🌐', 'Aucune demande ici.'); return; }
+    z.innerHTML = d.demandes.map(ligneDemande).join('');
+  }).catch(function (err) { z.innerHTML = erreurDem(err); });
+}
+
+function ligneDemande(x) {
+  var action = { nouvelle: '🧾 à chiffrer', paiement_declare: '💰 à vérifier',
+                 facture_expiree: '⏰ à relancer', payee: '🛍 à commander',
+                 commandee: '📦 attendu à Miami' }[x.statut_affiche];
+  return '<button class="ligne" onclick="ouvrirDemande(\'' + e(x.demande_id) + '\')">' +
+    '<div class="corps">' +
+      '<div class="t1">' + e(x.nom_complet) + '</div>' +
+      '<div class="t2">' + e(x.demande_id) + ' · ' + e(x.ville) + ' · ' + dateCourte(x.date) + '</div>' +
+      '<div style="margin-top:5px">' + puceDem(x.statut_affiche) +
+        (action ? ' <span class="badge">' + action + '</span>' : '') + '</div>' +
+    '</div>' +
+    '<div class="droite">' +
+      (x.a_payer_usd !== null ? '<div style="font-weight:800;font-size:14.5px">' +
+        usd(x.a_payer_usd) + '</div>' : '') +
+      '<div style="font-size:12px;color:var(--doux)">' + x.nb_articles + ' article' +
+        (x.nb_articles > 1 ? 's' : '') + '</div>' +
+      (x.commande_id ? '<div style="font-size:11.5px;color:var(--doux)">' +
+        e(x.commande_id) + '</div>' : '') +
+    '</div></button>';
+}
+
+
+// ── Détail ─────────────────────────────────────────────────────────
+
+function ouvrirDemande(id) {
+  modale('Demande', chargement());
+  api('cpm_detail', { demande_id: id }).then(function (d) {
+    Dem.detail = d;
+    Dem.prix = {};
+    d.articles.forEach(function (a) {
+      Dem.prix[a.article_id] = {
+        prix_unitaire_usd: a.prix_unitaire_usd || '',
+        livraison_vendeur_usd: a.livraison_vendeur_usd || '',
+        taxes_vendeur_usd: a.taxes_vendeur_usd || '',
+        poids_estime_lb: a.poids_estime_lb || '',
+        quantite: a.quantite || 1,
+        statut_article: a.statut_article === 'indisponible' ? 'indisponible' : 'disponible'
+      };
+    });
+    majModale(d.demande.demande_id, htmlDemande(d));
+    chargerDepotsDem();
+  }).catch(function (err) { majModale('Demande', erreurDem(err)); });
+}
+
+function rechargerDemande() {
+  if (Dem.detail) ouvrirDemande(Dem.detail.demande.demande_id);
+  if (Etat.onglet === 'demandes') chargerDemandes();
+}
+
+function peutSaisir() {
+  return !!(Etat.user && Etat.user.droits && Etat.user.droits.saisir_commande);
+}
+
+function htmlDemande(d) {
+  var dm = d.demande, st = dm.statut_affiche;
+  var iCourant = PARCOURS_DEM.indexOf(st === 'facture_expiree' ? 'facture_envoyee' : st);
+  var h = '';
+
+  // ── En-tête ──
+  h += '<div style="margin-bottom:10px">' +
+    '<div style="font-weight:800;font-size:17px">' + e(dm.nom_complet) + '</div>' +
+    '<div style="color:var(--doux);font-size:13px;margin:2px 0 8px">' +
+      e(dm.demande_id) + ' · reçue le ' + dateCourte(dm.date) + ' · retrait ' + e(dm.ville) + '</div>' +
+    puceDem(st) + '</div>';
+
+  if (st !== 'annulee') {
+    h += '<div class="jalons">' + PARCOURS_DEM.map(function (c, i) {
+      return '<div class="jalon ' + (i < iCourant ? 'faite' : (i === iCourant ? 'ici' : '')) +
+        '"><div class="pt"></div></div>';
+    }).join('') + '</div>';
+  }
+
+  (d.alertes || []).forEach(function (a) { h += bloc(a, 'attention', '⚠️'); });
+
+  // ── Prévenir le client, pour l'étape en cours ──
+  var cleMsg = MESSAGE_DEM[st];
+  if (cleMsg && d.liens_whatsapp[cleMsg]) {
+    h += '<a class="btn vert" href="' + e(d.liens_whatsapp[cleMsg]) + '" target="_blank" ' +
+      'rel="noopener" onclick="notePrevenu(\'' + e(dm.demande_id) + '\',\'' + e(st) + '\')">' +
+      '📲 Prévenir le client — ' + e(infoDem(st).libelle) + '</a>';
+  }
+
+  // ── Client ──
+  h += '<div class="titre-section">Client</div>' +
+    '<div class="carte serree">' +
+      '<div class="total"><span class="l">WhatsApp</span><a href="https://wa.me/' +
+        e(dm.whatsapp_international) + '" target="_blank" rel="noopener">' +
+        e(dm.whatsapp) + '</a></div>' +
+      (dm.email ? '<div class="total"><span class="l">Courriel</span><span>' + e(dm.email) +
+        '</span></div>' : '') +
+      '<div class="total"><span class="l">Notification équipe</span><span style="font-size:12px">' +
+        'Telegram ' + e(dm.notif_telegram || '—') + '</span></div>' +
+    '</div>' + htmlClientDem(d);
+
+  // ── Articles et chiffrage ──
+  h += htmlArticlesDem(d);
+
+  // ── Facture ──
+  if (d.facture) h += htmlFactureDem(d);
+
+  // ── Paiements ──
+  h += htmlPaiementsDem(d);
+
+  // ── Commande, achat, réception ──
+  h += htmlSuiteDem(d);
+
+  // ── Note interne ──
+  h += '<div class="titre-section">Note interne</div>' +
+    (dm.note_interne ? '<div class="carte serree" style="white-space:pre-wrap;font-size:13px">' +
+      e(dm.note_interne) + '</div>' : '') +
+    (peutSaisir() ? '<div class="duo"><input type="text" id="dm-note" placeholder="Ajouter une note">' +
+      '<button class="btn vide petit" style="flex:0 0 auto;width:auto" ' +
+      'onclick="noterDem(\'' + e(dm.demande_id) + '\')">Ajouter</button></div>' : '');
+
+  // ── Historique ──
+  h += '<div class="titre-section">Historique</div>' +
+    d.historique.slice().reverse().map(function (x) {
+      var change = x.nouveau && x.nouveau !== x.ancien;
+      return '<div style="padding:8px 2px;border-bottom:1px solid var(--bord);font-size:12.5px">' +
+        '<div style="color:var(--doux)">' + dateHeureDem(x.date) + ' · ' + e(x.par || '—') + '</div>' +
+        (change ? '<div style="margin:3px 0">' + (x.ancien ? puceDem(x.ancien) + ' → ' : '') +
+          puceDem(x.nouveau) + '</div>' : '') +
+        '<div>' + e(x.detail) + '</div></div>';
+    }).join('');
+
+  // ── Annuler ──
+  if (peutSaisir() && ['nouvelle', 'facture_envoyee', 'facture_expiree', 'paiement_declare',
+                       'payee'].indexOf(st) !== -1) {
+    h += '<button class="btn rouge" style="margin-top:14px" onclick="ouvrirAnnulerDem(\'' +
+      e(dm.demande_id) + '\',\'' + e(st) + '\')">Annuler la demande</button>';
+  }
+  return h;
+}
+
+function dateHeureDem(d) {
+  if (!d) return '';
+  var x = new Date(d);
+  if (isNaN(x)) return '';
+  return dateCourte(d) + ' ' + ('0' + x.getHours()).slice(-2) + ':' + ('0' + x.getMinutes()).slice(-2);
+}
+
+function notePrevenu(id, etape) {
+  api('cpm_prevenu', { demande_id: id, etape: etape }).catch(function () {});
+}
+
+function noterDem(id) {
+  var z = document.getElementById('dm-note');
+  if (!z || !z.value.trim()) return;
+  api('cpm_noter', { demande_id: id, note: z.value.trim() }).then(function () {
+    toast('Note ajoutée.', 'ok'); rechargerDemande();
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+
+// ── Fiche client ───────────────────────────────────────────────────
+
+function htmlClientDem(d) {
+  var dm = d.demande;
+  if (d.client) {
+    return '<div class="ligne"><div class="corps"><div class="t1">👤 ' + e(d.client.nom_complet) +
+      '</div><div class="t2">' + e(d.client.client_id) + ' · ' + e(d.client.code_client) +
+      '</div></div><div class="droite"><span class="badge ok">fiche reliée</span></div></div>';
+  }
+  if (dm.commande_id || !peutSaisir()) return '';
+
+  var morceaux = dm.nom_complet.split(/\s+/);
+  var prenom = morceaux.shift() || '', nom = morceaux.join(' ');
+
+  return bloc('Relie la demande à une fiche client avant d\'encaisser : c\'est elle qui ' +
+              'portera la commande, le koli et la facture de transport.', 'info', '👤') +
+    (d.suggestions.length
+      ? '<div class="suggestions">' + d.suggestions.map(function (c) {
+          return '<button onclick="lierClientDem(\'' + e(dm.demande_id) + '\',\'' +
+            e(c.client_id) + '\')"><b>' + e(c.nom_complet) + '</b> · ' + e(c.client_id) +
+            '<div style="font-size:12px;color:var(--doux)">' + e(c.telephone) + ' · ' +
+            e(c.ville) + ' — même numéro</div></button>';
+        }).join('') + '</div>'
+      : '') +
+    '<label class="champ"><span>Chercher une fiche</span><input type="text" id="dm-cli" ' +
+      'placeholder="Nom, code ou téléphone" oninput="chercherClientDem(\'' +
+      e(dm.demande_id) + '\')"></label><div id="dm-cli-sugg"></div>' +
+    '<div class="duo"><label class="champ"><span>Prénom</span><input type="text" id="dm-prenom" ' +
+      'value="' + e(prenom) + '"></label><label class="champ"><span>Nom</span>' +
+      '<input type="text" id="dm-nom" value="' + e(nom) + '"></label></div>' +
+    '<button class="btn vide" onclick="creerClientDem(\'' + e(dm.demande_id) + '\')">' +
+      '➕ Créer la fiche client</button>';
+}
+
+var minuteurCliDem = null;
+function chercherClientDem(id) {
+  clearTimeout(minuteurCliDem);
+  var q = document.getElementById('dm-cli').value.trim();
+  var z = document.getElementById('dm-cli-sugg');
+  if (q.length < 2) { z.innerHTML = ''; return; }
+  minuteurCliDem = setTimeout(function () {
+    api('client_chercher', { q: q }).then(function (liste) {
+      z.innerHTML = liste.length ? '<div class="suggestions">' + liste.map(function (c) {
+        return '<button onclick="lierClientDem(\'' + e(id) + '\',\'' + e(c.client_id) + '\')"><b>' +
+          e(c.nom_complet) + '</b> · ' + e(c.client_id) + '<div style="font-size:12px;' +
+          'color:var(--doux)">' + e(c.telephone || '') + ' · ' + e(c.ville || '') + '</div></button>';
+      }).join('') + '</div>' : bloc('Aucune fiche.', 'info', '🔍');
+    }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+  }, 300);
+}
+
+function lierClientDem(id, clientId) {
+  api('cpm_client_lier', { demande_id: id, client_id: clientId }).then(function () {
+    toast('Fiche reliée.', 'ok'); rechargerDemande();
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function creerClientDem(id) {
+  api('cpm_client_lier', {
+    demande_id: id, creer: true,
+    prenom: document.getElementById('dm-prenom').value.trim(),
+    nom: document.getElementById('dm-nom').value.trim()
+  }).then(function (r) {
+    toast('Fiche ' + r.client_id + ' créée et reliée.', 'ok'); rechargerDemande();
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+
+// ── Articles et chiffrage ──────────────────────────────────────────
+
+function chiffrable(st) {
+  return ['nouvelle', 'facture_envoyee', 'facture_expiree'].indexOf(st) !== -1 && peutSaisir();
+}
+
+function htmlArticlesDem(d) {
+  var st = d.demande.statut_affiche;
+  var edit = chiffrable(st);
+  var h = '<div class="titre-section">Articles — ' + d.articles.length + '</div>';
+
+  h += d.articles.map(function (a) {
+    var x = Dem.prix[a.article_id];
+    var indispo = x.statut_article === 'indisponible';
+    var entete =
+      '<div class="tete"><span class="num">' + a.rang + '</span>' +
+        '<b>' + e(a.plateforme) + '</b>' +
+        '<span style="font-size:12.5px;color:var(--doux)">' +
+          [a.taille, a.couleur].filter(Boolean).map(e).join(' · ') + '</span></div>' +
+      '<a href="' + e(a.url_produit) + '" target="_blank" rel="noopener noreferrer" ' +
+        'style="font-size:12.5px;word-break:break-all;display:block;margin-bottom:6px">' +
+        e(a.url_produit) + ' ↗</a>' +
+      (a.remarque ? '<div style="font-size:13px;margin-bottom:6px">💬 ' + e(a.remarque) + '</div>' : '') +
+      (a.a_capture ? '<div id="cap-' + e(a.article_id) + '"><button class="btn vide petit" ' +
+        'style="width:auto;margin-bottom:8px" onclick="voirImageDem(\'article\',\'' +
+        e(a.article_id) + '\',\'cap-' + e(a.article_id) + '\')">📷 Voir la capture</button></div>' : '');
+
+    if (!edit) {
+      return '<div class="article' + (indispo ? '" style="opacity:.55' : '') + '">' + entete +
+        '<div style="font-size:13px;color:var(--doux)">' + a.quantite + ' × ' +
+        (a.prix_unitaire_usd ? usd(a.prix_unitaire_usd) : '—') +
+        (indispo ? ' · <b>indisponible</b>' : '') + '</div></div>';
+    }
+
+    var id = e(a.article_id);
+    var champ = function (cle, lib, pas) {
+      return '<label class="champ"><span>' + lib + '</span><input type="number" step="' + pas +
+        '" min="0" inputmode="decimal" value="' + e(x[cle]) + '" ' +
+        'oninput="prixDem(\'' + id + '\',\'' + cle + '\',this.value)"' +
+        (indispo ? ' disabled' : '') + '></label>';
+    };
+    return '<div class="article" id="art-' + id + '">' + entete +
+      '<label class="coche' + (indispo ? '' : ' on') + '" style="margin-bottom:9px">' +
+        '<input type="checkbox" ' + (indispo ? '' : 'checked') + ' onchange="dispoDem(\'' + id +
+        '\',this.checked)"><span class="corps">Disponible chez le vendeur</span></label>' +
+      '<div class="duo">' + champ('prix_unitaire_usd', 'Prix unitaire ($)', '0.01') +
+        champ('quantite', 'Quantité', '1') + '</div>' +
+      '<div class="trio">' + champ('livraison_vendeur_usd', 'Livraison vendeur ($)', '0.01') +
+        champ('taxes_vendeur_usd', 'Taxes vendeur ($)', '0.01') +
+        champ('poids_estime_lb', 'Poids / unité (lb)', '0.1') + '</div>' +
+    '</div>';
+  }).join('');
+
+  if (edit) {
+    h += '<div class="carte" id="dm-apercu">' + htmlApercuDem(d) + '</div>' +
+      '<div id="dm-fact-res"></div>' +
+      '<button class="btn sombre" id="dm-fact-btn" onclick="facturerDem(\'' +
+        e(d.demande.demande_id) + '\')">🧾 ' +
+        (d.facture ? 'Refaire la facture avec ces montants' : 'Générer la facture') + '</button>';
+  }
+  return h;
+}
+
+/** Le calcul du serveur, refait ici pour l'aperçu pendant la saisie.
+ *  Le serveur recalcule tout à la génération : c'est lui qui fait foi. */
+function calculDem(d) {
+  var p = d.parametres, sous = 0, poids = 0, n = 0, manque = false;
+  d.articles.forEach(function (a) {
+    var x = Dem.prix[a.article_id];
+    if (x.statut_article === 'indisponible') return;
+    var q = Math.max(1, Math.round(Number(x.quantite) || 1));
+    var pu = r2(x.prix_unitaire_usd);
+    if (!(pu > 0)) manque = true;
+    sous += r2(pu * q + r2(x.livraison_vendeur_usd) + r2(x.taxes_vendeur_usd));
+    poids += Math.max(0, Number(x.poids_estime_lb) || 0) * q;
+    n++;
+  });
+  sous = r2(sous);
+  var auPct = r2(sous * p.taux_service);
+  var frais = sous > 0 ? Math.max(auPct, r2(p.frais_min)) : 0;
+  var aPayer = r2(sous + frais);
+  var poidsF = poids > 0 ? Math.max(poids, p.poids_min) : 0;
+  return { n: n, manque: manque, sous: sous, frais: frais, mini: sous > 0 && frais > auPct,
+           aPayer: aPayer, htg: Math.round(aPayer * p.taux_htg), poids: r2(poidsF),
+           fret: r2(poidsF * p.prix_lb) };
+}
+
+function htmlApercuDem(d) {
+  var c = calculDem(d), p = d.parametres;
+  return '<div class="total"><span class="l">Sous-total produits (' + c.n + ')</span><span>' +
+      usd(c.sous) + '</span></div>' +
+    '<div class="total"><span class="l">Frais de service ' + pct(p.taux_service) +
+      (c.mini ? ' → minimum ' + usd(p.frais_min) : '') + '</span><span>' + usd(c.frais) + '</span></div>' +
+    '<div class="total gros"><span class="l">À payer</span><span>' + usd(c.aPayer) + '</span></div>' +
+    '<div class="total"><span class="l">En gourdes (taux ' + n0(p.taux_htg) + ')</span><b>' +
+      htg(c.htg) + '</b></div>' +
+    '<div class="total"><span class="l">Fret estimé · ' + n2(c.poids) + ' lb · payé au retrait</span><span>' +
+      usd(c.fret) + '</span></div>' +
+    (c.manque ? bloc('Un article disponible n\'a pas de prix.', 'attention', '⚠️') : '');
+}
+
+function prixDem(id, cle, v) {
+  Dem.prix[id][cle] = v;
+  var z = document.getElementById('dm-apercu');
+  if (z) z.innerHTML = htmlApercuDem(Dem.detail);
+}
+
+function dispoDem(id, coche) {
+  Dem.prix[id].statut_article = coche ? 'disponible' : 'indisponible';
+  majModale(Dem.detail.demande.demande_id, htmlDemande(Dem.detail));
+}
+
+function facturerDem(id) {
+  var b = document.getElementById('dm-fact-btn');
+  var c = calculDem(Dem.detail);
+  if (!c.n) {
+    document.getElementById('dm-fact-res').innerHTML = bloc('Aucun article disponible : il n\'y a ' +
+      'rien à facturer. Annule la demande et préviens le client.', 'attention', '⚠️');
+    return;
+  }
+  b.disabled = true; b.textContent = 'Génération…';
+  var articles = Object.keys(Dem.prix).map(function (k) {
+    return Object.assign({ article_id: k }, Dem.prix[k]);
+  });
+  api('cpm_facturer', { demande_id: id, articles: articles }).then(function (r) {
+    toast('Facture ' + r.facture.facture_id + ' — ' + usd(r.facture.a_payer_usd), 'ok');
+    rechargerDemande();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = '🧾 Générer la facture';
+    document.getElementById('dm-fact-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function voirImageDem(type, id, zone) {
+  var z = document.getElementById(zone);
+  z.innerHTML = chargement('Image…');
+  api('cpm_image', { type: type, id: id }).then(function (r) {
+    z.innerHTML = '<img src="data:' + e(r.mime) + ';base64,' + r.base64 + '" alt="" ' +
+      'style="max-width:100%;max-height:340px;border-radius:9px;border:1px solid var(--bord);' +
+      'margin-bottom:8px;display:block">';
+  }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+}
+
+
+// ── Facture ────────────────────────────────────────────────────────
+
+function htmlFactureDem(d) {
+  var f = d.facture, dm = d.demande;
+  var h = '<div class="titre-section">Facture ' + e(f.facture_id) + '</div><div class="carte">' +
+    '<div class="total"><span class="l">Sous-total produits</span><span>' +
+      usd(f.sous_total_produits_usd) + '</span></div>' +
+    '<div class="total"><span class="l">Frais de service</span><span>' + usd(f.frais_service_usd) +
+      '</span></div>' +
+    '<div class="total gros"><span class="l">À payer</span><span>' + usd(f.a_payer_usd) + '</span></div>' +
+    '<div class="total"><span class="l">En gourdes (taux ' + n0(f.taux_htg) + ')</span><b>' +
+      htg(f.a_payer_htg) + '</b></div>' +
+    '<div class="total"><span class="l">Fret estimé (au retrait)</span><span>' +
+      usd(f.fret_estime_usd) + '</span></div>' +
+    '<div class="total"><span class="l">Valable jusqu\'au</span><b style="color:' +
+      (f.expiree ? 'var(--rouge)' : 'inherit') + '">' + dateHeureDem(f.valide_jusqu) +
+      (f.expiree ? ' — expirée' : '') + '</b></div>' +
+    '<div style="font-size:12px;color:var(--doux);margin-top:6px">' +
+      (f.envoyee_whatsapp ? '📲 WhatsApp ouvert le ' + dateHeureDem(f.envoyee_whatsapp) + ' · ' : '') +
+      (f.envoyee_email ? '✉️ courriel le ' + dateHeureDem(f.envoyee_email) : '') + '</div>' +
+    '</div>';
+
+  if (f.statut !== 'active') return h;
+
+  if (f.expiree && peutSaisir()) {
+    h += bloc('Facture expirée : les prix et le taux ne sont plus garantis. Une nouvelle ' +
+              'facture reprend les montants saisis sur les articles, avec les paramètres du ' +
+              'jour — vérifie d\'abord si le vendeur a changé ses prix.', 'attention', '⏰') +
+      '<button class="btn" onclick="regenererDem(\'' + e(dm.demande_id) + '\')">' +
+      '🔁 Régénérer la facture au prix du jour</button>';
+  }
+  if (!f.expiree) {
+    h += '<a class="btn vert" href="' + e(d.liens_whatsapp.facture) + '" target="_blank" ' +
+        'rel="noopener" onclick="notePrevenu(\'' + e(dm.demande_id) + '\',\'facture\')">' +
+        '📲 Envoyer par WhatsApp</a>' +
+      (dm.email ? '<button class="btn vide" id="dm-mail-btn" onclick="emailDem(\'' +
+        e(dm.demande_id) + '\')">✉️ Envoyer par courriel</button>' : '');
+  }
+  h += '<a class="btn vide" href="' + e(dm.lien_facture) + '" target="_blank" rel="noopener">' +
+    '👁 Voir la facture du client (PDF depuis la page)</a>';
+  return h;
+}
+
+function regenererDem(id) {
+  api('cpm_regenerer', { demande_id: id }).then(function (r) {
+    toast('Nouvelle facture ' + r.facture.facture_id + ' — ' + usd(r.facture.a_payer_usd), 'ok');
+    rechargerDemande();
+  }).catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function emailDem(id) {
+  var b = document.getElementById('dm-mail-btn');
+  b.disabled = true; b.textContent = 'Envoi…';
+  api('cpm_envoyer_email', { demande_id: id }).then(function () {
+    toast('Facture envoyée par courriel.', 'ok'); rechargerDemande();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = '✉️ Envoyer par courriel'; toast(err.message, 'ko');
+  });
+}
+
+
+// ── Paiements ──────────────────────────────────────────────────────
+
+var NOMS_MOYENS = { moncash: 'MonCash', natcash: 'NatCash', virement: 'Virement', cash: 'Espèces' };
+
+function htmlPaiementsDem(d) {
+  var st = d.demande.statut_affiche, dm = d.demande;
+  var h = '';
+  if (d.paiements.length) {
+    h += '<div class="titre-section">Paiements</div>' + d.paiements.map(function (p) {
+      var zone = 'pv-' + e(p.paiement_id);
+      return '<div class="article"><div class="tete"><b>' + e(NOMS_MOYENS[p.moyen] || p.moyen) +
+        '</b><span style="font-size:12.5px;color:var(--doux)">' + dateHeureDem(p.date) +
+        ' · ' + (p.declare_par === 'client' ? 'déclaré par le client' : 'saisi par ' + e(p.declare_par)) +
+        '</span></div>' +
+        (p.reference ? '<div class="mono">Réf. ' + e(p.reference) + '</div>' : '') +
+        (p.montant_declare ? '<div style="font-size:13px">Montant déclaré : <b>' +
+          e(p.montant_declare) + ' ' + e(p.devise) + '</b></div>' : '') +
+        '<div style="margin:6px 0">' +
+          (p.statut === 'declare' ? '<span class="badge">à vérifier</span>'
+            : p.statut === 'confirme' ? '<span class="badge ok">confirmé' +
+              (p.commande_id ? ' · ' + e(p.commande_id) : '') + '</span>'
+            : '<span class="badge ko">rejeté</span> <span style="font-size:12px">' +
+              e(p.motif) + '</span>') + '</div>' +
+        (p.a_preuve ? '<div id="' + zone + '"><button class="btn vide petit" style="width:auto" ' +
+          'onclick="voirImageDem(\'paiement\',\'' + e(p.paiement_id) + '\',\'' + zone + '\')">' +
+          '🧾 Voir la preuve</button></div>' : '') +
+        (p.statut === 'declare' && peutSaisir()
+          ? '<div class="rangee-btn" style="margin-top:8px">' +
+              '<button class="btn vert petit" onclick="ouvrirConfirmerDem(' +
+                jsArg({ id: dm.demande_id, paiement_id: p.paiement_id, devise: p.devise }) +
+                ')">✅ Confirmer</button>' +
+              '<button class="btn rouge petit" onclick="ouvrirRejeterDem(\'' + e(dm.demande_id) +
+                '\',\'' + e(p.paiement_id) + '\')">Rejeter</button></div>'
+          : '') +
+        '</div>';
+    }).join('');
+  }
+
+  if ((st === 'facture_envoyee' || st === 'facture_expiree') && peutSaisir()) {
+    h += '<button class="btn vide" onclick="ouvrirConfirmerDem(' +
+      jsArg({ id: dm.demande_id, bureau: true }) + ')">💵 Paiement reçu sans déclaration ' +
+      '(bureau, appel…)</button>';
+  }
+  return h;
+}
+
+function ouvrirConfirmerDem(o) {
+  var d = Dem.detail, f = d.facture;
+  if (!f) return;
+  var sansClient = !d.client;
+  var devise = o.devise === 'USD' ? 'USD' : 'Gourdes';
+  modale('Confirmer le paiement',
+    '<div class="total gros"><span class="l">' + e(d.demande.nom_complet) + '</span><span>' +
+      usd(f.a_payer_usd) + '</span></div>' +
+    '<div class="total"><span class="l">Soit</span><b>' + htg(f.a_payer_htg) + '</b></div>' +
+    bloc('Vérifie le paiement sur le compte AVANT de confirmer. La confirmation crée la ' +
+         'commande et écrit l\'encaissement en caisse : l\'avance du client en flux neutre, ' +
+         'les frais de service en produit.', 'info', '🔒') +
+    (sansClient ? bloc('Relie d\'abord la demande à une fiche client (section Client).',
+                       'attention', '👤') : '') +
+    (o.bureau ? '<label class="champ"><span>Payé par</span><select id="cf-moyen">' +
+        Object.keys(NOMS_MOYENS).map(function (k) {
+          return '<option value="' + k + '">' + NOMS_MOYENS[k] + '</option>';
+        }).join('') + '</select></label>' +
+      '<label class="champ"><span>Référence (facultatif)</span><input type="text" id="cf-ref"></label>'
+      : '') +
+    '<label class="champ"><span>Devise reçue</span><select id="cf-devise">' +
+      '<option value="Gourdes"' + (devise === 'Gourdes' ? ' selected' : '') + '>Gourdes — ' +
+        htg(f.a_payer_htg) + '</option>' +
+      '<option value="USD"' + (devise === 'USD' ? ' selected' : '') + '>Dollars — ' +
+        usd(f.a_payer_usd) + '</option></select></label>' +
+    (f.expiree ? '<label class="coche"><input type="checkbox" id="cf-exp"><span class="corps">' +
+      'La facture a expiré, mais le client a payé dans les temps</span></label>' : '') +
+    '<div id="cf-res"></div>' +
+    '<button class="btn vert" id="cf-btn"' + (sansClient ? ' disabled' : '') +
+      ' onclick="confirmerDem(' + jsArg(o) + ')">Encaisser ' + usd(f.a_payer_usd) + '</button>');
+}
+
+function confirmerDem(o) {
+  var b = document.getElementById('cf-btn');
+  var p = { demande_id: o.id, devise: document.getElementById('cf-devise').value };
+  if (o.paiement_id) p.paiement_id = o.paiement_id;
+  if (o.bureau) {
+    p.moyen = document.getElementById('cf-moyen').value;
+    p.reference = document.getElementById('cf-ref').value.trim();
+  }
+  var exp = document.getElementById('cf-exp');
+  if (exp && exp.checked) p.malgre_expiration = true;
+
+  b.disabled = true; b.textContent = 'Encaissement…';
+  api('cpm_paiement_confirmer', p).then(function (r) {
+    toast('Payée — commande ' + r.commande_id, 'ok');
+    rechargerDemande();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Encaisser';
+    document.getElementById('cf-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ouvrirRejeterDem(id, paiementId) {
+  modale('Rejeter le paiement',
+    bloc('Le client sera invité à renvoyer sa preuve. Le motif reste interne.', 'info', 'ℹ️') +
+    '<label class="champ"><span>Motif</span><input type="text" id="rj-motif" ' +
+      'placeholder="Ex. aucun paiement reçu avec cette référence"></label>' +
+    '<div id="rj-res"></div>' +
+    '<button class="btn rouge" onclick="rejeterDem(\'' + e(id) + '\',\'' + e(paiementId) +
+      '\')">Rejeter</button>');
+}
+
+function rejeterDem(id, paiementId) {
+  api('cpm_paiement_rejeter', { demande_id: id, paiement_id: paiementId,
+                                motif: document.getElementById('rj-motif').value.trim() })
+    .then(function (r) {
+      majModale('Paiement rejeté',
+        bloc('Préviens le client : il doit renvoyer sa preuve ou rappeler.', 'info', '📲') +
+        '<a class="btn vert" href="' + e(r.lien_whatsapp) + '" target="_blank" rel="noopener">' +
+        '📲 Prévenir le client</a><button class="btn vide" onclick="ouvrirDemande(\'' +
+        e(id) + '\')">Revenir à la demande</button>');
+      if (Etat.onglet === 'demandes') chargerDemandes();
+    }).catch(function (err) {
+      document.getElementById('rj-res').innerHTML = bloc(err.message, 'ko', '❌');
+    });
+}
+
+
+// ── Commande, achat, réception ─────────────────────────────────────
+
+function htmlSuiteDem(d) {
+  var dm = d.demande, st = dm.statut_affiche, c = d.commande;
+  if (!c) return '';
+  var h = '<div class="titre-section">Commande</div>' +
+    '<button class="ligne" onclick="ouvrirCommande(\'' + e(c.commande_id) + '\')">' +
+      '<div class="corps"><div class="t1">' + e(c.commande_id) + ' · ' + e(c.plateforme) + '</div>' +
+      '<div class="t2">panier ' + usd(c.montant_panier_usd) + ' · frais ' + usd(c.commission_usd) +
+      (c.depot_id ? ' · 💳 ' + e(c.depot_id) : '') + '</div></div>' +
+      '<div class="droite">' + puceCycle(c.statut) + '</div></button>';
+
+  if (dm.numero_commande_plateforme || dm.tracking_vendeur) {
+    h += '<div class="carte serree">' +
+      (dm.numero_commande_plateforme ? '<div class="total"><span class="l">Commande vendeur</span>' +
+        '<span class="mono">' + e(dm.numero_commande_plateforme) + '</span></div>' : '') +
+      (dm.tracking_vendeur ? '<div class="total"><span class="l">Suivi vendeur</span>' +
+        '<span class="mono">' + e(dm.tracking_vendeur) + '</span></div>' : '') +
+      (dm.date_commande ? '<div class="total"><span class="l">Commandée le</span><span>' +
+        dateCourte(dm.date_commande) + '</span></div>' : '') + '</div>';
+  }
+
+  if (!peutSaisir()) return h + htmlColisDem(d);
+
+  if (st === 'payee') {
+    var aujourdhui = new Date().toISOString().slice(0, 10);
+    h += '<div class="titre-section">Passer la commande chez le vendeur</div>' +
+      (c.depot_id ? '' : '<div id="dm-depots">' + chargement('Dépôts disponibles…') + '</div>') +
+      '<label class="champ"><span>Numéro de commande chez le vendeur *</span>' +
+        '<input type="text" id="ach-num" class="mono" spellcheck="false" autocapitalize="characters"></label>' +
+      '<label class="champ"><span>Numéro de suivi du vendeur (si déjà connu)</span>' +
+        '<input type="text" id="ach-tk" class="mono" spellcheck="false" autocapitalize="characters"></label>' +
+      '<div class="duo"><label class="champ"><span>Date</span><input type="date" id="ach-date" value="' +
+        aujourdhui + '"></label>' +
+      '<label class="champ"><span>Montant réellement débité ($)</span><input type="number" ' +
+        'id="ach-montant" step="0.01" min="0" inputmode="decimal" value="' +
+        e(c.montant_panier_usd) + '"></label></div>' +
+      '<div id="ach-res"></div>' +
+      '<button class="btn sombre" id="ach-btn" onclick="commandeeDem(\'' + e(dm.demande_id) +
+        '\',\'' + e(c.depot_id) + '\')">🛍 Marquer « Commandée »</button>';
+  }
+
+  if (st === 'commandee') {
+    var hubs = (Etat.ref && Etat.ref.agences || []).filter(function (a) {
+      return String(a.type).trim() === 'hub';
+    });
+    h += '<div class="titre-section">Arrivée à Miami</div>' +
+      bloc('Le koli entre dans la logistique. S\'il a déjà été scanné à Miami (souvent sur ' +
+           '« À identifier »), il est relié et attribué au client, sans doublon.', 'info', '📦') +
+      '<label class="champ"><span>Numéro(s) de suivi</span><textarea id="rc-tk" class="mono" ' +
+        'rows="2" spellcheck="false">' + e(dm.tracking_vendeur) + '</textarea></label>' +
+      '<div class="duo"><label class="champ"><span>Poids (lb, si pesé)</span><input type="number" ' +
+        'id="rc-poids" step="0.1" min="0" inputmode="decimal"></label>' +
+      '<label class="champ"><span>Point d\'entrée</span><select id="rc-entree">' +
+        '<option value="">— par défaut —</option>' + hubs.map(function (a) {
+          return '<option value="' + e(a.agence_id) + '">' + e(a.ville) + '</option>';
+        }).join('') + '</select></label></div>' +
+      '<div id="rc-res"></div>' +
+      '<button class="btn sombre" id="rc-btn" onclick="recueDem(\'' + e(dm.demande_id) + '\')">' +
+        '📦 Marquer « Reçue aux US »</button>' +
+      '<details style="margin-top:10px"><summary style="font-size:13px;color:var(--doux)">' +
+        'Compléter le numéro de suivi du vendeur</summary>' +
+        '<label class="champ" style="margin-top:8px"><span>Suivi vendeur</span><input type="text" ' +
+          'id="cp-tk" class="mono" value="' + e(dm.tracking_vendeur) + '"></label>' +
+        '<button class="btn vide petit" onclick="completerDem(\'' + e(dm.demande_id) + '\')">' +
+          'Enregistrer</button></details>';
+  }
+
+  return h + htmlColisDem(d);
+}
+
+function htmlColisDem(d) {
+  if (!d.colis.length) return '';
+  var st = d.demande.statut_affiche;
+  return '<div class="titre-section">Koli — suivis dans l\'app Logistique</div>' +
+    d.colis.map(function (x) {
+      return '<div class="ligne"><div class="corps"><div class="t2 mono" ' +
+        'style="color:var(--texte);font-weight:650">' + e(x.tracking) + '</div>' +
+        (x.agence_courante ? '<div class="t2">' + e(x.agence_courante) + '</div>' : '') +
+        '</div><div class="droite"><span class="badge">' + e(x.statut) + '</span>' +
+        (x.poids_lb ? '<div style="font-size:11.5px;color:var(--doux);margin-top:3px">' +
+          n2(x.poids_lb) + ' lb</div>' : '') + '</div></div>';
+    }).join('') +
+    (['recue_usa', 'en_transit', 'disponible'].indexOf(st) !== -1
+      ? bloc('La demande avance toute seule avec les scans de la logistique. Elle passera ' +
+             '« livrée » quand le koli sera facturé et remis.', 'info', '🚚')
+      : '');
+}
+
+/** Les dépôts qui peuvent encore porter ce panier. */
+function chargerDepotsDem() {
+  var z = document.getElementById('dm-depots');
+  if (!z || !Dem.detail || !Dem.detail.commande) return;
+  var panier = Number(Dem.detail.commande.montant_panier_usd) || 0;
+  var peutDepot = Etat.user && Etat.user.droits && Etat.user.droits.gerer_depots;
+  api('depot_lister').then(function (liste) {
+    var ok = liste.filter(function (x) { return x.non_affecte_usd + 0.01 >= panier; });
+    z.innerHTML = (ok.length
+      ? '<label class="champ"><span>Dépôt qui paie cet achat</span><select id="ach-depot">' +
+          ok.map(function (x) {
+            return '<option value="' + e(x.depot_id) + '">' + e(x.depot_id) + ' — ' +
+              usd(x.non_affecte_usd) + ' libres · ' + dateCourte(x.date) + '</option>';
+          }).join('') + '</select></label>'
+      : bloc('Aucun dépôt n\'a assez de solde libre pour ce panier (' + usd(panier) + ').',
+             'attention', '💳')) +
+      (peutDepot ? '<button class="btn vide petit" style="margin-bottom:12px" ' +
+        'onclick="fermerModale();ouvrirNouveauDepot(\'' + e(Dem.detail.commande.commande_id) +
+        '\')">💳 Créer un dépôt pour cette commande</button>'
+        : bloc('Un dépôt s\'enregistre par la direction.', 'info', '🔒'));
+  }).catch(function (err) { z.innerHTML = bloc(err.message, 'ko', '❌'); });
+}
+
+function commandeeDem(id, depotFixe) {
+  var b = document.getElementById('ach-btn');
+  var sel = document.getElementById('ach-depot');
+  var p = {
+    demande_id: id,
+    depot_id: depotFixe || (sel ? sel.value : ''),
+    numero_commande: document.getElementById('ach-num').value.trim(),
+    tracking_vendeur: document.getElementById('ach-tk').value.trim(),
+    date_commande: document.getElementById('ach-date').value,
+    montant_reel_usd: document.getElementById('ach-montant').value
+  };
+  if (!p.numero_commande) {
+    document.getElementById('ach-res').innerHTML = bloc('Le numéro de commande du vendeur est requis.', 'ko', '⚠️');
+    return;
+  }
+  b.disabled = true; b.textContent = 'Enregistrement…';
+  api('cpm_commandee', p).then(function (r) {
+    toast(r.alerte || 'Commandée.', r.alerte ? 'ko' : 'ok');
+    rechargerDemande();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = '🛍 Marquer « Commandée »';
+    document.getElementById('ach-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function completerDem(id) {
+  api('cpm_commandee', { demande_id: id, tracking_vendeur: document.getElementById('cp-tk').value.trim() })
+    .then(function () { toast('Suivi enregistré.', 'ok'); rechargerDemande(); })
+    .catch(function (err) { toast(err.message, 'ko'); });
+}
+
+function recueDem(id) {
+  var b = document.getElementById('rc-btn');
+  var p = { demande_id: id, trackings: document.getElementById('rc-tk').value,
+            poids_lb: document.getElementById('rc-poids').value || 0 };
+  var entree = document.getElementById('rc-entree').value;
+  if (entree) p.agence_entree = entree;
+  b.disabled = true; b.textContent = 'Enregistrement…';
+  api('cpm_recue_usa', p).then(function (r) {
+    toast('Koli dans le circuit : ' + r.trackings.join(', '), 'ok');
+    rechargerDemande();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = '📦 Marquer « Reçue aux US »';
+    document.getElementById('rc-res').innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ── Annulation ─────────────────────────────────────────────────────
+
+function ouvrirAnnulerDem(id, st) {
+  modale('Annuler ' + id,
+    (st === 'payee'
+      ? bloc('La demande est payée : l\'annulation annule aussi la commande et ses revenus. ' +
+             'Réservé à la direction. Le montant à rendre au client te sera indiqué.', 'attention', '💵')
+      : bloc('Aucun argent n\'a été encaissé : seule la demande s\'éteint.', 'info', 'ℹ️')) +
+    '<label class="champ"><span>Motif</span><input type="text" id="an-motif" ' +
+      'placeholder="Ex. articles en rupture"></label><div id="an-res"></div>' +
+    '<button class="btn rouge" onclick="annulerDem(\'' + e(id) + '\')">Annuler la demande</button>');
+}
+
+function annulerDem(id) {
+  api('cpm_annuler', { demande_id: id, motif: document.getElementById('an-motif').value.trim() })
+    .then(function (r) {
+      majModale('Demande annulée',
+        (r.a_rembourser_usd ? bloc(usd(r.a_rembourser_usd) + ' à rendre au client.', 'attention', '💵') : '') +
+        '<a class="btn vert" href="' + e(r.lien_whatsapp) + '" target="_blank" rel="noopener">' +
+        '📲 Prévenir le client</a><button class="btn vide" onclick="ouvrirDemande(\'' + e(id) +
+        '\')">Revenir à la demande</button>');
+      if (Etat.onglet === 'demandes') chargerDemandes();
+    }).catch(function (err) {
+      document.getElementById('an-res').innerHTML = bloc(err.message, 'ko', '❌');
+    });
+}
+
+
+// ── Réglages « Commande pour moi » ─────────────────────────────────
+
+/**
+ * Chaque réglage dit son unité et son effet. Les numéros de paiement et
+ * le texte des conditions restent au fondateur : changer le numéro
+ * MonCash imprimé sur les factures, c'est décider où arrive l'argent de
+ * tous les clients.
+ */
+var REGLAGES_CPM = [
+  { cle: 'TAUX_COMMISSION_DEFAUT', nom: 'Frais de service', unite: '%', fraction: true,
+    aide: 'Le même taux qu\'au comptoir. 0 pour une promotion.' },
+  { cle: 'FRAIS_SERVICE_MIN_USD', nom: 'Frais minimum', unite: '$',
+    aide: 'Appliqué quand le pourcentage donnerait moins.' },
+  { cle: 'CPM_VALIDITE_HEURES', nom: 'Validité d\'une facture', unite: 'h',
+    aide: 'Passé ce délai, le client ne peut plus déclarer de paiement dessus.' },
+  { cle: 'PRIX_LB_USD', nom: 'Fret par livre (estimation)', unite: '$',
+    aide: 'Le prix de la logistique : changer ici le change partout.' },
+  { cle: 'TAUX_ACHAT_USD', nom: 'Taux USD → HTG', unite: 'HTG',
+    aide: 'Le taux d\'achat du dollar, commun à toute l\'entreprise.' },
+  { cle: 'CPM_ACTIF', nom: 'Formulaire ouvert', type: 'oui_non',
+    aide: 'NON : le site renvoie les clients vers WhatsApp.' },
+  { cle: 'CPM_MAX_ARTICLES', nom: 'Articles par demande', unite: '' },
+  { cle: 'CPM_PAIEMENT_MONCASH', nom: 'MonCash (numéro et nom)', type: 'texte' },
+  { cle: 'CPM_PAIEMENT_NATCASH', nom: 'NatCash (numéro et nom)', type: 'texte' },
+  { cle: 'CPM_PAIEMENT_VIREMENT', nom: 'Virement (banque, titulaire, compte)', type: 'texte' },
+  { cle: 'CPM_PAIEMENT_CASH', nom: 'Espèces (où payer)', type: 'texte' },
+  { cle: 'CPM_ARTICLES_INTERDITS', nom: 'Articles interdits', type: 'liste',
+    aide: 'Un par ligne.' },
+  { cle: 'CPM_CONDITIONS', nom: 'Conditions', type: 'liste',
+    aide: 'Une par ligne. {heures} est remplacé par la validité.' },
+  { cle: 'CPM_EMAIL_EQUIPE', nom: 'Courriel de secours de l\'équipe', type: 'texte' },
+  { cle: 'CPM_URL_ADMIN', nom: 'Adresse de cette app (lien Telegram)', type: 'texte' }
+];
+
+function ouvrirReglagesCpm() {
+  modale('Réglages — Commande pour moi', chargement());
+  api('cpm_parametres').then(function (r) {
+    var parCle = {};
+    r.parametres.forEach(function (x) { parCle[x.cle] = x; });
+    var n = r.notifications;
+    majModale('Réglages — Commande pour moi',
+      bloc('Une facture déjà émise garde ses montants : un réglage ne change que les ' +
+           'factures suivantes.', 'info', 'ℹ️') +
+      '<div class="carte serree"><div class="titre-section" style="margin-top:0">Notifications ' +
+        'à l\'équipe</div>' +
+        (n ? '<div style="font-size:13px">Dernière demande ' + e(n.demande_id) + ' (' +
+          dateHeureDem(n.date) + ')<br>Telegram : <b>' + e(n.telegram || '—') + '</b><br>' +
+          'Courriel : <b>' + e(n.email || '—') + '</b></div>'
+          : '<div style="font-size:13px">Aucune demande reçue pour l\'instant.</div>') +
+        '<div style="font-size:12px;color:var(--doux);margin-top:6px">Le bot Telegram se ' +
+          'configure dans les propriétés du projet API publique (TELEGRAM_BOT_TOKEN, ' +
+          'TELEGRAM_CHAT_ID) — jamais dans le classeur, que six agents peuvent ouvrir.</div>' +
+      '</div>' +
+      REGLAGES_CPM.map(function (def) {
+        var x = parCle[def.cle];
+        if (!x) return '';
+        if (!x.present) return bloc(def.cle + ' absent : lance SYNCHRONISER_SCHEMA().', 'attention', '⚠️');
+        var id = 'rg-' + def.cle, dis = x.modifiable ? '' : ' disabled';
+        var champ;
+        if (def.type === 'oui_non') {
+          champ = '<select id="' + id + '"' + dis + '>' + ['OUI', 'NON'].map(function (v) {
+            return '<option' + (String(x.valeur).toUpperCase() === v ? ' selected' : '') + '>' + v + '</option>';
+          }).join('') + '</select>';
+        } else if (def.type === 'liste') {
+          champ = '<textarea id="' + id + '" rows="4"' + dis + '>' +
+            e(String(x.valeur || '').split('|').join('\n')) + '</textarea>';
+        } else if (def.type === 'texte') {
+          champ = '<input type="text" id="' + id + '" value="' + e(x.valeur) + '"' + dis + '>';
+        } else {
+          var v = def.fraction ? r2(Number(x.valeur) * 100) : x.valeur;
+          champ = '<input type="number" step="any" inputmode="decimal" id="' + id + '" value="' +
+            e(v) + '"' + dis + '>';
+        }
+        return '<label class="champ"><span>' + e(def.nom) + (def.unite ? ' (' + def.unite + ')' : '') +
+          (x.sensible ? ' 🔒' : '') + '</span>' + champ + '</label>' +
+          (def.aide ? '<div style="font-size:12px;color:var(--doux);margin:-8px 0 8px">' +
+            e(def.aide) + '</div>' : '') +
+          (x.modifiable ? '<button class="btn vide petit" style="margin-bottom:14px" ' +
+            'onclick="enregistrerReglageCpm(\'' + def.cle + '\')">Enregistrer</button>' : '');
+      }).join('') +
+      '<div style="font-size:12px;color:var(--doux);text-align:center">Module ' +
+        e(r.version_cpm) + '</div>');
+  }).catch(function (err) { majModale('Réglages', erreurDem(err)); });
+}
+
+function enregistrerReglageCpm(cle) {
+  var def = REGLAGES_CPM.filter(function (x) { return x.cle === cle; })[0];
+  var z = document.getElementById('rg-' + cle);
+  var v = z.value;
+  if (def.type === 'liste') {
+    v = v.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).join('|');
+  }
+  if (def.fraction) v = Number(v) / 100;
+  api('cpm_parametres', { cle: cle, valeur: v }).then(function () {
+    toast(def.nom + ' enregistré.', 'ok');
+    z.style.borderColor = 'var(--vert)';
+    if (/^(TAUX_|PRIX_)/.test(cle)) chargerReferentiels();
+  }).catch(function (err) {
+    z.style.borderColor = 'var(--rouge)';
+    toast(err.message, 'ko');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
 //  DÉMARRAGE
 // ═══════════════════════════════════════════════════════════════════
 
@@ -2713,6 +3706,11 @@ if ('serviceWorker' in navigator) {
 (function demarrer() {
   try {
     var h = (location.hash || '').replace('#', '');
+    var lien = /^demande=(.+)$/.exec(h);
+    if (lien) {
+      Etat.onglet = 'demandes';
+      Etat.demandeAOuvrir = decodeURIComponent(lien[1]);
+    }
     if (h && ONGLETS.some(function (o) { return o.id === h; })) Etat.onglet = h;
     history.replaceState({ onglet: Etat.onglet }, '', '#' + Etat.onglet);
   } catch (e) {}
