@@ -2723,7 +2723,9 @@ var MESSAGE_DEM = {
 };
 
 var FiltreDem = { statut: 'en_cours', q: '', du: '', au: '' };
-var Dem = { detail: null, prix: {}, minuteur: null };
+var Dem = { detail: null, prix: {}, minuteur: null, mode: 'total',
+            recap: { total_vendeur_usd: '', nb_articles_vendeur: '', poids_total_lb: '' },
+            recapIds: [], recapEnvoi: false, recapImg: {} };
 
 function infoDem(code) {
   return STATUTS_DEM.filter(function (x) { return x.code === code; })[0] ||
@@ -2862,7 +2864,19 @@ function ouvrirDemande(id) {
         statut_article: a.statut_article === 'indisponible' ? 'indisponible' : 'disponible'
       };
     });
+    /* Le mode : celui de la demande ; sinon celui de sa facture ; sinon
+       « au total du vendeur », la façon de travailler de l'équipe. */
+    var dm = d.demande;
+    Dem.mode = dm.chiffrage_mode || (d.facture && d.facture.mode_chiffrage) || 'total';
+    Dem.recap = {
+      total_vendeur_usd: dm.total_vendeur_usd || '',
+      nb_articles_vendeur: dm.nb_articles_vendeur || '',
+      poids_total_lb: dm.poids_total_lb || ''
+    };
+    Dem.recapIds = (dm.recap_ids || []).slice();
+    if (Dem.recapDe !== dm.demande_id) { Dem.recapImg = {}; Dem.recapDe = dm.demande_id; }
     majModale(d.demande.demande_id, htmlDemande(d));
+    chargerRecapsDem();
     chargerDepotsDem();
   }).catch(function (err) { majModale('Demande', erreurDem(err)); });
 }
@@ -3066,7 +3080,21 @@ function compterDem(articles) {
 function htmlArticlesDem(d) {
   var st = d.demande.statut_affiche;
   var edit = chiffrable(st);
+  var auTotal = edit && Dem.mode === 'total';
   var h = '<div class="titre-section">' + e(compterDem(d.articles)) + '</div>';
+
+  if (edit) {
+    h += '<div class="duo" style="margin-bottom:10px">' +
+      '<button class="btn petit' + (auTotal ? '' : ' vide') + '" style="margin:0" ' +
+        'onclick="modeDem(\'total\')">🧾 Au total du vendeur</button>' +
+      '<button class="btn petit' + (auTotal ? ' vide' : '') + '" style="margin:0" ' +
+        'onclick="modeDem(\'detail\')">✏️ Article par article</button></div>' +
+      '<div style="font-size:12.5px;color:var(--doux);margin:-2px 2px 12px;line-height:1.4">' +
+      (auTotal
+        ? 'Passe le panier chez le vendeur, recopie le <b>total de la commande</b> et joins la ' +
+          'capture du récapitulatif : le client la verra sur sa facture.'
+        : 'Prix, livraison, taxes et poids saisis ligne par ligne.') + '</div>';
+  }
 
   h += d.articles.map(function (a) {
     var x = Dem.prix[a.article_id];
@@ -3096,6 +3124,13 @@ function htmlArticlesDem(d) {
     }
 
     var id = e(a.article_id);
+    if (auTotal) {
+      return '<div class="article" id="art-' + id + '"' + (indispo ? ' style="opacity:.7"' : '') + '>' +
+        entete +
+        '<label class="coche' + (indispo ? '' : ' on') + '" style="margin-bottom:0">' +
+          '<input type="checkbox" ' + (indispo ? '' : 'checked') + ' onchange="dispoDem(\'' + id +
+          '\',this.checked)"><span class="corps">Disponible chez le vendeur</span></label></div>';
+    }
     var champ = function (cle, lib, pas) {
       return '<label class="champ"><span>' + lib + '</span><input type="number" step="' + pas +
         '" min="0" inputmode="decimal" value="' + e(x[cle]) + '" ' +
@@ -3119,6 +3154,8 @@ function htmlArticlesDem(d) {
     '</div>';
   }).join('');
 
+  if (auTotal) h += htmlRecapDem(d);
+
   if (edit) {
     h += '<div class="carte" id="dm-apercu">' + htmlApercuDem(d) + '</div>' +
       '<div id="dm-fact-res"></div>' +
@@ -3133,9 +3170,11 @@ function htmlArticlesDem(d) {
  *  Le serveur recalcule tout à la génération : c'est lui qui fait foi. */
 function calculDem(d) {
   var p = d.parametres, sous = 0, poids = 0, n = 0, manque = false;
+  var auTotal = Dem.mode === 'total';
   d.articles.forEach(function (a) {
     var x = Dem.prix[a.article_id];
     if (x.statut_article === 'indisponible') return;
+    if (auTotal) { n++; return; }
     var q = estPanierDem(a) ? 1 : Math.max(1, Math.round(Number(x.quantite) || 1));
     var pu = r2(x.prix_unitaire_usd);
     if (!(pu > 0)) manque = true;
@@ -3143,6 +3182,11 @@ function calculDem(d) {
     poids += Math.max(0, Number(x.poids_estime_lb) || 0) * q;
     n++;
   });
+  if (auTotal) {
+    sous = r2(Dem.recap.total_vendeur_usd);
+    poids = Math.max(0, Number(Dem.recap.poids_total_lb) || 0);
+    manque = !(sous > 0);
+  }
   sous = r2(sous);
   var auPct = r2(sous * p.taux_service);
   var frais = sous > 0 ? Math.max(auPct, r2(p.frais_min)) : 0;
@@ -3155,16 +3199,155 @@ function calculDem(d) {
 
 function htmlApercuDem(d) {
   var c = calculDem(d), p = d.parametres;
-  return '<div class="total"><span class="l">Sous-total produits (' + c.n + ')</span><span>' +
+  var auTotal = Dem.mode === 'total';
+  var nb = Math.round(Number(Dem.recap.nb_articles_vendeur) || 0);
+  return '<div class="total"><span class="l">' +
+      (auTotal ? 'Total chez le vendeur' + (nb ? ' (' + nb + ' article' + (nb > 1 ? 's' : '') + ')' : '')
+               : 'Sous-total produits (' + c.n + ')') + '</span><span>' +
       usd(c.sous) + '</span></div>' +
     '<div class="total"><span class="l">Frais de service ' + pct(p.taux_service) +
       (c.mini ? ' → minimum ' + usd(p.frais_min) : '') + '</span><span>' + usd(c.frais) + '</span></div>' +
     '<div class="total gros"><span class="l">À payer</span><span>' + usd(c.aPayer) + '</span></div>' +
     '<div class="total"><span class="l">En gourdes (taux ' + n0(p.taux_htg) + ')</span><b>' +
       htg(c.htg) + '</b></div>' +
-    '<div class="total"><span class="l">Fret estimé · ' + n2(c.poids) + ' lb · payé au retrait</span><span>' +
-      usd(c.fret) + '</span></div>' +
-    (c.manque ? bloc('Un article disponible n\'a pas de prix.', 'attention', '⚠️') : '');
+    (c.poids > 0
+      ? '<div class="total"><span class="l">Fret estimé · ' + n2(c.poids) + ' lb · payé au retrait</span><span>' +
+          usd(c.fret) + '</span></div>'
+      : '<div class="total"><span class="l">Fret</span><span>au retrait, au poids réel</span></div>') +
+    (c.manque ? bloc(auTotal ? 'Mets le total de la commande chez le vendeur.'
+                             : 'Un article disponible n\'a pas de prix.', 'attention', '⚠️') : '') +
+    (auTotal && !Dem.recapIds.length
+      ? bloc('Ajoute la capture du récapitulatif : sans elle, pas de facture.', 'attention', '📷') : '') +
+    (auTotal && !nb ? bloc('Mets le nombre d\'articles du récapitulatif.', 'attention', '⚠️') : '');
+}
+
+/* ── Au total du vendeur ──────────────────────────────────────────
+   Le récapitulatif de Shein (« Retail Price : 8 Items … Total de la
+   commande ») montre déjà prix, livraison, promotions et taxes. On ne
+   les recopie plus : un total, un nombre d'articles, la capture. */
+
+function modeDem(m) {
+  Dem.mode = m === 'detail' ? 'detail' : 'total';
+  majModale(Dem.detail.demande.demande_id, htmlDemande(Dem.detail));
+  if (Dem.mode === 'total') chargerRecapsDem();
+}
+
+function htmlRecapDem(d) {
+  var r = Dem.recap;
+  var champ = function (cle, lib, pas, mode) {
+    return '<label class="champ"><span>' + lib + '</span><input type="number" step="' + pas +
+      '" min="0" inputmode="' + mode + '" value="' + e(r[cle]) + '" ' +
+      'oninput="recapDem(\'' + cle + '\',this.value)"></label>';
+  };
+  var vignettes = Dem.recapIds.map(function (id) {
+    return '<div class="article" style="padding:8px;margin-bottom:8px">' +
+      '<div id="rc-' + e(id) + '">' + (Dem.recapImg[id] ? imgRecapDem(Dem.recapImg[id]) : chargement('Capture…')) + '</div>' +
+      '<button class="btn vide petit" style="width:auto;margin:0" onclick="retirerRecapDem(\'' +
+        e(id) + '\')">🗑 Retirer cette capture</button></div>';
+  }).join('');
+
+  return '<div class="carte" style="margin-bottom:12px">' +
+    '<div style="font-weight:700;margin-bottom:8px">Récapitulatif du vendeur</div>' +
+    '<div class="duo">' + champ('total_vendeur_usd', 'Total de la commande ($)', '0.01', 'decimal') +
+      champ('nb_articles_vendeur', 'Nombre d\'articles', '1', 'numeric') + '</div>' +
+    champ('poids_total_lb', 'Poids estimé (lb) — facultatif', '0.1', 'decimal') +
+    '<div style="font-size:12px;color:var(--doux);margin:2px 2px 10px">Le total tel qu\'affiché, ' +
+      'livraison, promotions et taxes comprises. Sans poids, le fret s\'annonce « au retrait ».</div>' +
+    vignettes +
+    (Dem.recapIds.length < 3
+      ? '<label class="btn vide" style="margin-bottom:0">' +
+          (Dem.recapEnvoi ? '⏳ Envoi de la capture…' : '📷 ' + (Dem.recapIds.length
+            ? 'Ajouter une autre capture' : 'Joindre la capture du récapitulatif')) +
+          '<input type="file" accept="image/*" style="display:none" ' +
+          (Dem.recapEnvoi ? 'disabled ' : '') + 'onchange="ajouterRecapDem(this)"></label>'
+      : '') +
+    '<div id="rc-res"></div></div>';
+}
+
+function recapDem(cle, v) {
+  Dem.recap[cle] = v;
+  var z = document.getElementById('dm-apercu');
+  if (z) z.innerHTML = htmlApercuDem(Dem.detail);
+}
+
+function imgRecapDem(src) {
+  return '<img src="' + src + '" alt="Récapitulatif du vendeur" style="max-width:100%;max-height:420px;' +
+    'border-radius:9px;border:1px solid var(--bord);margin-bottom:8px;display:block">';
+}
+
+/** Les vignettes, chargées après l'affichage et gardées : redessiner la
+ *  fiche (une case cochée, un chiffre tapé) ne les retélécharge pas. */
+function chargerRecapsDem() {
+  var dem = Dem.detail && Dem.detail.demande;
+  if (!dem) return;
+  Dem.recapIds.forEach(function (id) {
+    if (Dem.recapImg[id] || Dem.recapImg[id] === false) return;
+    Dem.recapImg[id] = false;   // en cours
+    api('cpm_image', { type: 'recap', id: id, demande_id: dem.demande_id }).then(function (r) {
+      Dem.recapImg[id] = 'data:' + r.mime + ';base64,' + r.base64;
+      var z = document.getElementById('rc-' + id);
+      if (z) z.innerHTML = imgRecapDem(Dem.recapImg[id]);
+    }).catch(function (err) {
+      delete Dem.recapImg[id];
+      var z = document.getElementById('rc-' + id);
+      if (z) z.innerHTML = bloc(err.message, 'ko', '❌');
+    });
+  });
+}
+
+/** Une capture d'écran de téléphone pèse lourd : réduite avant l'envoi,
+ *  assez nette pour que les chiffres restent lisibles. */
+function reduireImageDem(fichier) {
+  return new Promise(function (ok, ko) {
+    if (!fichier || !/^image\//.test(fichier.type)) return ko(new Error('Choisis une image.'));
+    var url = URL.createObjectURL(fichier);
+    var img = new Image();
+    img.onload = function () {
+      var max = 1600, w = img.naturalWidth, h = img.naturalHeight;
+      var k = Math.min(1, max / Math.max(w, h));
+      var c = document.createElement('canvas');
+      c.width = Math.round(w * k); c.height = Math.round(h * k);
+      var g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      var data = c.toDataURL('image/jpeg', 0.85);
+      ok({ mime: 'image/jpeg', base64: data.split(',')[1] });
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); ko(new Error('Image illisible.')); };
+    img.src = url;
+  });
+}
+
+function ajouterRecapDem(input) {
+  var f = input.files && input.files[0];
+  input.value = '';
+  if (!f || Dem.recapEnvoi) return;
+  var id = Dem.detail.demande.demande_id;
+  Dem.recapEnvoi = true;
+  majModale(id, htmlDemande(Dem.detail)); chargerRecapsDem();
+  reduireImageDem(f).then(function (img) {
+    return api('cpm_recap_ajouter', { demande_id: id, mime: img.mime, base64: img.base64 });
+  }).then(function (r) {
+    Dem.recapEnvoi = false;
+    Dem.recapIds = r.recap_ids;
+    Dem.detail.demande.recap_ids = r.recap_ids;
+    toast('Capture jointe.', 'ok');
+    majModale(id, htmlDemande(Dem.detail)); chargerRecapsDem();
+  }).catch(function (err) {
+    Dem.recapEnvoi = false;
+    majModale(id, htmlDemande(Dem.detail)); chargerRecapsDem();
+    toast(err.message, 'ko');
+  });
+}
+
+function retirerRecapDem(rid) {
+  var id = Dem.detail.demande.demande_id;
+  api('cpm_recap_retirer', { demande_id: id, id: rid }).then(function (r) {
+    Dem.recapIds = r.recap_ids;
+    Dem.detail.demande.recap_ids = r.recap_ids;
+    majModale(id, htmlDemande(Dem.detail)); chargerRecapsDem();
+  }).catch(function (err) { toast(err.message, 'ko'); });
 }
 
 function prixDem(id, cle, v) {
@@ -3176,6 +3359,7 @@ function prixDem(id, cle, v) {
 function dispoDem(id, coche) {
   Dem.prix[id].statut_article = coche ? 'disponible' : 'indisponible';
   majModale(Dem.detail.demande.demande_id, htmlDemande(Dem.detail));
+  chargerRecapsDem();
 }
 
 function facturerDem(id) {
@@ -3190,7 +3374,16 @@ function facturerDem(id) {
   var articles = Object.keys(Dem.prix).map(function (k) {
     return Object.assign({ article_id: k }, Dem.prix[k]);
   });
-  api('cpm_facturer', { demande_id: id, articles: articles }).then(function (r) {
+  var envoi = { demande_id: id, articles: articles, mode: Dem.mode };
+  if (Dem.mode === 'total') {
+    envoi.articles = articles.map(function (a) {
+      return { article_id: a.article_id, statut_article: a.statut_article };
+    });
+    envoi.total_vendeur_usd = Dem.recap.total_vendeur_usd;
+    envoi.nb_articles_vendeur = Dem.recap.nb_articles_vendeur;
+    envoi.poids_total_lb = Dem.recap.poids_total_lb || 0;
+  }
+  api('cpm_facturer', envoi).then(function (r) {
     toast('Facture ' + r.facture.facture_id + ' — ' + usd(r.facture.a_payer_usd), 'ok');
     rechargerDemande();
   }).catch(function (err) {
@@ -3199,10 +3392,10 @@ function facturerDem(id) {
   });
 }
 
-function voirImageDem(type, id, zone) {
+function voirImageDem(type, id, zone, demandeId) {
   var z = document.getElementById(zone);
   z.innerHTML = chargement('Image…');
-  api('cpm_image', { type: type, id: id }).then(function (r) {
+  api('cpm_image', { type: type, id: id, demande_id: demandeId || '' }).then(function (r) {
     z.innerHTML = '<img src="data:' + e(r.mime) + ';base64,' + r.base64 + '" alt="" ' +
       'style="max-width:100%;max-height:340px;border-radius:9px;border:1px solid var(--bord);' +
       'margin-bottom:8px;display:block">';
@@ -3214,8 +3407,12 @@ function voirImageDem(type, id, zone) {
 
 function htmlFactureDem(d) {
   var f = d.facture, dm = d.demande;
+  var auTotal = f.mode_chiffrage === 'total';
   var h = '<div class="titre-section">Facture ' + e(f.facture_id) + '</div><div class="carte">' +
-    '<div class="total"><span class="l">Sous-total produits</span><span>' +
+    '<div class="total"><span class="l">' + (auTotal
+        ? 'Total chez le vendeur (' + f.nb_articles_vendeur + ' art., ' + f.recap_ids.length +
+          ' capture' + (f.recap_ids.length > 1 ? 's' : '') + ')'
+        : 'Sous-total produits') + '</span><span>' +
       usd(f.sous_total_produits_usd) + '</span></div>' +
     '<div class="total"><span class="l">Frais de service</span><span>' + usd(f.frais_service_usd) +
       '</span></div>' +
@@ -3223,7 +3420,7 @@ function htmlFactureDem(d) {
     '<div class="total"><span class="l">En gourdes (taux ' + n0(f.taux_htg) + ')</span><b>' +
       htg(f.a_payer_htg) + '</b></div>' +
     '<div class="total"><span class="l">Fret estimé (au retrait)</span><span>' +
-      usd(f.fret_estime_usd) + '</span></div>' +
+      (f.poids_estime_lb > 0 ? usd(f.fret_estime_usd) : 'au poids réel') + '</span></div>' +
     '<div class="total"><span class="l">Valable jusqu\'au</span><b style="color:' +
       (f.expiree ? 'var(--rouge)' : 'inherit') + '">' + dateHeureDem(f.valide_jusqu) +
       (f.expiree ? ' — expirée' : '') + '</b></div>' +
@@ -3236,8 +3433,11 @@ function htmlFactureDem(d) {
 
   if (f.expiree && peutSaisir()) {
     h += bloc('Facture expirée : les prix et le taux ne sont plus garantis. Une nouvelle ' +
-              'facture reprend les montants saisis sur les articles, avec les paramètres du ' +
-              'jour — vérifie d\'abord si le vendeur a changé ses prix.', 'attention', '⏰') +
+              'facture reprend ' + (auTotal ? 'le total et les captures du récapitulatif'
+                                            : 'les montants saisis sur les articles') +
+              ', avec les paramètres du jour — vérifie d\'abord si le vendeur a changé ses ' +
+              'prix' + (auTotal ? ' ; sinon, rechiffre au-dessus avec une nouvelle capture' : '') +
+              '.', 'attention', '⏰') +
       '<button class="btn" onclick="regenererDem(\'' + e(dm.demande_id) + '\')">' +
       '🔁 Régénérer la facture au prix du jour</button>';
   }
