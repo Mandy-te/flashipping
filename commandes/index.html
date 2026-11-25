@@ -2837,7 +2837,7 @@ function ligneDemande(x) {
     '<div class="droite">' +
       (x.a_payer_usd !== null ? '<div style="font-weight:800;font-size:14.5px">' +
         usd(x.a_payer_usd) + '</div>' : '') +
-      '<div style="font-size:12px;color:var(--doux)">' + x.nb_articles + ' article' +
+      '<div style="font-size:12px;color:var(--doux)">' + x.nb_articles + ' lien' +
         (x.nb_articles > 1 ? 's' : '') + '</div>' +
       (x.commande_id ? '<div style="font-size:11.5px;color:var(--doux)">' +
         e(x.commande_id) + '</div>' : '') +
@@ -2858,7 +2858,7 @@ function ouvrirDemande(id) {
         livraison_vendeur_usd: a.livraison_vendeur_usd || '',
         taxes_vendeur_usd: a.taxes_vendeur_usd || '',
         poids_estime_lb: a.poids_estime_lb || '',
-        quantite: a.quantite || 1,
+        quantite: estPanierDem(a) ? 1 : a.quantite || 1,
         statut_article: a.statut_article === 'indisponible' ? 'indisponible' : 'disponible'
       };
     });
@@ -3051,19 +3051,34 @@ function chiffrable(st) {
   return ['nouvelle', 'facture_envoyee', 'facture_expiree'].indexOf(st) !== -1 && peutSaisir();
 }
 
+/* Un panier partagé en entier : le client a déjà choisi tailles, couleurs
+   et quantités chez le vendeur. Il se chiffre d'un bloc — le prix du
+   panier, le poids du panier — et sa quantité reste 1. */
+function estPanierDem(a) { return a && a.type_article === 'panier'; }
+
+function compterDem(articles) {
+  var p = articles.filter(estPanierDem).length, a = articles.length - p, m = [];
+  if (a) m.push(a + ' article' + (a > 1 ? 's' : ''));
+  if (p) m.push(p + ' panier' + (p > 1 ? 's' : ''));
+  return m.join(' et ') || '0 article';
+}
+
 function htmlArticlesDem(d) {
   var st = d.demande.statut_affiche;
   var edit = chiffrable(st);
-  var h = '<div class="titre-section">Articles — ' + d.articles.length + '</div>';
+  var h = '<div class="titre-section">' + e(compterDem(d.articles)) + '</div>';
 
   h += d.articles.map(function (a) {
     var x = Dem.prix[a.article_id];
     var indispo = x.statut_article === 'indisponible';
+    var panier = estPanierDem(a);
     var entete =
       '<div class="tete"><span class="num">' + a.rang + '</span>' +
         '<b>' + e(a.plateforme) + '</b>' +
-        '<span style="font-size:12.5px;color:var(--doux)">' +
-          [a.taille, a.couleur].filter(Boolean).map(e).join(' · ') + '</span></div>' +
+        (panier
+          ? '<span class="etat" style="background:#E3F2FD">🛒 Panier entier</span>'
+          : '<span style="font-size:12.5px;color:var(--doux)">' +
+              [a.taille, a.couleur].filter(Boolean).map(e).join(' · ') + '</span>') + '</div>' +
       '<a href="' + e(a.url_produit) + '" target="_blank" rel="noopener noreferrer" ' +
         'style="font-size:12.5px;word-break:break-all;display:block;margin-bottom:6px">' +
         e(a.url_produit) + ' ↗</a>' +
@@ -3074,7 +3089,8 @@ function htmlArticlesDem(d) {
 
     if (!edit) {
       return '<div class="article' + (indispo ? '" style="opacity:.55' : '') + '">' + entete +
-        '<div style="font-size:13px;color:var(--doux)">' + a.quantite + ' × ' +
+        '<div style="font-size:13px;color:var(--doux)">' +
+        (panier ? 'Panier : ' : a.quantite + ' × ') +
         (a.prix_unitaire_usd ? usd(a.prix_unitaire_usd) : '—') +
         (indispo ? ' · <b>indisponible</b>' : '') + '</div></div>';
     }
@@ -3090,11 +3106,16 @@ function htmlArticlesDem(d) {
       '<label class="coche' + (indispo ? '' : ' on') + '" style="margin-bottom:9px">' +
         '<input type="checkbox" ' + (indispo ? '' : 'checked') + ' onchange="dispoDem(\'' + id +
         '\',this.checked)"><span class="corps">Disponible chez le vendeur</span></label>' +
-      '<div class="duo">' + champ('prix_unitaire_usd', 'Prix unitaire ($)', '0.01') +
-        champ('quantite', 'Quantité', '1') + '</div>' +
-      '<div class="trio">' + champ('livraison_vendeur_usd', 'Livraison vendeur ($)', '0.01') +
-        champ('taxes_vendeur_usd', 'Taxes vendeur ($)', '0.01') +
-        champ('poids_estime_lb', 'Poids / unité (lb)', '0.1') + '</div>' +
+      (panier
+        ? '<div class="duo">' + champ('prix_unitaire_usd', 'Prix du panier ($)', '0.01') +
+            champ('poids_estime_lb', 'Poids du panier (lb)', '0.1') + '</div>' +
+          '<div class="duo">' + champ('livraison_vendeur_usd', 'Livraison vendeur ($)', '0.01') +
+            champ('taxes_vendeur_usd', 'Taxes vendeur ($)', '0.01') + '</div>'
+        : '<div class="duo">' + champ('prix_unitaire_usd', 'Prix unitaire ($)', '0.01') +
+            champ('quantite', 'Quantité', '1') + '</div>' +
+          '<div class="trio">' + champ('livraison_vendeur_usd', 'Livraison vendeur ($)', '0.01') +
+            champ('taxes_vendeur_usd', 'Taxes vendeur ($)', '0.01') +
+            champ('poids_estime_lb', 'Poids / unité (lb)', '0.1') + '</div>') +
     '</div>';
   }).join('');
 
@@ -3115,7 +3136,7 @@ function calculDem(d) {
   d.articles.forEach(function (a) {
     var x = Dem.prix[a.article_id];
     if (x.statut_article === 'indisponible') return;
-    var q = Math.max(1, Math.round(Number(x.quantite) || 1));
+    var q = estPanierDem(a) ? 1 : Math.max(1, Math.round(Number(x.quantite) || 1));
     var pu = r2(x.prix_unitaire_usd);
     if (!(pu > 0)) manque = true;
     sous += r2(pu * q + r2(x.livraison_vendeur_usd) + r2(x.taxes_vendeur_usd));
