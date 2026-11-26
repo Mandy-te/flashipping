@@ -1118,9 +1118,19 @@ function ouvrirEtats() {
           htg(b.passif.dettes_gdes) + '</span></div>' +
         '<div class="total"><span class="l">Capitaux propres</span><span>' +
           htg(b.passif.capitaux_propres_gdes) + '</span></div>' +
+        /* Tant que l'écart n'est pas tranché, il s'affiche : c'est une
+           question ouverte. Une fois la correction passée en réunion,
+           c'est son montant et sa date qui s'affichent à la place —
+           elle a retiré de l'argent des comptes des associés, et ça ne
+           doit pas s'effacer de l'écran le jour où on le décide. */
         (b.passif.ecart_heritage_gdes
           ? '<div class="ligne"><span class="l">Correction exercice antérieur</span>' +
             '<span>' + htg(b.passif.ecart_heritage_gdes) + '</span></div>' : '') +
+        (b.passif.correction_passee_gdes
+          ? '<div class="ligne"><span class="l">dont correction passée' +
+            (b.passif.correction_passee_date
+              ? ' le ' + dateCourte(b.passif.correction_passee_date) : '') +
+            '</span><span>' + htg(-b.passif.correction_passee_gdes) + '</span></div>' : '') +
         '<div class="total gros"><span class="l">Total passif</span><span>' +
           htg(b.passif.total_gdes) + '</span></div>' +
         (b.equilibre
