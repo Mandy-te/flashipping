@@ -4234,8 +4234,7 @@ function rendreLivraison() {
         'value="' + e(payeVal) + '" placeholder="' + n2(t.net) + '" ' +
         'oninput="majResteLivraison()"></label>' +
       '<div class="rangee-btn" style="margin-bottom:10px">' +
-        '<button class="btn vide petit" onclick="document.getElementById(\'lv-paye\')' +
-          '.value=' + t.net + ';majResteLivraison()">Payé en entier</button>' +
+        '<button class="btn vide petit" onclick="payerEnEntier()">Payé en entier</button>' +
         '<button class="btn vide petit" onclick="document.getElementById(\'lv-paye\')' +
           '.value=0;majResteLivraison()">Rien payé</button>' +
       '</div>' +
@@ -4286,23 +4285,74 @@ function blocTotaux() {
         'inputmode="decimal" value="' + e(remiseVal) + '" ' +
         'oninput="majTotauxSeuls()"></label>'
       : '') +
-    (t.remise > 0
-      ? '<div class="total"><span class="l">Remise</span><span>-' +
-        usd(t.remise) + '</span></div>' : '') +
+    /* Conteneur toujours présent, même vide : la ligne « Remise »
+       apparaît et disparaît au fil de la frappe, et on ne peut pas
+       repeindre un élément qui n'existe pas. */
+    '<div id="lv-ligne-remise">' + ligneRemise(t.remise) + '</div>' +
 
-    '<div class="total gros"><span class="l">À payer</span><span>' +
+    '<div class="total gros"><span class="l">À payer</span><span id="lv-net">' +
       usd(t.net) + '</span></div>' +
-    '<div class="total"><span class="l">Au taux ' + n0(d.taux) + '</span><b>' +
+    '<div class="total"><span class="l">Au taux ' + n0(d.taux) + '</span><b id="lv-htg">' +
       htg(t.htg) + '</b></div>';
 }
 
+function ligneRemise(r) {
+  return r > 0
+    ? '<div class="total"><span class="l">Remise</span><span>-' + usd(r) + '</span></div>'
+    : '';
+}
+
 /* La remise se tape caractère par caractère : repeindre son propre
-   champ à chaque frappe lui ferait perdre le curseur. On ne touche
-   donc qu'au reste dû. */
+   champ à chaque frappe lui ferait perdre le curseur. On repeint donc
+   tout ce qui dépend d'elle, un nœud à la fois, sauf ce champ-là.
+
+   Ne repeindre que « À payer » — ce que faisait cette fonction —
+   laissait trois chiffres en arrière, tous visibles par l'agent et par
+   le client :
+
+   · la conversion en gourdes, qui restait calculée sur le prix PLEIN.
+     Sur une remise de 1,25 $ au taux 135, l'écran réclamait 2 734 HTG
+     au lieu de 2 565. Le client payait donc la remise de sa poche, et
+     les 169 gourdes de trop n'apparaissaient nulle part : le serveur
+     plafonne l'encaissement au net, la facture se solde à 19 $, et le
+     surplus restait dans la caisse sans ligne pour l'expliquer ;
+   · la ligne « Remise », qui n'apparaissait jamais — elle n'est
+     construite que si une remise existe DÉJÀ au moment du rendu ;
+   · le montant encaissé proposé, resté au prix d'avant. */
 function majTotauxSeuls() {
   var t = totauxLivraison();
-  var z = document.querySelector('#lv-totaux .total.gros span:last-child');
+
+  var z = document.getElementById('lv-net');
   if (z) z.textContent = usd(t.net);
+
+  var g = document.getElementById('lv-htg');
+  if (g) g.textContent = htg(t.htg);
+
+  var lr = document.getElementById('lv-ligne-remise');
+  if (lr) lr.innerHTML = ligneRemise(t.remise);
+
+  var champ = document.getElementById('lv-paye');
+  if (champ) {
+    champ.placeholder = n2(t.net);
+    /* On ne corrige QUE vers le bas. Un agent qui a saisi un paiement
+       partiel garde son chiffre ; mais un montant devenu supérieur au
+       net — typiquement celui qu'avait écrit « Payé en entier » avant
+       la remise — ferait réclamer plus que dû. */
+    if (champ.value !== '' && Number(champ.value) > t.net) {
+      champ.value = t.net;
+    }
+  }
+
+  majResteLivraison();
+}
+
+/* Le montant du moment, pas celui d'il y a trois frappes.
+   Ce bouton portait la valeur en dur, figée au rendu de l'écran :
+   accorder une remise ensuite ne la changeait plus. */
+function payerEnEntier() {
+  var champ = document.getElementById('lv-paye');
+  if (!champ) return;
+  champ.value = totauxLivraison().net;
   majResteLivraison();
 }
 
@@ -4333,6 +4383,12 @@ function validerLivraison() {
   var trackings = Object.keys(Livr.coches).filter(function (k) { return Livr.coches[k]; });
   var saisi = document.getElementById('lv-paye').value;
   var paye = saisi === '' ? t.net : Number(saisi) || 0;
+  /* Le serveur plafonne déjà au net — c'est lui qui fait foi. On
+     plafonne quand même ici pour que les deux côtés racontent la même
+     chose : un écran qui annonce 20,25 $ encaissés sur une facture de
+     19 $ est un écart que personne ne saura expliquer au comptoir. */
+  if (paye < 0) paye = 0;
+  if (paye > t.net) paye = t.net;
 
   var b = document.getElementById('lv-btn');
   b.disabled = true; b.textContent = 'Facturation…';
