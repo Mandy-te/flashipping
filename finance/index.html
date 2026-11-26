@@ -695,6 +695,7 @@ var TOUS_ONGLETS = [
   { id: 'caisse',   ic: '💰', nom: 'Caisse',   droit: 'voir_finance' },
   { id: 'saisie',   ic: '✍️', nom: 'Saisie',   droit: 'saisir_finance' },
   { id: 'journal',  ic: '📜', nom: 'Journal',  droit: 'voir_finance' },
+  { id: 'dettes',   ic: '🏦', nom: 'Dettes',   droit: 'voir_finance' },
   { id: 'associes', ic: '👥', nom: 'Associés', droit: 'voir_parts' },
   { id: 'cloture',  ic: '🔒', nom: 'Clôture',  droit: 'cloturer' }
 ];
@@ -776,6 +777,7 @@ function rendreOnglet() {
     case 'caisse':   return ongletCaisse();
     case 'saisie':   return ongletSaisie();
     case 'journal':  return ongletJournal();
+    case 'dettes':   return ongletDettes();
     case 'associes': return ongletAssocies();
     case 'cloture':  return ongletCloture();
   }
@@ -2512,6 +2514,352 @@ function imprimerRegistre() {
   h += piedDocFin('') + '</div>';
   imprimer(h, 'a4');
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  LES DETTES
+//
+//  Jusqu'ici une dette n'existait que comme un total dans le bilan :
+//  « Dettes — 0 HTG ». Pas de créancier, pas d'échéance, pas de reste
+//  dû, aucun moyen d'enregistrer un remboursement. Le serveur savait
+//  pourtant déjà tout calculer : aucune des six apps n'appelait la
+//  fonction.
+//
+//  Un versement est UN geste et DEUX écritures : le capital rendu ne
+//  change pas la richesse — on devait déjà cet argent — tandis que
+//  l'intérêt est une charge comme un loyer. L'écran le dit en toutes
+//  lettres, parce que c'est la ligne que tout le monde se trompe à
+//  saisir.
+// ═══════════════════════════════════════════════════════════════════
+
+var Det = { etat: null, ouverte: null };
+
+function ongletDettes() {
+  poser(chargement('Lecture des dettes…'));
+
+  api('dettes').then(function (d) {
+    Det.etat = d;
+
+    var h =
+      '<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v">' + court(d.total_du_gdes) + '</div>' +
+          '<div class="l">reste dû</div></div>' +
+        '<div class="stat"><div class="v" style="color:' +
+          (d.total_retard_gdes > 1 ? 'var(--rouge)' : 'var(--doux)') + '">' +
+          court(d.total_retard_gdes) + '</div><div class="l">en retard</div></div>' +
+        '<div class="stat"><div class="v">' + court(d.a_prevoir_30j_gdes) + '</div>' +
+          '<div class="l">à sortir sous 30 j</div></div>' +
+      '</div>';
+
+    /* Une trésorerie qui paraît confortable ne l'est pas si les
+       échéances du mois la dépassent. On le dit ici, pas au moment
+       où le virement est refusé. */
+    if (d.a_prevoir_30j_gdes > 1) {
+      h += bloc('À sortir d\'ici 30 jours : ' + htg(d.a_prevoir_30j_gdes) +
+                '. Regarde la caisse avant d\'engager autre chose.',
+                d.total_retard_gdes > 1 ? 'attention' : 'info', '📅');
+    }
+
+    if (!d.dettes.length) {
+      h += bloc('Aucune dette enregistrée. Une dette naît toute seule quand ' +
+                'tu saisis un « Encaissement emprunt » dans Saisie.', 'info', '🏦');
+      poser(h);
+      return;
+    }
+
+    h += '<div class="titre-section">Ce que nous devons</div>';
+
+    h += d.dettes.map(function (x) {
+      var soldee = x.statut === 'Soldee';
+      var prochaine = x.prochaine_echeance;
+
+      var etiquette = soldee
+        ? '<span style="color:var(--vert);font-weight:700">Soldée</span>'
+        : x.en_retard
+          ? '<span style="color:var(--rouge);font-weight:700">En retard de ' +
+            htg(x.retard_gdes) + '</span>'
+          : prochaine
+            ? 'Prochaine : ' + dateCourte(prochaine.date) + ' · ' +
+              htg(prochaine.a_verser_gdes)
+            : x.echeance
+              ? 'À rendre avant le ' + dateCourte(x.echeance)
+              : 'Sans échéance convenue';
+
+      return '<div class="carte" style="cursor:pointer" ' +
+        'onclick="ouvrirDette(\'' + x.dette_id + '\')">' +
+        '<div style="display:flex;justify-content:space-between;gap:10px">' +
+          '<div>' +
+            '<div style="font-weight:800">' + e(x.creancier || 'Créancier à préciser') +
+              '</div>' +
+            '<div style="color:var(--doux);font-size:12.5px;margin-top:2px">' +
+              e(x.type_dette || 'Emprunt') + ' · ' + x.dette_id +
+              (x.mode_remboursement === 'Mensualites'
+                ? ' · ' + x.duree_mois + ' mois à ' + n2(x.taux_interet) + ' % ' +
+                  (x.taux_periodicite === 'Mensuel' ? 'par mois' : 'par an')
+                : ' · remboursement libre') +
+            '</div>' +
+            '<div style="font-size:12.5px;margin-top:6px">' + etiquette + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;flex:none">' +
+            '<div style="font-weight:800;font-size:17px">' + htg(x.reste_du_gdes) +
+              '</div>' +
+            '<div style="color:var(--doux);font-size:11.5px">sur ' +
+              htg(x.montant_initial_gdes) + '</div>' +
+          '</div>' +
+        '</div></div>';
+    }).join('');
+
+    poser(h);
+  }).catch(function (err) {
+    poser(bloc(err.message, 'ko', '❌'));
+  });
+}
+
+
+function detteParId(id) {
+  var t = null;
+  ((Det.etat && Det.etat.dettes) || []).forEach(function (x) {
+    if (x.dette_id === id) t = x;
+  });
+  return t;
+}
+
+
+function ouvrirDette(id) {
+  var x = detteParId(id);
+  if (!x) return;
+  Det.ouverte = id;
+
+  var h = '';
+
+  if (x.statut === 'Soldee') {
+    h += bloc('Dette soldée.', 'ok', '✅');
+  } else if (x.en_retard) {
+    h += bloc('En retard de ' + htg(x.retard_gdes) + '.', 'ko', '⚠️');
+  }
+
+  h += '<div class="carte">' +
+    '<div class="total"><span class="l">Emprunté</span><span>' +
+      htg(x.montant_initial_gdes) + '</span></div>' +
+    '<div class="total"><span class="l">Capital rendu</span><span>' +
+      htg(x.capital_verse_gdes) + '</span></div>' +
+    '<div class="total gros"><span class="l">Reste dû</span><span>' +
+      htg(x.reste_du_gdes) + '</span></div>' +
+    /* Les intérêts versés sont affichés À PART du capital, et jamais
+       additionnés avec lui : les confondre ferait croire qu'on a
+       remboursé plus que ce qu'on devait. */
+    '<div class="total"><span class="l">Intérêts déjà payés</span><span>' +
+      htg(x.interets_verses_gdes) + '</span></div>' +
+    (x.cout_total_interets_gdes > 0
+      ? '<div class="ligne"><span class="l">Coût total du crédit, au terme</span>' +
+        '<span>' + htg(x.cout_total_interets_gdes) + '</span></div>'
+      : '') +
+  '</div>';
+
+  if (x.statut !== 'Soldee') {
+    var prochaine = x.prochaine_echeance;
+    h += '<div class="carte">' +
+      '<div style="font-weight:800;margin-bottom:10px">Enregistrer un versement</div>' +
+      (prochaine
+        ? bloc('Prochaine échéance le ' + dateCourte(prochaine.date) + ' : ' +
+               htg(prochaine.a_verser_gdes) + ', dont ' +
+               htg(prochaine.interet_gdes) + ' d\'intérêt.', 'info', '📅')
+        : '') +
+      '<label class="champ"><span>Montant total remis</span>' +
+        '<input type="number" id="dv-total" step="0.01" inputmode="decimal" ' +
+        'value="' + (prochaine ? prochaine.a_verser_gdes : '') + '"></label>' +
+      '<label class="champ"><span>Dont intérêt ' +
+        '<span style="font-weight:400">— la part qui est une charge</span></span>' +
+        '<input type="number" id="dv-interet" step="0.01" inputmode="decimal" ' +
+        'value="' + (prochaine ? prochaine.interet_gdes : 0) + '"></label>' +
+      '<label class="champ"><span>Devise</span><select id="dv-devise">' +
+        '<option value="Gourdes">Gourdes</option>' +
+        '<option value="USD">USD</option></select></label>' +
+      '<label class="champ"><span>Date</span>' +
+        '<input type="date" id="dv-date" value="' + aujourdhui() + '"></label>' +
+      bloc('Le capital rendu ne touche pas le bénéfice — on devait déjà cet ' +
+           'argent. L\'intérêt, lui, est une charge : l\'oublier gonflerait ' +
+           'le bénéfice d\'un montant qu\'on n\'a jamais gagné.', 'info', '↔️') +
+      '<div id="dv-res"></div>' +
+      '<button class="btn" id="dv-btn" onclick="validerVersement()">' +
+        'Enregistrer le versement</button>' +
+    '</div>';
+  }
+
+  if (x.echeancier && x.echeancier.length) {
+    h += '<div class="carte">' +
+      '<div style="font-weight:800;margin-bottom:8px">Échéancier</div>' +
+      '<div style="color:var(--doux);font-size:12px;margin-bottom:10px">' +
+        'Recalculé à partir du montant, du taux et de la durée — il n\'est ' +
+        'pas stocké, donc il ne peut pas diverger de la dette.</div>' +
+      x.echeancier.map(function (ec) {
+        var passee = ec.date <= aujourdhui();
+        return '<div class="ligne" style="' + (passee ? 'opacity:.55' : '') + '">' +
+          '<span class="l">' + ec.rang + '. ' + dateCourte(ec.date) + '</span>' +
+          '<span>' + htg(ec.a_verser_gdes) +
+            ' <span style="color:var(--doux);font-size:11px">(int. ' +
+            htg(ec.interet_gdes) + ')</span></span></div>';
+      }).join('') +
+    '</div>';
+  }
+
+  if (x.versements && x.versements.length) {
+    h += '<div class="carte">' +
+      '<div style="font-weight:800;margin-bottom:8px">Versements enregistrés</div>' +
+      x.versements.sort(function (a, b) { return a.date < b.date ? 1 : -1; })
+        .map(function (v) {
+          return '<div class="ligne"><span class="l">' + dateCourte(v.date) + ' · ' +
+            (v.nature === 'interet' ? 'intérêt' : 'capital') + '</span>' +
+            '<span>' + htg(v.montant_gdes) + '</span></div>';
+        }).join('') +
+    '</div>';
+  }
+
+  h += '<button class="btn vide" onclick="ouvrirModifDette(\'' + x.dette_id + '\')">' +
+       '✏️ Corriger les conditions</button>';
+
+  modale(x.creancier || x.dette_id, h);
+}
+
+
+function validerVersement() {
+  var res = document.getElementById('dv-res');
+  var b = document.getElementById('dv-btn');
+  var total = Number(document.getElementById('dv-total').value);
+  var interet = Number(document.getElementById('dv-interet').value) || 0;
+
+  if (!total) { res.innerHTML = bloc('Le montant est requis.', 'ko', '⚠️'); return; }
+  if (interet > total) {
+    res.innerHTML = bloc('La part d\'intérêt dépasse le montant remis.', 'ko', '⚠️');
+    return;
+  }
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('dette_verser', {
+    dette_id: Det.ouverte,
+    montant_saisi: total,
+    interet_saisi: interet,
+    devise_saisie: document.getElementById('dv-devise').value,
+    date: document.getElementById('dv-date').value
+  }).then(function (d) {
+    toast(d.soldee ? 'Dette soldée.' : 'Versement enregistré.', 'ok');
+    fermerModale();
+    ongletDettes();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer le versement';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+function ouvrirModifDette(id) {
+  var x = detteParId(id);
+  if (!x) return;
+  Det.ouverte = id;
+
+  modale('Conditions — ' + x.dette_id,
+    bloc('Le montant emprunté ne se corrige pas ici : il correspond à de ' +
+         'l\'argent réellement encaissé, inscrit en face dans les revenus. ' +
+         'Le changer d\'un seul côté ferait diverger la trésorerie du passif.',
+         'info', 'ℹ️') +
+    '<div class="carte">' +
+      '<label class="champ"><span>Créancier</span>' +
+        '<input id="dm-creancier" value="' + e(x.creancier) + '"></label>' +
+      '<label class="champ"><span>Nature</span><select id="dm-type">' +
+        ['Emprunt', 'Credit fournisseur', 'Avance associe', 'Autre'].map(function (t) {
+          return '<option' + (t === x.type_dette ? ' selected' : '') + '>' + t +
+                 '</option>';
+        }).join('') +
+      '</select></label>' +
+      '<label class="champ"><span>Remboursement</span><select id="dm-mode" ' +
+        'onchange="majChampsMensualites()">' +
+        '<option value="Libre"' + (x.mode_remboursement === 'Libre' ? ' selected' : '') +
+          '>Libre — on rend quand on peut</option>' +
+        '<option value="Mensualites"' +
+          (x.mode_remboursement === 'Mensualites' ? ' selected' : '') +
+          '>Mensualités — prêt bancaire</option>' +
+      '</select></label>' +
+      '<div id="dm-zone-mens">' + champsMensualites(x) + '</div>' +
+      '<label class="champ"><span>À rendre avant le ' +
+        '<span style="font-weight:400">— facultatif</span></span>' +
+        '<input type="date" id="dm-echeance" value="' + (x.echeance || '') +
+        '"></label>' +
+      '<div id="dm-res"></div>' +
+      '<button class="btn" id="dm-btn" onclick="validerModifDette()">Enregistrer</button>' +
+    '</div>');
+}
+
+
+function champsMensualites(x) {
+  if (x.mode_remboursement !== 'Mensualites') return '';
+  return '<label class="champ"><span>Taux d\'intérêt (%)</span>' +
+      '<input type="number" id="dm-taux" step="0.01" inputmode="decimal" value="' +
+      (x.taux_interet || 0) + '"></label>' +
+    /* Sans cette question, « 12 % » peut vouloir dire 12 % par an ou
+       12 % par mois — soit douze fois plus. Rien à l'écran ne
+       trancherait, et l'échéancier serait faux sans prévenir. */
+    '<label class="champ"><span>Ce taux est</span><select id="dm-periodicite">' +
+      '<option value="Annuel"' + (x.taux_periodicite !== 'Mensuel' ? ' selected' : '') +
+        '>par an</option>' +
+      '<option value="Mensuel"' + (x.taux_periodicite === 'Mensuel' ? ' selected' : '') +
+        '>par mois</option>' +
+    '</select></label>' +
+    '<label class="champ"><span>Durée (mois)</span>' +
+      '<input type="number" id="dm-duree" step="1" inputmode="numeric" value="' +
+      (x.duree_mois || '') + '"></label>' +
+    '<label class="champ"><span>Première échéance</span>' +
+      '<input type="date" id="dm-premiere" value="' +
+      (x.date_premiere_echeance || '') + '"></label>';
+}
+
+
+function majChampsMensualites() {
+  var z = document.getElementById('dm-zone-mens');
+  if (!z) return;
+  var x = detteParId(Det.ouverte) || {};
+  var mode = document.getElementById('dm-mode').value;
+  z.innerHTML = champsMensualites(Object.assign({}, x, { mode_remboursement: mode }));
+}
+
+
+function validerModifDette() {
+  var res = document.getElementById('dm-res');
+  var b = document.getElementById('dm-btn');
+  var mode = document.getElementById('dm-mode').value;
+
+  var p = {
+    dette_id: Det.ouverte,
+    creancier: document.getElementById('dm-creancier').value,
+    type_dette: document.getElementById('dm-type').value,
+    mode_remboursement: mode,
+    echeance: document.getElementById('dm-echeance').value
+  };
+
+  if (mode === 'Mensualites') {
+    var duree = Number((document.getElementById('dm-duree') || {}).value) || 0;
+    if (duree <= 0) {
+      res.innerHTML = bloc('Une mensualité sans durée ne donne aucun échéancier : ' +
+                           'indique le nombre de mois.', 'ko', '⚠️');
+      return;
+    }
+    p.taux_interet = Number((document.getElementById('dm-taux') || {}).value) || 0;
+    p.taux_periodicite = (document.getElementById('dm-periodicite') || {}).value;
+    p.duree_mois = duree;
+    p.date_premiere_echeance = (document.getElementById('dm-premiere') || {}).value;
+  }
+
+  b.disabled = true; b.textContent = 'Enregistrement…';
+
+  api('dette_modifier', p).then(function () {
+    toast('Conditions enregistrées.', 'ok');
+    fermerModale();
+    ongletDettes();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Enregistrer';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
 
 function ongletAssocies() {
   poser(chargement('Parts et vesting…'));
