@@ -1455,6 +1455,11 @@ function formRevenu() {
     champMontant('rv') +
     '<label class="champ"><span>Date</span>' +
       '<input type="date" id="rv-date" value="' + aujourdhui() + '"></label>' +
+    /* Un emprunt crée une dette en même temps que l'encaissement. Sans
+       créancier ni échéance, cette dette existe au bilan mais ne dit
+       pas à qui ni pour quand — on les demande donc ici, pas dans le
+       classeur six mois plus tard. */
+    '<div id="rv-emprunt"></div>' +
     '<div id="rv-res"></div>' +
     '<button class="btn" id="rv-btn" onclick="validerRevenu()">Enregistrer le revenu</button>' +
     bloc('Les revenus de colis et de commandes s\'écrivent tout seuls depuis ' +
@@ -1471,6 +1476,17 @@ function avertirNeutre() {
            'mais ne fait pas de bénéfice. Il appartient au client, ou il sera ' +
            'rendu.', 'attention', '↔️')
     : '';
+
+  var e = document.getElementById('rv-emprunt');
+  if (!e) return;
+  e.innerHTML = src === 'Encaissement emprunt'
+    ? '<label class="champ"><span>Créancier <span style="font-weight:400">' +
+        '— à qui on doit cet argent</span></span>' +
+        '<input id="rv-creancier" placeholder="Nom de la personne ou de la banque"></label>' +
+      '<label class="champ"><span>Échéance <span style="font-weight:400">' +
+        '— facultatif</span></span>' +
+        '<input type="date" id="rv-echeance"></label>'
+    : '';
 }
 
 function validerRevenu() {
@@ -1481,14 +1497,25 @@ function validerRevenu() {
 
   b.disabled = true; b.textContent = 'Enregistrement…';
 
+  var cr = document.getElementById('rv-creancier');
+  var ec = document.getElementById('rv-echeance');
+
   api('revenu', {
     source: document.getElementById('rv-source').value,
     description: document.getElementById('rv-desc').value,
     montant_saisi: montant,
     devise_saisie: document.getElementById('rv-devise').value,
-    date: document.getElementById('rv-date').value
+    date: document.getElementById('rv-date').value,
+    creancier: cr ? cr.value : '',
+    echeance: ec ? ec.value : ''
   }).then(function (d) {
+    /* Quand une dette est née avec le revenu, on le DIT. Une écriture
+       au passif qu'on découvre un mois plus tard dans le bilan est une
+       écriture qu'on soupçonne. */
     toast('Revenu ' + (d.revenu_id || '') + ' enregistré.', 'ok');
+    if (d.dette && d.dette.dette_id) {
+      toast('Dette ' + d.dette.dette_id + ' créée au passif.', 'ok');
+    }
     ongletSaisie();
   }).catch(function (err) {
     b.disabled = false; b.textContent = 'Enregistrer le revenu';
@@ -1782,7 +1809,13 @@ function jrnVueMouvements(d) {
   // Les lignes qui ne pèsent pas sur le bénéfice sont annoncées, sinon
   // les totaux au-dessus semblent faux par rapport à la liste en bas.
   var aside = [];
-  if (t.revenus_neutres_gdes) aside.push(htg(t.revenus_neutres_gdes) + ' d\'avances encaissées');
+  /* « Avances » englobait aussi les emprunts : le bandeau annonçait
+     1 000 HTG d'avances client là où il y avait une dette à rendre.
+     Deux choses qui ne se remboursent pas de la même façon ne peuvent
+     pas porter le même nom. */
+  if (t.revenus_neutres_gdes) {
+    aside.push(htg(t.revenus_neutres_gdes) + ' encaissés à rendre (avances et emprunts)');
+  }
   if (t.depenses_neutres_gdes) aside.push(htg(t.depenses_neutres_gdes) + ' d\'achats pour clients');
   if (t.entrees_stock_gdes) aside.push(htg(t.entrees_stock_gdes) + ' partis en stock');
   if (t.apports_gdes) aside.push(htg(t.apports_gdes) + ' d\'apports');
