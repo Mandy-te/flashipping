@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#5B2D4F">
+<title>Flashipping — Associés</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+
+/* ═══════════════════════════════════════════════════════════════
+   Même grammaire visuelle que les quatre autres applications,
+   en-tête sarcelle : celui qui a les cinq apps installées voit
+   d'un coup d'œil laquelle est ouverte.
+
+   Le document imprimé, lui, est identique partout — un rapport
+   Flashipping doit se reconnaître sur le papier, pas l'app qui
+   l'a produit.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --marine:#0B3C4A; --or:#11899E; --or-fonce:#0C6F80;
+  --vert:#1B7F4B; --rouge:#C62828; --orange:#E67E22; --bleu:#1565C0;
+  --fond:#F2F7F8; --carte:#FFFFFF; --bord:#D5E3E6;
+  --texte:#0E2429; --doux:#5A7278;
+  --ombre:0 1px 3px rgba(11,60,74,.12);
+  --haut:env(safe-area-inset-top,0px);
+  --bas:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--fond); color:var(--texte); overscroll-behavior-y:none;
+}
+input,select,textarea,button{font:inherit;color:inherit}
+a{color:var(--bleu)}
+
+#app{min-height:100vh;display:flex;flex-direction:column}
+.entete{
+  background:var(--marine); color:#fff;
+  padding:calc(var(--haut) + 10px) 14px 10px;
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;
+}
+.entete h1{font-size:16px;margin:0;font-weight:700;flex:1;letter-spacing:.2px}
+.entete .sous{font-size:11.5px;opacity:.78;font-weight:400;display:block}
+.pastille{width:9px;height:9px;border-radius:50%;background:#7FD9E6;flex:none}
+.pastille.hors{background:#FF8A80}
+.btn-entete{
+  background:rgba(255,255,255,.16);border:0;color:#fff;
+  width:38px;height:38px;border-radius:10px;font-size:17px;flex:none;
+}
+main{flex:1;padding:12px 12px 96px;max-width:760px;margin:0 auto;width:100%}
+
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;
+  border-top:1px solid var(--bord);display:flex;padding-bottom:var(--bas);
+  box-shadow:0 -1px 8px rgba(11,60,74,.08);
+}
+nav button{
+  flex:1;background:none;border:0;padding:8px 2px 7px;display:flex;
+  flex-direction:column;align-items:center;gap:3px;font-size:10.5px;
+  color:var(--doux);font-weight:600;
+}
+nav button .ic{font-size:21px;line-height:1}
+nav button.actif{color:var(--marine)}
+
+.carte{
+  background:var(--carte);border:1px solid var(--bord);border-radius:12px;
+  padding:14px;margin-bottom:12px;box-shadow:var(--ombre);
+}
+.carte.serree{padding:11px 12px}
+.titre-section{
+  font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--doux);margin:18px 2px 8px;
+}
+.titre-section:first-child{margin-top:2px}
+
+label.champ{display:block;margin-bottom:12px}
+label.champ > span{
+  display:block;font-size:12px;font-weight:700;color:var(--doux);
+  margin-bottom:5px;letter-spacing:.2px;
+}
+input[type=text],input[type=date],input[type=number],input[type=password],
+input[type=url],select{
+  width:100%;padding:13px 12px;border:1.5px solid var(--bord);
+  border-radius:10px;background:#fff;font-size:16px;
+}
+input:focus,select:focus{
+  outline:0;border-color:var(--or-fonce);box-shadow:0 0 0 3px rgba(17,137,158,.18);
+}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:14px;border:0;border-radius:11px;background:var(--or);
+  color:#fff;font-weight:800;font-size:15.5px;
+}
+.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.45}
+.btn.sombre{background:var(--marine);color:#fff}
+.btn.rouge{background:var(--rouge);color:#fff}
+.btn.vide{background:#fff;color:var(--marine);border:1.5px solid var(--bord);font-weight:700}
+.btn.petit{padding:10px;font-size:14px;border-radius:9px}
+.btn + .btn{margin-top:9px}
+
+.puces{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;
+  scrollbar-width:none;-ms-overflow-style:none}
+.puces::-webkit-scrollbar{display:none}
+.puce{
+  flex:none;padding:8px 13px;border-radius:999px;border:1.5px solid var(--bord);
+  background:#fff;font-size:13px;font-weight:650;white-space:nowrap;color:var(--doux);
+}
+.puce.actif{background:var(--marine);color:#fff;border-color:var(--marine)}
+
+/* Lignes de liste — l'onglet Marketing est le premier écran de cette
+   application à présenter des personnes plutôt que des chiffres
+   agrégés. Les trois autres onglets n'avaient besoin que de cartes. */
+.ligne{display:flex;align-items:center;gap:10px;background:#fff;
+  border:1px solid var(--bord);border-radius:11px;padding:11px 12px;
+  margin-bottom:7px}
+.ligne .corps{min-width:0;flex:1}
+.ligne .t1{font-weight:750;font-size:14.5px;line-height:1.25}
+.ligne .t2{font-size:12px;color:var(--doux);margin-top:2px;line-height:1.35}
+
+.mono{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px}
+
+.msg{padding:12px 13px;border-radius:11px;margin-bottom:12px;font-size:14px;
+  font-weight:500;line-height:1.4;display:flex;gap:9px;align-items:flex-start}
+.msg.ok{background:#E8F5E9;color:#145A32;border:1px solid #BEE3C8}
+.msg.ko{background:#FFEBEE;color:#8E1F1F;border:1px solid #F5C6C6}
+.msg.info{background:#EAF3FB;color:#0D3C6E;border:1px solid #C3DEF3}
+.msg.attention{background:#FFF8E1;color:#7A4F00;border:1px solid #FFE0A3}
+.msg .ic{font-size:17px;flex:none;line-height:1.3}
+
+.vide{text-align:center;padding:42px 20px;color:var(--doux)}
+.vide .gros{font-size:40px;margin-bottom:10px;opacity:.5}
+.chargement{text-align:center;padding:30px;color:var(--doux);font-size:14px}
+.tourne{display:inline-block;width:19px;height:19px;border:2.5px solid var(--bord);
+  border-top-color:var(--or-fonce);border-radius:50%;animation:t .7s linear infinite;
+  vertical-align:-4px;margin-right:8px}
+@keyframes t{to{transform:rotate(360deg)}}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:9px}
+.stat{background:#fff;border:1px solid var(--bord);border-radius:11px;
+  padding:12px 9px;text-align:center}
+.stat .v{font-size:19px;font-weight:800;line-height:1.1}
+.stat .l{font-size:10px;color:var(--doux);margin-top:3px;font-weight:650;
+  text-transform:uppercase;letter-spacing:.4px}
+.stat.pos .v{color:#1B7F4B}
+.stat.neg .v{color:var(--rouge)}
+
+.total{display:flex;justify-content:space-between;align-items:baseline;
+  padding:8px 0;font-size:14.5px;gap:14px}
+.total + .total{border-top:1px solid var(--bord)}
+.total .l{color:var(--doux);font-weight:650}
+.total > span:last-child{text-align:right;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+/* La ligne de solde clôt l'addition : elle doit se voir comme un total,
+   pas comme une ligne de plus. */
+.total.gros{border-top:2px solid var(--texte);margin-top:4px;padding-top:10px;
+  font-size:16px;font-weight:800}
+.total.gros .l{color:var(--texte);font-weight:800}
+
+/* ── Sélecteur de période ─────────────────────────────────────── */
+.periode{
+  display:flex;align-items:center;gap:8px;background:#fff;
+  border:1px solid var(--bord);border-radius:12px;padding:8px 9px;
+  margin-bottom:10px;box-shadow:var(--ombre);
+}
+.periode .fleche{
+  flex:none;width:40px;height:40px;border-radius:10px;border:0;
+  background:#E7F1F3;color:var(--marine);font-size:17px;font-weight:800;
+}
+.periode .fleche:disabled{opacity:.3}
+.periode .milieu{flex:1;min-width:0;text-align:center}
+.periode .milieu .t{font-size:14.5px;font-weight:800;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.periode .milieu .s{font-size:11.5px;color:var(--doux);margin-top:2px}
+
+/* ── Une succursale, et la cascade qui mène à son résultat ─────
+   Le résultat ne s'affiche jamais seul : la contribution est un
+   fait, la quote-part une convention. Les montrer côte à côte est
+   la seule façon honnête de donner le troisième chiffre. */
+.ag-tete{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.rang{
+  flex:none;width:27px;height:27px;border-radius:8px;background:var(--marine);
+  color:#fff;font-weight:800;font-size:13px;display:flex;
+  align-items:center;justify-content:center;
+}
+.ag-tete .corps{flex:1;min-width:0}
+.ag-tete .t1{font-weight:800;font-size:15.5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ag-tete .t2{font-size:11.5px;color:var(--doux);margin-top:1px}
+.chip{
+  flex:none;padding:5px 10px;border-radius:9px;font-weight:800;font-size:13.5px;
+  white-space:nowrap;
+}
+.chip.pos{background:#E8F5E9;color:#145A32}
+.chip.neg{background:#FFEBEE;color:#8E1F1F}
+.chip.nul{background:#EEF2F3;color:var(--doux)}
+
+.cascade{border:1px solid var(--bord);border-radius:10px;overflow:hidden}
+.cascade .c-l{
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:9px 11px;font-size:13.5px;border-bottom:1px solid var(--bord);
+}
+.cascade .c-l:last-child{border-bottom:0}
+.cascade .c-l > span{color:var(--doux);min-width:0}
+.cascade .c-l > span i{font-style:normal;display:block;font-size:11px;opacity:.85}
+.cascade .c-l > b{flex:none;font-weight:800;white-space:nowrap}
+.cascade .c-l.neg > b{color:#C0392B}
+.cascade .c-l.somme{background:#F5FAFB}
+.cascade .c-l.somme > span,.cascade .c-l.total > span{color:var(--texte);font-weight:700}
+.cascade .c-l.total{background:var(--marine);color:#fff;font-size:15px}
+.cascade .c-l.total > span{color:#fff}
+.cascade .c-l.total > b{font-size:16.5px}
+.ag-pied{font-size:12px;color:var(--doux);margin-top:9px;line-height:1.5}
+
+/* ── Série d'évolution ────────────────────────────────────────── */
+/* ── Le graphe ──
+   `preserveAspectRatio="none"` étire le dessin à la largeur
+   disponible : sur un téléphone on veut toute la place, et une courbe
+   un peu étirée se lit sans peine. Les textes, eux, sont posés par le
+   navigateur et gardent leur taille. */
+.gr{width:100%;height:230px;display:block;overflow:visible}
+.gr-ax{font-size:11px;fill:var(--doux);font-family:inherit}
+.gr-max{font-size:11.5px;font-weight:700;fill:var(--texte);font-family:inherit}
+.gr-zero{font-size:11px;font-weight:700;fill:#44616A;font-family:inherit}
+
+/* Deux champs côte à côte : les bornes d'une période se lisent
+   ensemble ou ne se lisent pas. */
+.filtres{display:flex;gap:8px;margin-bottom:10px}
+.filtres label.champ.serre{flex:1;margin-bottom:0;min-width:0}
+.filtres label.champ.serre input{width:100%}
+
+@media print{
+  .gr{height:200px}
+}
+
+.serie-l{margin-bottom:11px}
+.serie-tete{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:12.5px;margin-bottom:4px}
+.serie-tete .n{font-weight:700;color:var(--doux)}
+.serie-tete .v{font-weight:800;font-size:14px}
+.serie-tete .v.neg{color:var(--rouge)}
+.barre{height:10px;border-radius:7px;background:#E7F1F3;overflow:hidden}
+.barre > div{height:100%;border-radius:7px;background:var(--or);min-width:2px}
+.barre > div.neg{background:var(--rouge)}
+.barre > div.cour{background:var(--marine)}
+
+.voile{position:fixed;inset:0;background:rgba(14,36,41,.5);z-index:60;
+  display:flex;align-items:flex-end;justify-content:center}
+.modale{
+  background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;
+  padding:18px 16px calc(18px + var(--bas));max-height:92vh;overflow-y:auto;
+  animation:monte .22s ease-out;
+}
+@keyframes monte{from{transform:translateY(18px);opacity:.4}}
+.modale h3{margin:0 0 14px;font-size:17px}
+.poignee{width:40px;height:4px;background:var(--bord);border-radius:9px;
+  margin:0 auto 14px}
+
+#bandeau{
+  background:var(--rouge);color:#fff;padding:9px 13px;font-size:13px;
+  font-weight:700;display:none;align-items:center;gap:8px;
+  position:sticky;top:0;z-index:29;
+}
+#bandeau.vu{display:flex}
+
+#toast{position:fixed;left:12px;right:12px;bottom:calc(84px + var(--bas));
+  z-index:80;pointer-events:none}
+#toast div{
+  background:var(--marine);color:#fff;padding:13px 15px;border-radius:11px;
+  font-size:14px;font-weight:650;box-shadow:0 5px 22px rgba(11,60,74,.3);
+  animation:monte .2s ease-out;margin-top:8px;
+}
+#toast div.ko{background:var(--rouge)}
+#toast div.ok{background:var(--vert)}
+
+/* ── Impression ───────────────────────────────────────────────── */
+#zone-impression{display:none}
+@media print{
+  /* Le format de page n'est PAS figé ici : imprimer() injecte @page
+     au moment du clic. Une règle fixe à cet endroit imposerait un
+     format à tous les documents de l'application. */
+  body{background:#fff;margin:0}
+  /* .voile est frère de #app : sans cette ligne, c'est la modale
+     affichée à l'écran qui part sur le papier. */
+  #app,#toast,#bandeau,nav,.voile{display:none!important}
+  #zone-impression{display:block!important}
+
+  .doc{
+    font-family:Arial,Helvetica,sans-serif;color:#16222E;font-size:10.5pt;
+    line-height:1.45;
+  }
+  .doc-tete{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3px solid #0B2545;padding-bottom:4mm;margin-bottom:5mm;
+  }
+  .doc-marque{font-size:21pt;font-weight:bold;letter-spacing:3px;color:#0B2545;
+    line-height:1}
+  .doc-eclair{color:#F0A818}
+  .doc-slogan{font-size:8pt;font-weight:bold;color:#C62828;letter-spacing:2.5px;
+    margin-top:1mm}
+  .doc-coord{font-size:7.5pt;color:#5F7183;text-align:right;line-height:1.5}
+  .doc-titre{
+    background:#0B2545;color:#fff;padding:2.5mm 4mm;font-size:12pt;
+    font-weight:bold;letter-spacing:1px;display:flex;
+    justify-content:space-between;margin-bottom:5mm;
+  }
+
+  table.doc-t{width:100%;border-collapse:collapse;margin-bottom:4mm}
+  table.doc-t th{
+    background:#EEF2F6;font-size:7.5pt;text-transform:uppercase;letter-spacing:.6px;
+    color:#0B2545;padding:1.8mm;text-align:left;border-bottom:1.5px solid #0B2545;
+  }
+  table.doc-t td{padding:1.8mm;border-bottom:1px solid #E6ECF1;font-size:9pt;
+    vertical-align:top}
+  table.doc-t .num{text-align:right;white-space:nowrap}
+  table.doc-t .ref{font-family:'Courier New',monospace;font-size:8.5pt}
+  table.doc-t tfoot td{
+    font-weight:bold;border-top:1.5px solid #0B2545;border-bottom:0;
+    background:#F7F9FB;
+  }
+  table.doc-t td.pos{color:#145A32;font-weight:bold}
+  table.doc-t td.neg{color:#8E1F1F;font-weight:bold}
+
+  .doc-h2{
+    font-size:9pt;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;
+    color:#0B2545;border-bottom:1.5px solid #0B2545;padding-bottom:1mm;
+    margin:6mm 0 2.5mm;
+  }
+  .doc-h2:first-of-type{margin-top:0}
+  .doc-cadre{border:1.5px solid #0B2545;padding:3mm 4mm;margin-bottom:5mm}
+  .doc-cadre .l{display:flex;justify-content:space-between;padding:1mm 0;
+    font-size:10pt}
+  .doc-cadre .l.creux{font-size:8.5pt;color:#5F7183}
+  .doc-cadre .l.fort{font-size:12.5pt;font-weight:bold;
+    border-top:1px solid #0B2545;margin-top:1.5mm;padding-top:2mm}
+  .doc-alerte{
+    border-left:3px solid #C62828;background:#FDF3F3;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-bottom:3mm;color:#8E1F1F;
+  }
+  .doc-note{
+    background:#F7F9FB;border-left:3px solid #F0A818;padding:2.5mm 3mm;
+    font-size:8.5pt;margin-top:4mm;color:#16222E;
+  }
+  .doc-note b{display:block;margin-bottom:1mm}
+  .doc-sign{display:flex;gap:10mm;margin-top:12mm}
+  .doc-sign div{flex:1;border-top:1px solid #16222E;padding-top:1.5mm;
+    font-size:8pt;color:#5F7183}
+  .doc-pied{
+    margin-top:7mm;border-top:1px solid #D9E0E6;padding-top:2.5mm;
+    font-size:7.5pt;color:#5F7183;text-align:center;line-height:1.6;
+  }
+  .doc-pied b{color:#C62828;letter-spacing:1.5px}
+  .doc-saut{page-break-before:always}
+  /* Un tableau de douze succursales ne doit pas se couper au milieu
+     d'une ligne : la moitié haute d'un chiffre n'est pas un chiffre. */
+  table.doc-t tr{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<div id="bandeau"><span>📴</span><span id="bandeau-txt">Hors ligne</span></div>
+<div id="app"></div>
+<div id="toast"></div>
+<div id="zone-impression"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLASHIPPING — STATISTIQUES
+
+   Cette application sert à évaluer des succursales, donc à juger le
+   travail de collègues. Deux principes en découlent.
+
+   1. LE FAIT ET LA CONVENTION NE SE MÉLANGENT PAS. Les volumes — colis,
+      livres, clients, commandes — sont des faits lus dans les tables.
+      La rentabilité, non : elle dépend de la façon de répartir les
+      coûts partagés, et cette façon change le classement. L'écran
+      affiche donc toujours les trois niveaux ensemble — contribution,
+      quote-part, résultat — et nomme la clé employée. Jamais un
+      résultat seul.
+
+   2. L'APPLICATION NE CORRIGE PAS LES DONNÉES, ELLE LES DÉNONCE. Si
+      une succursale encaisse sans qu'aucune charge ne lui soit
+      imputée, le serveur le dit en alerte au lieu de la couronner
+      meilleure du réseau.
+
+   Elle ne fait que lire. Aucun écran d'ici n'écrit dans le classeur.
+   ═══════════════════════════════════════════════════════════════════ */
+
+var APP = 'associes';
+
+var CLE_URL   = 'fls_api_url';
+var CLE_TOKEN = 'fls_aso_token';
+/* L'identifiant saisi, retenu par l'appareil : la liste des
+   comptes ayant disparu, c'est lui qui évite de le retaper
+   chaque matin. Il ne donne aucun accès sans le code. */
+var CLE_IDENT = 'fls_aso_ident';
+var CLE_USER  = 'fls_aso_user';
+var CLE_CACHE = 'fls_aso_cache';
+
+var S = {
+  lire: function (c, d) {
+    try { var v = localStorage.getItem(c); return v === null ? d : v; }
+    catch (e) { return d; }
+  },
+  ecrire: function (c, v) { try { localStorage.setItem(c, v); } catch (e) {} },
+  effacer: function (c) { try { localStorage.removeItem(c); } catch (e) {} },
+  lireJson: function (c, d) {
+    try { return JSON.parse(localStorage.getItem(c)) || d; } catch (e) { return d; }
+  },
+  ecrireJson: function (c, v) { S.ecrire(c, JSON.stringify(v)); }
+};
+
+var Etat = {
+  url: S.lire(CLE_URL, ''),
+  token: S.lire(CLE_TOKEN, ''),
+  user: S.lireJson(CLE_USER, null),
+  ref: null,
+  onglet: 'tableau'
+};
+
+/* Les noms de période sont ceux du serveur (bornes_). « mois » au lieu
+   de « mensuel » tombe dans le défaut et renvoie l'année entière. */
+var PERIODES = [
+  { id: 'journalier',   nom: 'Jour' },
+  { id: 'hebdomadaire', nom: 'Semaine' },
+  { id: 'mensuel',      nom: 'Mois' },
+  { id: 'trimestriel',  nom: 'Trimestre' },
+  { id: 'semestriel',   nom: 'Semestre' },
+  { id: 'annuel',       nom: 'Année' }
+];
+
+var Per = { type: 'mensuel', ref: '', agence: '',
+            data: null, err: null, enCours: false };
+
+var METRIQUES = [
+  { id: 'colis_livres',     nom: 'Colis livrés',  fmt: 'nb',  couleur: 'var(--or)' },
+  { id: 'colis_recus',      nom: 'Colis reçus',   fmt: 'nb',  couleur: 'var(--bleu)' },
+  { id: 'livres_lb',        nom: 'Livres',        fmt: 'lb',  couleur: 'var(--or-fonce)' },
+  { id: 'revenus_gdes',     nom: 'Revenus',       fmt: 'htg', couleur: 'var(--vert)' },
+  { id: 'resultat_gdes',    nom: 'Résultat',      fmt: 'htg', couleur: 'var(--marine)' },
+  { id: 'clients_actifs',   nom: 'Clients servis', fmt: 'nb', couleur: 'var(--orange)' },
+  { id: 'clients_nouveaux', nom: 'Nouvelles fiches', fmt: 'nb', couleur: 'var(--or)' }
+];
+
+var GRANULARITES = [
+  { id: '',        nom: 'Auto' },
+  { id: 'jour',    nom: 'Jour' },
+  { id: 'semaine', nom: 'Semaine' },
+  { id: 'mois',    nom: 'Mois' },
+  { id: 'annee',   nom: 'Année' }
+];
+
+var Evo = { metrique: 'colis_livres', gran: '', debut: '', fin: '',
+            data: null, err: null };
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  API
+// ═══════════════════════════════════════════════════════════════════
+
+function api(action, params) {
+  params = params || {};
+  if (!Etat.url) return Promise.reject(new Error('Aucune URL d\'API configurée.'));
+  if (!navigator.onLine) {
+    return Promise.reject(new Error(
+      'Pas de réseau. Ton solde se calcule sur le serveur, à partir du ' +
+      'journal : il n\'y a rien de fiable à lire hors ligne.'));
+  }
+
+  var corps = Object.assign({ action: action }, params);
+  if (Etat.token && !corps.token) corps.token = Etat.token;
+
+  // text/plain : Apps Script ne répond pas au préalable CORS
+  return fetch(Etat.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(corps),
+    redirect: 'follow'
+  })
+  .then(function (r) { return r.text(); })
+  .then(function (txt) {
+    var d;
+    try { d = JSON.parse(txt); }
+    catch (e) {
+      if (txt.indexOf('<!DOCTYPE') === 0 || txt.indexOf('<html') === 0) {
+        throw new Error(Etat.token
+          ? 'Google a renvoyé une page d\'erreur : le script a échoué ou a ' +
+            'dépassé son temps d\'exécution. Une série de 24 périodes relit ' +
+            'tout le classeur 24 fois — réduis le nombre de périodes, ou ' +
+            'regarde « Exécutions » dans Apps Script.'
+          : 'L\'API a renvoyé une page web. Vérifie que le déploiement est ' +
+            'réglé sur « Accès : Tout le monde ».');
+      }
+      throw new Error('Réponse illisible du serveur.');
+    }
+    if (d.ok === false) { var x = new Error(d.erreur || 'Erreur inconnue.');
+                          x.metier = true; x.detail = d; throw x; }
+    return d.data !== undefined ? d.data : d;
+  })
+  .catch(function (er) {
+    if (er.metier) throw er;
+    if (/Session expirée|Jeton/i.test(er.message)) { deconnecter(); throw er; }
+    throw er;
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  OUTILS
+// ═══════════════════════════════════════════════════════════════════
+
+function e(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function n2(v) { return (Math.round((Number(v) || 0) * 100) / 100).toFixed(2); }
+function n0(v) { return Math.round(Number(v) || 0).toLocaleString('fr-FR'); }
+function n1(v) { return (Math.round((Number(v) || 0) * 10) / 10).toLocaleString('fr-FR'); }
+function usd(v) {
+  return (Math.round((Number(v) || 0) * 100) / 100).toLocaleString('fr-FR', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  }) + ' $';
+}
+/* Dans cette app des associés, un seul format d'argent : avec les
+   centimes, toujours. Voir htg2 — c'est l'addition qui l'exige. */
+function htg(v) { return htg2(v); }
+
+/**
+ * Dans cette app, l'associé vérifie une addition : les lignes de « D'où
+ * vient ce chiffre » doivent tomber exactement sur le solde. Arrondie à
+ * la gourde chacune de son côté, l'addition ne tombait pas — 0 + 3 000 +
+ * 2 024 − 180 − 500 = 4 344 sous un solde affiché 4 345. Une gourde
+ * d'écart sur l'écran qui promet d'expliquer le chiffre suffit à faire
+ * douter de tout le reste.
+ *
+ * Donc : tout montant qui entre dans une addition vérifiable garde ses
+ * centimes. Les repères sur l'entreprise (bénéfice de la période,
+ * trésorerie) restent à la gourde, ils ne s'additionnent avec rien.
+ */
+function htg2(v) {
+  return (Math.round((Number(v) || 0) * 100) / 100).toLocaleString('fr-FR', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  }) + ' HTG';
+}
+function lb(v)  { return n1(v) + ' lb'; }
+/* « 18.9 % » juste sous « 3 000,00 HTG » : deux séparateurs décimaux sur
+   le même écran. Une seule convention, celle du pays. */
+function pct(v) {
+  return (Math.round((Number(v) || 0) * 10) / 10)
+    .toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' %';
+}
+function signe(v) { return (Number(v) || 0) > 0 ? '+' : ''; }
+
+/** Les gros montants se lisent mieux abrégés sur un téléphone. */
+function court(v) {
+  var n = Number(v) || 0, s = n < 0 ? '-' : '';
+  n = Math.abs(n);
+  if (n >= 1000000) return s + (n / 1000000).toFixed(1).replace('.0', '') + ' M';
+  if (n >= 10000)   return s + Math.round(n / 1000) + ' k';
+  return s + n0(n);
+}
+
+/**
+ * « 2026-09-30 » tout seul se lit en UTC, et minuit UTC tombe la veille
+ * au soir en Haïti. Une période affichée telle quelle reculait d'un
+ * jour — et un mois entier pouvait basculer sur le précédent.
+ */
+function jourLocal_(d) {
+  var j = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(d).trim());
+  return j ? new Date(Number(j[1]), Number(j[2]) - 1, Number(j[3])) : new Date(d);
+}
+function ymdLocal_(d) {
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) +
+         '-' + ('0' + d.getDate()).slice(-2);
+}
+function dateCourte(d) {
+  if (!d) return '';
+  var x = jourLocal_(d);
+  if (isNaN(x)) return String(d).substring(0, 10);
+  return ('0' + x.getDate()).slice(-2) + '/' + ('0' + (x.getMonth() + 1)).slice(-2) +
+         '/' + x.getFullYear();
+}
+function aujourdhui() { return ymdLocal_(new Date()); }
+
+function toast(txt, genre) {
+  var z = document.getElementById('toast');
+  var d = document.createElement('div');
+  if (genre) d.className = genre;
+  d.textContent = txt;
+  z.appendChild(d);
+  setTimeout(function () { d.remove(); }, genre === 'ko' ? 5600 : 3200);
+}
+
+function bloc(msg, genre, icone) {
+  return '<div class="msg ' + genre + '"><span class="ic">' + (icone || 'ℹ️') +
+         '</span><span>' + e(msg) + '</span></div>';
+}
+
+/**
+ * Même bloc, sans échappement — réservé aux phrases écrites ici, dans le
+ * source, pour pouvoir y mettre un <b>. À n'utiliser JAMAIS avec un
+ * message venu du serveur : bloc() l'échappe, et c'est exprès.
+ */
+function blocRiche(msg, genre, icone) {
+  return '<div class="msg ' + genre + '"><span class="ic">' + (icone || 'ℹ️') +
+         '</span><span>' + msg + '</span></div>';
+}
+function chargement(t) {
+  return '<div class="chargement"><span class="tourne"></span>' +
+         e(t || 'Chargement…') + '</div>';
+}
+function vide(ic, t) {
+  return '<div class="vide"><div class="gros">' + ic + '</div>' + e(t) + '</div>';
+}
+
+function nomPeriode(id) {
+  var p = PERIODES.filter(function (x) { return x.id === id; })[0];
+  return p ? p.nom : id;
+}
+
+/**
+ * Déplace la période de référence d'un cran.
+ *
+ * On ancre au 1er du mois avant toute arithmétique de mois : partir du
+ * 31 octobre et retirer un mois donne le 1er octobre en passant par le
+ * 31 septembre, qui n'existe pas et que le navigateur traduit en 1er
+ * octobre — on sauterait donc un mois sur deux. Le serveur normalise
+ * ensuite la borne exacte ; il suffit d'atterrir dans la bonne période.
+ */
+function decaler(sens) {
+  var d = jourLocal_(Per.ref || aujourdhui());
+  if (isNaN(d)) d = new Date();
+
+  if (Per.type === 'journalier')        d.setDate(d.getDate() + sens);
+  else if (Per.type === 'hebdomadaire') d.setDate(d.getDate() + sens * 7);
+  else if (Per.type === 'annuel')       { d.setMonth(0, 1);
+                                          d.setFullYear(d.getFullYear() + sens); }
+  else {
+    var pas = Per.type === 'trimestriel' ? 3 : Per.type === 'semestriel' ? 6 : 1;
+    d.setDate(1);
+    d.setMonth(d.getMonth() + sens * pas);
+  }
+
+  Per.ref = ymdLocal_(d);
+  chargerStats();
+}
+
+/**
+ * Les périodes futures n'ont rien à montrer : la flèche s'éteint.
+ *
+ * Le test porte sur la FIN de la période chargée, pas sur la date de
+ * référence. Comparer la référence laissait avancer d'un cran de trop :
+ * revenu sur septembre puis repassé en avant, la référence devenait le
+ * 1er octobre — antérieure à aujourd'hui, donc la flèche restait
+ * active et ouvrait novembre, vide par construction.
+ */
+function periodeFuture() {
+  if (Per.data && Per.data.periode && Per.data.periode.fin) {
+    return String(Per.data.periode.fin) >= aujourdhui();
+  }
+  var d = jourLocal_(Per.ref || aujourdhui());
+  return !isNaN(d) && ymdLocal_(d) >= aujourdhui();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  SQUELETTE
+// ═══════════════════════════════════════════════════════════════════
+
+var TOUS_ONGLETS = [
+  { id: 'compte',     ic: '💼', nom: 'Mon compte',  droit: null },
+  { id: 'mouvements', ic: '📑', nom: 'Mouvements',  droit: null },
+  { id: 'parts',      ic: '📈', nom: 'Mes parts',   droit: null }
+];
+
+var ONGLETS = TOUS_ONGLETS;
+
+function majOnglets() {
+  /* Aucun filtrage par droit ici : être associé n'est pas un rôle,
+     c'est une ligne de la table Associes. Le serveur refuse à qui n'y
+     figure pas, avec un message qui explique — plutôt qu'une app aux
+     onglets vides dont on ne comprend pas pourquoi elle est vide. */
+  ONGLETS = TOUS_ONGLETS;
+  if (!ONGLETS.some(function (o) { return o.id === Etat.onglet; })) {
+    Etat.onglet = ONGLETS[0].id;
+  }
+}
+
+var Nav = { modaleOuverte: false };
+
+function dessiner() {
+  var app = document.getElementById('app');
+  if (!Etat.url)   { app.innerHTML = ecranReglage(); return; }
+  if (!Etat.token) { app.innerHTML = ecranConnexion(); preparerConnexion(); return; }
+
+  /* Pas de garde sur un droit ici. Être associé n'est pas un rôle : c'est
+     une ligne de la table Associes, reliée à un compte. C'est le serveur
+     qui le sait, et qui répond en expliquant à qui n'y figure pas. */
+  majOnglets();
+
+  var u = Etat.user;
+  app.innerHTML =
+    '<header class="entete">' +
+      '<span class="pastille' + (navigator.onLine ? '' : ' hors') + '"></span>' +
+      '<h1>' + e(titreOnglet()) + '<span class="sous">' + e(u.nom) +
+        ' · ' + e(u.role_libelle || u.role) + '</span></h1>' +
+      '<button class="btn-entete" onclick="ouvrirReglages()">⚙️</button>' +
+    '</header>' +
+    '<main id="contenu">' + chargement() + '</main>' +
+    '<nav>' + ONGLETS.map(function (o) {
+      return '<button class="' + (Etat.onglet === o.id ? 'actif' : '') +
+        '" onclick="allerA(\'' + o.id + '\')"><span class="ic">' + o.ic +
+        '</span>' + e(o.nom) + '</button>';
+    }).join('') + '</nav>';
+
+  majBandeau();
+  rendreOnglet();
+}
+
+function titreOnglet() {
+  /* En vue d'ensemble l'écran ne montre pas « mon compte » : le titre
+     doit dire ce qu'on regarde, pas quel onglet est allumé. */
+  if (Moi.vue === 'ensemble') return 'Tous les comptes';
+  var o = ONGLETS.filter(function (x) { return x.id === Etat.onglet; })[0];
+  return o ? o.nom : 'Associés';
+}
+
+function allerA(id) {
+  /* Taper un onglet depuis la vue d'ensemble doit ramener à son compte :
+     sans ça les trois onglets affichaient tous la liste globale. Qui n'a
+     pas de compte personnel (directeur financier non associé) y reste. */
+  if (Moi.vue === 'ensemble' && Moi.data && Moi.data.mode === 'personnel') {
+    Moi.vue = 'perso';
+    Etat.onglet = id;
+    dessiner();
+    return;
+  }
+  if (Etat.onglet === id) return;
+  Etat.onglet = id;
+  try { history.pushState({ onglet: id }, '', '#' + id); } catch (e2) {}
+  dessiner();
+}
+
+window.addEventListener('popstate', function (ev) {
+  if (Nav.modaleOuverte) { fermerModaleDom(); return; }
+  var st = ev.state || {};
+  if (st.onglet && st.onglet !== Etat.onglet) {
+    Etat.onglet = st.onglet; dessiner();
+  }
+});
+
+function poser(h) { var c = document.getElementById('contenu'); if (c) c.innerHTML = h; }
+
+function rendreOnglet() {
+  if (Moi.vue === 'ensemble') return ongletEnsemble();
+  switch (Etat.onglet) {
+    case 'compte':     return ongletMonCompte();
+    case 'mouvements': return ongletMesMouvements();
+    case 'parts':      return ongletMesParts();
+  }
+}
+
+function majBandeau() {
+  var b = document.getElementById('bandeau');
+  if (!b) return;
+  b.className = navigator.onLine ? '' : 'vu';
+  if (!navigator.onLine) {
+    document.getElementById('bandeau-txt').textContent =
+      'Hors ligne — ton solde se calcule sur le serveur';
+  }
+  var p = document.querySelector('.pastille');
+  if (p) p.className = 'pastille' + (navigator.onLine ? '' : ' hors');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  RÉGLAGE INITIAL ET CONNEXION
+// ═══════════════════════════════════════════════════════════════════
+
+function ecranReglage() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">' +
+    'Première configuration</span></h1></header><main><div class="carte">' +
+    bloc('Colle l\'URL de ton déploiement Apps Script — la même que pour les ' +
+         'autres applications. Elle se termine par /exec.', 'info', '🔗') +
+    '<label class="champ"><span>URL de l\'API</span>' +
+    '<input type="url" id="in-url" placeholder="https://script.google.com/macros/s/…/exec" ' +
+    'autocomplete="off" autocapitalize="off" spellcheck="false"></label>' +
+    '<button class="btn" onclick="validerUrl()">Vérifier et continuer</button>' +
+    '<div id="res-url"></div></div></main>';
+}
+
+function validerUrl() {
+  var v = (document.getElementById('in-url').value || '').trim();
+  var res = document.getElementById('res-url');
+
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec$/.test(v)) {
+    res.innerHTML = bloc('L\'URL doit finir par /exec, pas /dev.', 'ko', '⚠️');
+    return;
+  }
+  res.innerHTML = chargement('Vérification…');
+  Etat.url = v;
+
+  api('diag').then(function (d) {
+    if (d.modules && !d.modules.portail_associes) {
+      Etat.url = '';
+      res.innerHTML = bloc('L\'API répond, mais Portail_Associes.gs n\'y ' +
+        'est pas enregistré. Ouvre le projet Apps Script, colle le ' +
+        'fichier, enregistre, puis redéploie en « Nouvelle version ».',
+        'ko', '❌');
+      return;
+    }
+    S.ecrire(CLE_URL, v);
+    toast('API joignable.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    Etat.url = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function ecranConnexion() {
+  return '<header class="entete"><h1>Flashipping<span class="sous">Associés' +
+    '</span></h1></header><main><div class="carte">' +
+    '<div id="liste-users"></div></div>' +
+    '<button class="btn vide petit" onclick="changerUrl()">Changer l\'URL de l\'API</button>' +
+    '</main>';
+}
+
+/**
+ * L'écran de connexion ne demande plus « qui es-tu » à une liste.
+ *
+ * Avant, il affichait tous les comptes actifs avec leur rôle et leur
+ * succursale — l'organigramme de l'entreprise, visible sans jeton par
+ * qui connaissait l'adresse. Et il offrait de quoi nuire : choisir un
+ * collègue, taper cinq codes faux, et le compte était fermé jusqu'à
+ * l'intervention de l'administrateur.
+ *
+ * Maintenant on tape son identifiant. L'appareil le retient, donc au
+ * quotidien il ne reste que les six chiffres à saisir — le geste est
+ * le même qu'avant, sans l'annuaire.
+ */
+function formulaireConnexion() {
+  var dernier = S.lire(CLE_IDENT, '');
+
+  return '<label class="champ"><span>Ton identifiant</span>' +
+      '<input type="text" id="in-ident" value="' + e(dernier) + '" ' +
+      'placeholder="Numéro de téléphone" autocomplete="username" ' +
+      'autocapitalize="off" spellcheck="false"></label>' +
+    '<label class="champ"><span>Code à 6 chiffres</span>' +
+      '<input type="password" id="in-code" inputmode="numeric" maxlength="6" ' +
+      'autocomplete="current-password" style="text-align:center;font-size:25px;' +
+      'letter-spacing:9px;font-weight:700"></label>' +
+    '<button class="btn" id="btn-login" onclick="connecter()">Entrer</button>' +
+    '<div style="font-size:12px;color:var(--doux);margin-top:10px;' +
+      'line-height:1.45">Ton numéro de téléphone, ou l\'identifiant que ' +
+      't\'a donné l\'administrateur. Cet appareil s\'en souviendra.</div>' +
+    '<div id="res-login"></div>';
+}
+
+function preparerConnexion() {
+  var z = document.getElementById('liste-users');
+  if (!z) return;
+  z.innerHTML = formulaireConnexion();
+
+  var ic = document.getElementById('in-code');
+  var ident = document.getElementById('in-ident');
+  if (!ic) return;
+
+  ic.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') connecter(); });
+  ic.addEventListener('input', function () { if (ic.value.length === 6) connecter(); });
+  if (ident) {
+    ident.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') ic.focus();
+    });
+  }
+
+  /* L'identifiant est déjà connu de l'appareil : on place le curseur
+     sur le code, pour que le geste quotidien reste d'une seule main. */
+  try { (ident && !ident.value ? ident : ic).focus(); } catch (e2) {}
+}
+
+function connecter() {
+  var ident = (document.getElementById('in-ident').value || '').trim();
+  var code = document.getElementById('in-code').value;
+  var b = document.getElementById('btn-login');
+  var res = document.getElementById('res-login');
+
+  if (!ident) {
+    res.innerHTML = bloc('Entre ton identifiant.', 'ko', '⚠️');
+    return;
+  }
+  if (!/^\d{6}$/.test(code)) {
+    res.innerHTML = bloc('Six chiffres.', 'ko', '⚠️'); return;
+  }
+  b.disabled = true; b.textContent = 'Connexion…'; res.innerHTML = '';
+
+  api('login', { identifiant: ident, code: code, app: APP }).then(function (d) {
+    Etat.token = d.token; Etat.user = d.utilisateur;
+    S.ecrire(CLE_TOKEN, d.token); S.ecrireJson(CLE_USER, d.utilisateur);
+    /* On retient ce que la personne a TAPÉ, pas son user_id : c'est
+       ce qu'elle retapera, et c'est ce qu'elle reconnaîtra. */
+    S.ecrire(CLE_IDENT, ident);
+    verifierVersion();
+    return chargerReferentiels();
+  }).then(function () {
+    toast('Bienvenue ' + (Etat.user.nom || '') + '.', 'ok');
+    dessiner();
+  }).catch(function (err) {
+    b.disabled = false; b.textContent = 'Entrer';
+    document.getElementById('in-code').value = '';
+    res.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+function chargerReferentiels() {
+  return api('referentiels').then(function (r) {
+    Etat.ref = r;
+    S.ecrireJson(CLE_CACHE, { ref: r, date: Date.now() });
+
+    /* Les droits se rafraîchissent, ils ne se figent pas.
+       `Etat.user` était écrit à la connexion puis relu du stockage à
+       chaque ouverture, pour toujours : un droit ajouté côté serveur
+       n'atteignait jamais quelqu'un de déjà connecté. Le serveur
+       recalcule les droits depuis le rôle à chaque requête, donc cette
+       réponse porte déjà une session fraîche. On la jetait. */
+    if (r && r.session && r.session.droits) {
+      Etat.user = r.session;
+      S.ecrireJson(CLE_USER, r.session);
+    }
+    return r;
+  }).catch(function (err) {
+    var c = S.lireJson(CLE_CACHE, null);
+    if (c && c.ref) { Etat.ref = c.ref; return c.ref; }
+    throw err;
+  });
+}
+
+function deconnecter() {
+  /* CLE_IDENT survit volontairement : se déconnecter n'est pas
+     changer de personne, et retaper son numéro chaque soir
+     n'ajoute aucune sécurité — le code, lui, est redemandé. */
+  S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  Etat.token = ''; Etat.user = null; Etat.onglet = 'tableau';
+  Per.data = null; Evo.data = null;
+  dessiner();
+}
+
+function changerUrl() {
+  if (!confirm('Changer l\'URL de l\'API ? Tu devras te reconnecter.')) return;
+  S.effacer(CLE_URL); S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
+  S.effacer(CLE_IDENT);
+  Etat.url = ''; Etat.token = ''; Etat.user = null;
+  dessiner();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ONGLET PÉRIODE
+// ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+//  LE PORTAIL DES ASSOCIÉS
+//
+//  Chacun ne voit que son compte. Le filtrage est fait PAR LE SERVEUR :
+//  l'app ne reçoit jamais les lignes des autres. Une app qui recevrait
+//  tout et n'afficherait qu'une partie laisserait les autres comptes
+//  lisibles à qui sait ouvrir la console de son téléphone.
+//
+//  La vue d'ensemble n'apparaît que pour le fondateur et le directeur
+//  financier, et elle vient d'un appel distinct.
+// ═══════════════════════════════════════════════════════════════════
+
+var Moi = { data: null, ensemble: null, vue: 'perso' };
+
+function chargerMonCompte(apres) {
+  api('mon_compte').then(function (d) {
+    Moi.data = d;
+    if (apres) apres();
+    else dessiner();
+  }).catch(function (err) {
+    /* Qui n'est pas associé reçoit ici le refus du serveur, en clair, et
+       une porte de sortie : sans elle il reste coincé sur trois onglets
+       qui lui répètent la même chose.
+
+       Et un cadenas pour une coupure réseau ferait croire à un refus de
+       droit : l'icône suit la nature de la panne. */
+    var reseau = !navigator.onLine || /Pas de réseau/.test(err.message);
+    poser(bloc(err.message, reseau ? 'attention' : 'ko', reseau ? '📡' : '🔒') +
+      '<button class="btn vide" onclick="' +
+      (reseau ? 'rendreOnglet()' : 'deconnecter()') + '">' +
+      (reseau ? '↻ Réessayer' : 'Se déconnecter') + '</button>');
+  });
+}
+
+// ── Onglet 1 : mon compte ──────────────────────────────────────────
+
+function ongletMonCompte() {
+  if (!Moi.data) { poser(chargement('Lecture de ton compte…')); chargerMonCompte(rendreOnglet); return; }
+
+  var d = Moi.data;
+  if (d.mode === 'ensemble') {
+    /* Le directeur financier qui n'est pas associé : le serveur a déjà
+       mis l'ensemble dans cette réponse. Sans cette ligne, l'app
+       l'ignorait et redemandait associes_ensemble — un aller-retour
+       Sheets pour des données déjà en main. */
+    if (d.ensemble && !Moi.ensemble) Moi.ensemble = d.ensemble;
+    Moi.vue = 'ensemble';
+    return ongletEnsemble();
+  }
+
+  var m = d.moi;
+  var h = '';
+
+  h += '<div class="carte" style="background:linear-gradient(160deg,#6E3A62,#5B2D4F);color:#fff">' +
+    '<div style="opacity:.85;font-size:13px">Mon compte courant</div>' +
+    '<div style="font-size:30px;font-weight:800;margin:4px 0 2px">' + htg2(m.solde_gdes) + '</div>' +
+    '<div style="opacity:.8;font-size:13px">' + usd(m.solde_usd) + '</div>' +
+  '</div>';
+
+  /* Ce qu'il peut RÉELLEMENT retirer aujourd'hui, annoncé avant le
+     guichet et non pas découvert au guichet. Un compte courant est une
+     dette de l'entreprise, pas un portefeuille : le montant y figure
+     même quand l'argent est parti en stock ou en loyer. */
+  if (m.limite_par_la_caisse) {
+    h += blocRiche('Retirable aujourd\'hui : <b>' + htg2(m.disponible_maintenant_gdes) +
+              '</b>. Le reste t\'est dû, mais la caisse ne le contient pas en ce ' +
+              'moment — il est parti en stock ou en dépenses.', 'attention', '💵');
+  } else if (m.solde_gdes > 0) {
+    h += bloc('La caisse couvre ton solde : tu peux demander jusqu\'à ' +
+              htg2(m.disponible_maintenant_gdes) + '.', 'info', '💵');
+  }
+
+  h += '<div class="titre-section">D\'où vient ce chiffre</div>';
+  h += '<div class="carte">' +
+    ligneCompte('Solde d\'ouverture', m.solde_ouverture_gdes) +
+    ligneCompte('Apports en espèces', m.apports_cash_gdes) +
+    (m.apports_nature_gdes ? ligneCompte('Apports en nature', m.apports_nature_gdes) : '') +
+    (m.rachats_gdes ? ligneCompte('Parts rachetées', m.rachats_gdes) : '') +
+    (m.cessions_gdes ? ligneCompte('Parts cédées', -m.cessions_gdes) : '') +
+    ligneCompte('Ma part du bénéfice', m.part_profit_gdes) +
+    (m.correction_exercice_gdes
+      ? ligneCompte('Correction d\'exercice antérieur', -m.correction_exercice_gdes) : '') +
+    ligneCompte('Retraits', -m.retraits_gdes) +
+    '<div class="total gros"><span class="l">Solde</span><span>' +
+      htg2(m.solde_gdes) + '</span></div>' +
+  '</div>';
+
+  if (m.correction_exercice_gdes) {
+    h += bloc('La correction d\'exercice antérieur vient d\'un écart hérité des ' +
+              'clôtures de l\'ancienne application, tranché en réunion des associés' +
+              (d.contexte.correction_exercice_date
+                ? ' et passé le ' + dateCourte(d.contexte.correction_exercice_date) : '') +
+              '. Elle a été répartie au prorata des parts.', 'info', 'ℹ️');
+  }
+
+  h += '<div class="titre-section">Mon financement</div>';
+  h += '<div class="carte">' +
+    ligneTexte('Ma part du capital', pct(m.part_pourcentage)) +
+    ligneTexte('Part statutaire', pct(m.part_statutaire)) +
+    ligneCompte('Capital déjà versé', m.capital_verse_gdes) +
+    (m.cible_gdes ? ligneCompte('Cible', m.cible_gdes) : '') +
+    (m.reste_a_verser_gdes > 0
+      ? ligneCompte('Reste à verser', m.reste_a_verser_gdes) : '') +
+    (m.taux_atteinte_pct !== undefined
+      ? ligneTexte('Atteinte', pct(m.taux_atteinte_pct) +
+          (m.a_jour ? ' — à jour' : '')) : '') +
+  '</div>';
+
+  h += '<div class="carte" style="background:var(--fond)">' +
+    '<div style="font-size:12.5px;color:var(--doux);line-height:1.5">' +
+    'Clé de répartition en vigueur : <b>' + e(d.contexte.mode_repartition || '—') +
+    '</b>. Bénéfice de la période pour l\'entreprise : <b>' +
+    htg2(d.contexte.profit_gdes) + '</b>, réparti entre ' +
+    d.contexte.nb_associes + ' associés.' +
+    '</div></div>';
+
+  if (d.peut_voir_ensemble) {
+    h += '<button class="btn vide" onclick="basculerEnsemble()">' +
+         '👥 Voir tous les comptes</button>';
+  }
+
+  poser(h);
+}
+
+function ligneCompte(nom, v) {
+  var n = Number(v) || 0;
+  return '<div class="total"><span class="l">' + nom + '</span><span style="color:' +
+    (n < 0 ? 'var(--rouge)' : 'inherit') + '">' +
+    (n < 0 ? '−' : '') + htg2(Math.abs(n)) + '</span></div>';
+}
+
+function ligneTexte(nom, v) {
+  return '<div class="total"><span class="l">' + nom + '</span><span>' + v + '</span></div>';
+}
+
+// ── Onglet 2 : mes mouvements ──────────────────────────────────────
+
+function ongletMesMouvements() {
+  if (!Moi.data) { poser(chargement('Lecture…')); chargerMonCompte(rendreOnglet); return; }
+  if (Moi.data.mode === 'ensemble') return ongletEnsemble();
+
+  var mv = Moi.data.mouvements || [];
+  if (!mv.length) {
+    poser(vide('📭', 'Aucun mouvement enregistré sur ton compte.'));
+    return;
+  }
+
+  var h = '<div class="titre-section">' + mv.length + ' mouvement' +
+          (mv.length > 1 ? 's' : '') + '</div>';
+
+  h += mv.map(function (x) {
+    /* Un retrait sort de la caisse, un apport y entre : la couleur le
+       dit avant qu'on lise le libellé. */
+    var sortie = /retrait|cession/i.test(x.type);
+    return '<div class="carte">' +
+      '<div style="display:flex;justify-content:space-between;gap:10px">' +
+        '<div><div style="font-weight:700">' + e(x.type) + '</div>' +
+        '<div style="color:var(--doux);font-size:12.5px;margin-top:2px">' +
+          dateCourte(x.date) +
+          (x.mode_paiement ? ' · ' + e(x.mode_paiement) : '') +
+          (x.reference ? ' · ' + e(x.reference) : '') + '</div>' +
+        (x.note ? '<div style="color:var(--doux);font-size:12px;margin-top:4px">' +
+                  e(x.note) + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:right;flex:none">' +
+          '<div style="font-weight:800;color:' +
+            (sortie ? 'var(--rouge)' : 'var(--vert)') + '">' +
+            (sortie ? '−' : '+') + htg2(x.montant_gdes) + '</div>' +
+          '<div style="color:var(--doux);font-size:11.5px">' + usd(x.montant_usd) + '</div>' +
+        '</div>' +
+      '</div></div>';
+  }).join('');
+
+  poser(h);
+}
+
+// ── Onglet 3 : mes parts ───────────────────────────────────────────
+
+function ongletMesParts() {
+  if (!Moi.data) { poser(chargement('Lecture…')); chargerMonCompte(rendreOnglet); return; }
+  if (Moi.data.mode === 'ensemble') return ongletEnsemble();
+
+  var m = Moi.data.moi;
+  var v = m.vesting;
+
+  if (!v) {
+    poser(bloc('Aucun calendrier d\'acquisition n\'est enregistré pour toi.',
+               'info', '📄'));
+    return;
+  }
+
+  var h = '';
+
+  h += '<div class="stats" style="margin-bottom:14px">' +
+    '<div class="stat"><div class="v">' + pct(m.part_pourcentage) + '</div>' +
+      '<div class="l">ma part</div></div>' +
+    '<div class="stat"><div class="v">' + pct(v.acquis_a_ce_jour_pct) + '</div>' +
+      '<div class="l">déjà acquis</div></div>' +
+    '<div class="stat"><div class="v">' + v.mois_restants + '</div>' +
+      '<div class="l">mois restants</div></div>' +
+  '</div>';
+
+  if (v.en_titres) {
+    h += '<div class="carte">' +
+      ligneTexte('Titres attribués', n0(v.titres_attribues)) +
+      ligneTexte('Titres déjà acquis', n0(v.titres_acquis)) +
+      ligneTexte('Acquisition mensuelle', n0(v.titres_par_mois) + ' titres') +
+    '</div>';
+  }
+
+  /* Une part ACQUISE est déjà à toi : il n'y a rien à réclamer, et le
+     terme du vesting ne transfère rien — il signifie seulement que
+     tout est acquis. Ce que ça ne donne pas, c'est de l'argent : ça se
+     dit ici plutôt que de se découvrir le jour où on demande. */
+  h += blocRiche('Une part acquise est <b>déjà à toi</b> : si tu pars demain, tu la ' +
+            'gardes. Ce qui reste à acquérir, non. En revanche une part ne se ' +
+            'transforme pas en argent quand on veut — c\'est ton compte courant ' +
+            'qui se retire, pas tes parts.', 'info', '🔑');
+
+  h += '<div class="titre-section">Mon calendrier</div>';
+  h += '<div class="carte">' +
+    ligneTexte('Entrée', dateCourte(m.date_entree)) +
+    ligneTexte('Fin du cliff', dateCourte(v.date_cliff)) +
+    ligneTexte('Terme', dateCourte(v.date_terme)) +
+    ligneTexte('Mois écoulés', v.mois_ecoules + ' / ' +
+               (v.mois_ecoules + v.mois_restants)) +
+    (v.date_prochain_versement
+      ? ligneTexte('Prochaine acquisition',
+          dateCourte(v.date_prochain_versement) + ' · +' + pct(v.prochain_versement_pct))
+      : ligneTexte('Prochaine acquisition', 'terminée')) +
+  '</div>';
+
+  if (v.jalons && v.jalons.length) {
+    h += '<div class="carte">' +
+      '<div style="font-weight:800;margin-bottom:8px">Jalons</div>' +
+      v.jalons.map(function (j) {
+        var passe = j.date <= aujourdhui();
+        return '<div class="total" style="' + (passe ? 'opacity:.55' : '') + '">' +
+          '<span class="l">' + dateCourte(j.date) + '</span>' +
+          '<span>' + pct(j.acquis_pct !== undefined ? j.acquis_pct : j.pct) + '</span></div>';
+      }).join('') +
+    '</div>';
+  }
+
+  /* Le pourcentage affiché n'est pas une promesse : l'entrée d'un
+     associé dilue tout le monde, y compris la part déjà acquise. Le
+     taire reviendrait à annoncer un terme qu'on ne tiendra pas. */
+  h += blocRiche('Ce calendrier vaut <b>à capital constant</b>. L\'entrée d\'un nouvel ' +
+            'associé réduit la part de chacun, y compris celle déjà acquise — ' +
+            'le nombre de titres, lui, ne bouge pas.', 'attention', '⚠️');
+
+  poser(h);
+}
+
+// ── La vue d'ensemble, pour qui en a le droit ──────────────────────
+
+function basculerEnsemble() {
+  Moi.vue = 'ensemble';
+  poser(chargement('Lecture des comptes…'));
+  api('associes_ensemble').then(function (d) {
+    Moi.ensemble = d;
+    /* dessiner() et non ongletEnsemble() : le titre de l'en-tête dépend
+       de Moi.vue, et poser() ne repeint que le contenu. */
+    dessiner();
+  }).catch(function (err) { poser(bloc(err.message, 'ko', '🔒')); });
+}
+
+function ongletEnsemble() {
+  if (!Moi.ensemble) {
+    poser(chargement('Lecture des comptes…'));
+    api('associes_ensemble').then(function (d) {
+      Moi.ensemble = d; ongletEnsemble();
+    }).catch(function (err) { poser(bloc(err.message, 'ko', '🔒')); });
+    return;
+  }
+
+  var d = Moi.ensemble;
+  var h = '';
+
+  h += '<div class="stats" style="margin-bottom:14px">' +
+    '<div class="stat"><div class="v">' + court(d.solde_associes_gdes) + '</div>' +
+      '<div class="l">dû aux associés</div></div>' +
+    '<div class="stat"><div class="v">' + court(d.tresorerie_gdes) + '</div>' +
+      '<div class="l">en caisse</div></div>' +
+    '<div class="stat"><div class="v">' + court(d.profit_gdes) + '</div>' +
+      '<div class="l">bénéfice</div></div>' +
+  '</div>';
+
+  /* Ce que doit l'entreprise face à ce qu'elle a. Si les comptes
+     courants dépassent la caisse, tout le monde ne peut pas être
+     remboursé en même temps — mieux vaut le lire ici qu'au guichet. */
+  if (d.solde_associes_gdes > d.tresorerie_gdes) {
+    h += bloc('Les comptes courants (' + htg2(d.solde_associes_gdes) + ') dépassent ' +
+              'la caisse (' + htg2(d.tresorerie_gdes) + '). C\'est normal — l\'argent ' +
+              'travaille en stock et en dépenses — mais tous les associés ne ' +
+              'peuvent pas être remboursés en même temps.', 'attention', '⚖️');
+  }
+
+  h += '<div class="titre-section">Les comptes</div>';
+  h += (d.associes || []).map(function (a) {
+    return '<div class="carte">' +
+      '<div style="display:flex;justify-content:space-between;gap:10px">' +
+        '<div><div style="font-weight:800">' + e(a.nom) + '</div>' +
+        '<div style="color:var(--doux);font-size:12.5px;margin-top:2px">' +
+          pct(a.part_pourcentage) + ' du capital' +
+          (a.titres_attribues
+            ? ' · ' + n0(a.titres_acquis) + ' / ' + n0(a.titres_attribues) + ' titres acquis'
+            : '') +
+        '</div></div>' +
+        '<div style="text-align:right;flex:none">' +
+          '<div style="font-weight:800;font-size:17px">' + htg2(a.solde_gdes) + '</div>' +
+          '<div style="color:var(--doux);font-size:11.5px">bénéfice ' +
+            htg2(a.part_profit_gdes) + '</div>' +
+        '</div>' +
+      '</div></div>';
+  }).join('');
+
+  if (Moi.data && Moi.data.mode === 'personnel') {
+    h += '<button class="btn vide" onclick="Moi.vue=\'perso\';dessiner()">' +
+         '← Revenir à mon compte</button>';
+  }
+
+  poser(h);
+}
+
+(function demarrer() {
+  Per.ref = aujourdhui();
+
+  try {
+    var h = (location.hash || '').replace('#', '');
+    if (h && TOUS_ONGLETS.some(function (o) { return o.id === h; })) Etat.onglet = h;
+    history.replaceState({ onglet: Etat.onglet }, '', '#' + Etat.onglet);
+  } catch (e2) {}
+
+  if (Etat.url && Etat.token) {
+    document.getElementById('app').innerHTML =
+      '<header class="entete"><h1>Flashipping<span class="sous">Ouverture…' +
+      '</span></h1></header><main>' + chargement() + '</main>';
+    verifierVersion();
+    chargerReferentiels().then(dessiner).catch(function (err) {
+      if (/Session|Jeton/i.test(err.message)) { deconnecter(); return; }
+      toast(err.message, 'ko'); dessiner();
+    });
+  } else {
+    dessiner();
+  }
+})();
+</script>
+</body>
+</html>
