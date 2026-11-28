@@ -429,27 +429,7 @@ var Etat = {
 
 /* Les noms de période sont ceux du serveur (bornes_). « mois » au lieu
    de « mensuel » tombe dans le défaut et renvoie l'année entière. */
-var PERIODES = [
-  { id: 'journalier',   nom: 'Jour' },
-  { id: 'hebdomadaire', nom: 'Semaine' },
-  { id: 'mensuel',      nom: 'Mois' },
-  { id: 'trimestriel',  nom: 'Trimestre' },
-  { id: 'semestriel',   nom: 'Semestre' },
-  { id: 'annuel',       nom: 'Année' }
-];
 
-var Per = { type: 'mensuel', ref: '', agence: '',
-            data: null, err: null, enCours: false };
-
-var METRIQUES = [
-  { id: 'colis_livres',     nom: 'Colis livrés',  fmt: 'nb',  couleur: 'var(--or)' },
-  { id: 'colis_recus',      nom: 'Colis reçus',   fmt: 'nb',  couleur: 'var(--bleu)' },
-  { id: 'livres_lb',        nom: 'Livres',        fmt: 'lb',  couleur: 'var(--or-fonce)' },
-  { id: 'revenus_gdes',     nom: 'Revenus',       fmt: 'htg', couleur: 'var(--vert)' },
-  { id: 'resultat_gdes',    nom: 'Résultat',      fmt: 'htg', couleur: 'var(--marine)' },
-  { id: 'clients_actifs',   nom: 'Clients servis', fmt: 'nb', couleur: 'var(--orange)' },
-  { id: 'clients_nouveaux', nom: 'Nouvelles fiches', fmt: 'nb', couleur: 'var(--or)' }
-];
 
 var GRANULARITES = [
   { id: '',        nom: 'Auto' },
@@ -459,8 +439,6 @@ var GRANULARITES = [
   { id: 'annee',   nom: 'Année' }
 ];
 
-var Evo = { metrique: 'colis_livres', gran: '', debut: '', fin: '',
-            data: null, err: null };
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -622,56 +600,6 @@ function chargement(t) {
 function vide(ic, t) {
   return '<div class="vide"><div class="gros">' + ic + '</div>' + e(t) + '</div>';
 }
-
-function nomPeriode(id) {
-  var p = PERIODES.filter(function (x) { return x.id === id; })[0];
-  return p ? p.nom : id;
-}
-
-/**
- * Déplace la période de référence d'un cran.
- *
- * On ancre au 1er du mois avant toute arithmétique de mois : partir du
- * 31 octobre et retirer un mois donne le 1er octobre en passant par le
- * 31 septembre, qui n'existe pas et que le navigateur traduit en 1er
- * octobre — on sauterait donc un mois sur deux. Le serveur normalise
- * ensuite la borne exacte ; il suffit d'atterrir dans la bonne période.
- */
-function decaler(sens) {
-  var d = jourLocal_(Per.ref || aujourdhui());
-  if (isNaN(d)) d = new Date();
-
-  if (Per.type === 'journalier')        d.setDate(d.getDate() + sens);
-  else if (Per.type === 'hebdomadaire') d.setDate(d.getDate() + sens * 7);
-  else if (Per.type === 'annuel')       { d.setMonth(0, 1);
-                                          d.setFullYear(d.getFullYear() + sens); }
-  else {
-    var pas = Per.type === 'trimestriel' ? 3 : Per.type === 'semestriel' ? 6 : 1;
-    d.setDate(1);
-    d.setMonth(d.getMonth() + sens * pas);
-  }
-
-  Per.ref = ymdLocal_(d);
-  chargerStats();
-}
-
-/**
- * Les périodes futures n'ont rien à montrer : la flèche s'éteint.
- *
- * Le test porte sur la FIN de la période chargée, pas sur la date de
- * référence. Comparer la référence laissait avancer d'un cran de trop :
- * revenu sur septembre puis repassé en avant, la référence devenait le
- * 1er octobre — antérieure à aujourd'hui, donc la flèche restait
- * active et ouvrait novembre, vide par construction.
- */
-function periodeFuture() {
-  if (Per.data && Per.data.periode && Per.data.periode.fin) {
-    return String(Per.data.periode.fin) >= aujourdhui();
-  }
-  var d = jourLocal_(Per.ref || aujourdhui());
-  return !isNaN(d) && ymdLocal_(d) >= aujourdhui();
-}
-
 
 // ═══════════════════════════════════════════════════════════════════
 //  SQUELETTE
@@ -950,8 +878,8 @@ function deconnecter() {
      changer de personne, et retaper son numéro chaque soir
      n'ajoute aucune sécurité — le code, lui, est redemandé. */
   S.effacer(CLE_TOKEN); S.effacer(CLE_USER);
-  Etat.token = ''; Etat.user = null; Etat.onglet = 'tableau';
-  Per.data = null; Evo.data = null;
+  Etat.token = ''; Etat.user = null; Etat.onglet = 'compte';
+  Moi = { data: null, ensemble: null, vue: 'perso' };
   dessiner();
 }
 
@@ -1293,8 +1221,207 @@ function ongletEnsemble() {
   poser(h);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  VERSION DÉPLOYÉE
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Le code déployé dans Apps Script n'est pas forcément celui qu'attend
+ * cette page : un fichier .gs oublié, ou un déploiement refait en
+ * « mise à jour » au lieu de « nouvelle version », donne des symptômes
+ * incompréhensibles. Cette vérification en fait une phrase claire.
+ */
+var VERSION_ATTENDUE = '2026-11-28.1';
+
+function verifierVersion() {
+  return api('diag').then(function (d) {
+    var dep = String(d.version_code || '');
+    Etat.versionBackend = dep || '(ancienne)';
+    Etat.versionOk = (dep === VERSION_ATTENDUE);
+    Etat.portailPresent = !(d.modules && d.modules.portail_associes === false);
+    return Etat.versionOk;
+  }).catch(function () { return null; });
+}
+
+function blocVersion() {
+  if (Etat.versionOk === undefined) {
+    verifierVersion().then(function (r) {
+      if (r !== null && document.getElementById('voile')) ouvrirReglages();
+    });
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Vérification de la version…</div>';
+  }
+  if (Etat.versionOk) {
+    return '<div style="text-align:center;color:var(--doux);font-size:11.5px;' +
+      'margin-top:14px">Code déployé ' + e(Etat.versionBackend) + ' — à jour</div>';
+  }
+  return bloc('Le code déployé dans Apps Script (' + Etat.versionBackend + ') ne ' +
+    'correspond pas à cette application (' + VERSION_ATTENDUE + '). Il manque un ' +
+    'fichier .gs, ou le déploiement n\'a pas été refait en « Nouvelle version ». ' +
+    'Certaines fonctions ne marcheront pas.', 'attention', '⚠️');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  RÉGLAGES
+// ═══════════════════════════════════════════════════════════════════
+
+function ouvrirReglages() {
+  var u = Etat.user || {};
+  var estAssocie = !!(Moi.data && Moi.data.mode === 'personnel');
+
+  modale('Réglages',
+    '<div class="carte serree" style="margin-bottom:12px">' +
+      '<div style="font-weight:800;font-size:16px">' + e(u.nom) + '</div>' +
+      '<div style="color:var(--doux);font-size:13px;margin-top:3px">' +
+        e(u.user_id) + ' · ' + e(u.role_libelle || u.role) + '</div>' +
+      '<div style="color:var(--doux);font-size:12.5px;margin-top:6px">' +
+        (estAssocie
+          ? 'Ce compte est rattaché à une fiche d\'associé.'
+          : 'Ce compte n\'est rattaché à aucune fiche d\'associé.') +
+      '</div></div>' +
+
+    (Moi.data && Moi.data.peut_voir_ensemble
+      ? '<div class="carte serree" style="margin-bottom:12px">' +
+        '<div style="font-size:12.5px;color:var(--doux);line-height:1.45">' +
+        'Tu peux voir les comptes de tous les associés. Les autres ne ' +
+        'voient que le leur.</div></div>'
+      : '') +
+
+    '<button class="btn vide" onclick="rafraichirRef()">' +
+      '🔄 Recharger les référentiels</button>' +
+    '<button class="btn vide" onclick="changerUrl()">' +
+      '🔗 Changer l\'URL de l\'API</button>' +
+    '<button class="btn rouge" onclick="fermerModale();deconnecter()">' +
+      'Se déconnecter</button>' +
+    blocVersion());
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MODALE
+// ═══════════════════════════════════════════════════════════════════
+
+function rafraichirRef() {
+  var c = document.getElementById('corps-modale');
+  if (c) c.innerHTML = chargement('Rechargement…');
+  chargerReferentiels().then(function () {
+    toast('Référentiels à jour.', 'ok');
+    Per.data = null; Evo.data = null;
+    fermerModale();
+    dessiner();
+  }).catch(function (err) {
+    if (c) c.innerHTML = bloc(err.message, 'ko', '❌');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  MODALE ET DÉMARRAGE
+// ═══════════════════════════════════════════════════════════════════
+
+function modale(titre, html) {
+  var dejaOuverte = Nav.modaleOuverte;
+  fermerModaleDom();
+
+  /* Le clavier doit disparaître AVANT que la fiche s'ouvre.
+
+     Un élément en position:fixed se cale sur la fenêtre de mise en
+     page, pas sur ce qu'il reste de visible. Clavier ouvert, le
+     panneau — collé en bas — se range donc DERRIÈRE le clavier : rien
+     ne bouge à l'écran, et le bouton passe pour mort. L'onglet Clients
+     donne le focus au champ de recherche en arrivant, donc le clavier
+     est ouvert précisément là où on va chercher l'engrenage. */
+  try {
+    var actif = document.activeElement;
+    if (actif && actif !== document.body && typeof actif.blur === 'function') {
+      actif.blur();
+    }
+  } catch (eb) {}
+  var v = document.createElement('div');
+  v.className = 'voile'; v.id = 'voile';
+  v.innerHTML = '<div class="modale" onclick="event.stopPropagation()">' +
+    '<div class="poignee"></div><h3>' + e(titre) + '</h3>' +
+    '<div id="corps-modale">' + html + '</div></div>';
+  /* Le geste qui OUVRE ne doit pas refermer.
+
+     Sur mobile, le clic de synthèse qui suit le doigt est remis à
+     l'élément présent sous le point touché AU MOMENT où il part —
+     c'est-à-dire au voile qu'on vient d'insérer. Et comme le panneau
+     est collé en bas, tout le haut de l'écran est du voile : un bouton
+     d'en-tête refermait donc la fiche dans la même fraction de
+     seconde. Symptôme vu par l'agent : « je clique, rien ne se passe ».
+
+     On ignore les clics sur le voile le temps que ce fantôme puisse
+     encore arriver. Fermer au doigt reste possible juste après. */
+  var ouvertA = Date.now();
+  v.onclick = function () {
+    if (Date.now() - ouvertA < 400) return;
+    fermerModale();
+  };
+  document.body.appendChild(v);
+  document.body.style.overflow = 'hidden';
+  Nav.modaleOuverte = true;
+  if (!dejaOuverte) { try { history.pushState({ modale: true }, ''); } catch (e2) {} }
+}
+
+function majModale(titre, html) {
+  var c = document.getElementById('corps-modale');
+  var t = document.querySelector('.modale h3');
+  if (c) { c.innerHTML = html; if (t) t.textContent = titre; }
+  else modale(titre, html);
+}
+
+/** Ferme sans toucher à l'historique — réservé à popstate. */
+function fermerModaleDom() {
+  var v = document.getElementById('voile');
+  if (v) v.remove();
+  document.body.style.overflow = '';
+  Nav.modaleOuverte = false;
+}
+
+function fermerModale() {
+  if (Nav.modaleOuverte) {
+    Nav.modaleOuverte = false;
+    fermerModaleDom();
+    try { history.back(); } catch (e2) {}
+    return;
+  }
+  fermerModaleDom();
+}
+
+window.addEventListener('online',  function () { majBandeau(); toast('Réseau revenu.', 'ok'); });
+window.addEventListener('offline', function () { majBandeau(); toast('Réseau perdu.', 'ko'); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+
+  /* ── Une mise à jour ne doit pas attendre la visite suivante ──
+   *
+   * Le service worker sert la page depuis le cache puis la rafraîchit
+   * en arrière-plan : l'application s'ouvre hors ligne, mais le code
+   * neuf n'apparaît qu'à l'ouverture d'APRÈS. Personne ne le sait.
+   * Le 1er novembre 2026, un bouton livré la veille restait invisible
+   * pour cette seule raison, et on a cherché le défaut dans les droits.
+   *
+   * Le nouveau worker prend la main tout de suite (skipWaiting puis
+   * clients.claim) : quand il la prend, la page affichée est périmée
+   * et on la recharge. Pas à la première installation — là, il n'y a
+   * rien de périmé à remplacer, et recharger ferait clignoter un
+   * premier lancement sans raison.
+   */
+  var avaitUnWorker = !!navigator.serviceWorker.controller;
+  var rechargeFaite = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (!avaitUnWorker || rechargeFaite) return;
+    rechargeFaite = true;
+    location.reload();
+  });
+}
+
 (function demarrer() {
-  Per.ref = aujourdhui();
 
   try {
     var h = (location.hash || '').replace('#', '');
