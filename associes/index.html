@@ -1081,9 +1081,19 @@ function ongletMesParts() {
   var m = Moi.data.moi;
   var v = m.vesting;
 
+  /* Même sans calendrier, la part est connue : l'abandonner ici
+     donnait un écran vide à qui voulait justement voir ses parts. */
   if (!v) {
-    poser(bloc('Aucun calendrier d\'acquisition n\'est enregistré pour toi.',
-               'info', '📄'));
+    poser('<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v">' + pct(m.part_pourcentage) + '</div>' +
+          '<div class="l">ma part</div></div>' +
+        '<div class="stat"><div class="v">' + pct(m.part_statutaire) + '</div>' +
+          '<div class="l">part statutaire</div></div>' +
+      '</div>' +
+      bloc('Aucun calendrier d\'acquisition n\'est enregistré pour toi : ta ' +
+           'part t\'est acquise en totalité, il n\'y a rien à attendre. Si tu ' +
+           'pensais avoir un vesting, c\'est que le nombre de mois n\'est pas ' +
+           'renseigné dans ta fiche — vois avec le fondateur.', 'info', '📄'));
     return;
   }
 
