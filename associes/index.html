@@ -512,6 +512,7 @@ function usd(v) {
 /* Dans cette app des associés, un seul format d'argent : avec les
    centimes, toujours. Voir htg2 — c'est l'addition qui l'exige. */
 function htg(v) { return htg2(v); }
+function nombre0_(v) { return Number(v) || 0; }
 
 /**
  * Dans cette app, l'associé vérifie une addition : les lignes de « D'où
@@ -993,8 +994,10 @@ function ongletMonCompte() {
 
   h += '<div class="titre-section">Mon financement</div>';
   h += '<div class="carte">' +
-    ligneTexte('Ma part du capital', pct(m.part_pourcentage)) +
+    ligneTexte('Ma clé de répartition', pct(m.part_pourcentage)) +
     ligneTexte('Part statutaire', pct(m.part_statutaire)) +
+    (m.part_capital_pct !== null && m.part_capital_pct !== undefined
+      ? ligneTexte('Ma part du capital', pct(m.part_capital_pct)) : '') +
     ligneCompte('Capital déjà versé', m.capital_verse_gdes) +
     (m.cible_gdes ? ligneCompte('Cible', m.cible_gdes) : '') +
     (m.reste_a_verser_gdes > 0
@@ -1099,14 +1102,28 @@ function ongletMesParts() {
 
   var h = '';
 
+  /* Le calendrier raisonne en part du CAPITAL. Afficher ici la clé de
+     répartition du bénéfice donnait un écran qui se contredit : 45,7 %
+     en haut, un terme à 36 % en bas. */
+  var partCap = m.part_capital_pct !== null && m.part_capital_pct !== undefined
+                ? m.part_capital_pct : m.part_pourcentage;
+
   h += '<div class="stats" style="margin-bottom:14px">' +
-    '<div class="stat"><div class="v">' + pct(m.part_pourcentage) + '</div>' +
-      '<div class="l">ma part</div></div>' +
+    '<div class="stat"><div class="v">' + pct(partCap) + '</div>' +
+      '<div class="l">ma part du capital</div></div>' +
     '<div class="stat"><div class="v">' + pct(v.acquis_a_ce_jour_pct) + '</div>' +
       '<div class="l">déjà acquis</div></div>' +
     '<div class="stat"><div class="v">' + v.mois_restants + '</div>' +
       '<div class="l">mois restants</div></div>' +
   '</div>';
+
+  if (Math.abs(nombre0_(m.part_pourcentage) - nombre0_(partCap)) >= 0.05) {
+    h += bloc('Ta part du capital (' + pct(partCap) + ') n\'est pas la même ' +
+      'que ta clé de répartition du bénéfice (' + pct(m.part_pourcentage) +
+      '), qui tient compte de ton rôle et de ton financement. C\'est le ' +
+      'capital qui est repris ci-dessous ; le bénéfice se lit sur Mon compte.',
+      'info', 'ℹ️');
+  }
 
   if (v.en_titres) {
     h += '<div class="carte">' +
